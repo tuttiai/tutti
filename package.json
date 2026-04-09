@@ -1,0 +1,21 @@
+{
+  "name": "tutti-ai",
+  "private": true,
+  "description": "Tutti — multi-agent orchestration framework. All agents. All together.",
+  "workspaces": [
+    "packages/*",
+    "voices/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti"
+  },
+  "homepage": "https://tutti-ai.com"
+}
