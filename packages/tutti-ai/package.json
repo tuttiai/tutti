@@ -1,0 +1,20 @@
+{
+  "name": "tutti-ai",
+  "version": "0.2.0",
+  "description": "Tutti — multi-agent orchestration. All agents. All together.",
+  "type": "module",
+  "bin": {
+    "tutti-ai": "./bin/tutti-ai.js"
+  },
+  "dependencies": {
+    "@tuttiai/cli": "0.2.0"
+  },
+  "files": ["bin", "README.md"],
+  "license": "MIT",
+  "homepage": "https://tutti-ai.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti"
+  },
+  "keywords": ["ai", "agents", "orchestration", "multi-agent", "tutti", "cli"]
+}
