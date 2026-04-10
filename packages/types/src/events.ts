@@ -12,7 +12,9 @@ export type TuttiEvent =
   | { type: "tool:end"; agent_name: string; tool_name: string; result: ToolResult }
   | { type: "tool:error"; agent_name: string; tool_name: string; error: Error }
   | { type: "turn:start"; agent_name: string; session_id: string; turn: number }
-  | { type: "turn:end"; agent_name: string; session_id: string; turn: number };
+  | { type: "turn:end"; agent_name: string; session_id: string; turn: number }
+  | { type: "delegate:start"; from: string; to: string; task: string }
+  | { type: "delegate:end"; from: string; to: string; output: string };
 
 export type TuttiEventType = TuttiEvent["type"];
 

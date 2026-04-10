@@ -9,4 +9,6 @@ export interface ScoreConfig {
   agents: Record<string, AgentConfig>;
   provider: LLMProvider;
   default_model?: string;
+  /** Which agent is the entry point (default: "orchestrator"). */
+  entry?: string;
 }

@@ -10,6 +10,10 @@ export interface AgentConfig {
   system_prompt: string;
   voices: Voice[];
   max_turns?: number;
+  /** Agent IDs this agent can delegate to via the orchestrator. */
+  delegates?: string[];
+  /** Role in the orchestration — orchestrator receives input first. */
+  role?: "orchestrator" | "specialist";
 }
 
 export interface AgentResult {
