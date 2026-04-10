@@ -135,13 +135,14 @@ export class MyProvider implements LLMProvider {
 
 ## Writing Tests
 
-We use [vitest](https://vitest.dev/) for all tests. Tests live alongside
-source files with a `.test.ts` suffix.
+We use [vitest](https://vitest.dev/) for all tests. Tests live in a
+dedicated `tests/` directory at each package root, separate from source.
 
 ### Conventions
 
-- **Mock the LLM provider** — never make real API calls in tests. Create a
-  mock `LLMProvider` that returns canned `ChatResponse` objects.
+- **Mock the LLM provider** — never make real API calls in tests. Use the
+  shared helpers in `tests/helpers/mock-provider.ts` to build mock providers
+  and response fixtures.
 - **Use real Zod schemas** — test that tool input validation works with
   actual Zod schemas, not mocks.
 - **Test event emission** — subscribe to the `EventBus` and assert the
@@ -152,30 +153,37 @@ source files with a `.test.ts` suffix.
 ### Test structure
 
 ```
-packages/core/src/
-├── event-bus.ts
-├── event-bus.test.ts        # ← tests next to source
-├── session-store.ts
-├── session-store.test.ts
-├── agent-runner.ts
-├── agent-runner.test.ts
-├── runtime.ts
-├── runtime.test.ts
-├── define-score.ts
-└── define-score.test.ts
+packages/core/
+├── src/                         # source only — no tests here
+│   ├── event-bus.ts
+│   ├── session-store.ts
+│   ├── agent-runner.ts
+│   ├── runtime.ts
+│   └── ...
+└── tests/                       # all tests live here
+    ├── helpers/
+    │   └── mock-provider.ts     # shared mock LLM provider & fixtures
+    ├── event-bus.test.ts
+    ├── session-store.test.ts
+    ├── define-score.test.ts
+    ├── agent-runner.test.ts
+    └── runtime.test.ts
 
-packages/cli/src/commands/
-├── init.ts
-├── init.test.ts
-├── run.ts
-└── run.test.ts              # ← future
+packages/cli/
+├── src/
+│   └── commands/
+│       ├── init.ts
+│       └── run.ts
+└── tests/
+    └── commands/
+        └── init.test.ts
 ```
 
 ### Running a single test file
 
 ```bash
 cd packages/core
-npx vitest run src/event-bus.test.ts
+npx vitest run tests/event-bus.test.ts
 ```
 
 ## Security

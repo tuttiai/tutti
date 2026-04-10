@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { InMemorySessionStore } from "./session-store.js";
+import { InMemorySessionStore } from "../src/session-store.js";
 
 describe("InMemorySessionStore", () => {
   it("creates a session with a unique id", () => {

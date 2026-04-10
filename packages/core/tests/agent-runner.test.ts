@@ -1,60 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
-import { AgentRunner } from "./agent-runner.js";
-import { EventBus } from "./event-bus.js";
-import { InMemorySessionStore } from "./session-store.js";
-import type {
-  AgentConfig,
-  ChatResponse,
-  LLMProvider,
-  TuttiEvent,
-  Voice,
-} from "@tuttiai/types";
-
-function createMockProvider(
-  responses: ChatResponse[],
-): LLMProvider {
-  let callIndex = 0;
-  return {
-    chat: vi.fn(async () => {
-      const response = responses[callIndex];
-      if (!response) throw new Error("No more mock responses");
-      callIndex++;
-      return response;
-    }),
-  };
-}
-
-function textResponse(text: string): ChatResponse {
-  return {
-    id: `resp-${Math.random().toString(36).slice(2)}`,
-    content: [{ type: "text", text }],
-    stop_reason: "end_turn",
-    usage: { input_tokens: 10, output_tokens: 5 },
-  };
-}
-
-function toolUseResponse(
-  toolName: string,
-  input: unknown,
-  toolId = "tool-1",
-): ChatResponse {
-  return {
-    id: `resp-${Math.random().toString(36).slice(2)}`,
-    content: [
-      { type: "tool_use", id: toolId, name: toolName, input },
-    ],
-    stop_reason: "tool_use",
-    usage: { input_tokens: 15, output_tokens: 10 },
-  };
-}
-
-const simpleAgent: AgentConfig = {
-  name: "test-agent",
-  model: "test-model",
-  system_prompt: "You are a test agent.",
-  voices: [],
-};
+import { AgentRunner } from "../src/agent-runner.js";
+import { EventBus } from "../src/event-bus.js";
+import { InMemorySessionStore } from "../src/session-store.js";
+import {
+  createMockProvider,
+  textResponse,
+  toolUseResponse,
+  simpleAgent,
+} from "./helpers/mock-provider.js";
+import type { TuttiEvent, Voice } from "@tuttiai/types";
 
 describe("AgentRunner", () => {
   it("runs a simple single-turn conversation", async () => {
@@ -129,11 +84,6 @@ describe("AgentRunner", () => {
       ],
     };
 
-    const agentWithVoice: AgentConfig = {
-      ...simpleAgent,
-      voices: [voice],
-    };
-
     const provider = createMockProvider([
       toolUseResponse("double", { x: 21 }),
       textResponse("The answer is 42"),
@@ -142,7 +92,10 @@ describe("AgentRunner", () => {
     const sessions = new InMemorySessionStore();
     const runner = new AgentRunner(provider, events, sessions);
 
-    const result = await runner.run(agentWithVoice, "double 21");
+    const result = await runner.run(
+      { ...simpleAgent, voices: [voice] },
+      "double 21",
+    );
 
     expect(executeFn).toHaveBeenCalledOnce();
     expect(executeFn).toHaveBeenCalledWith(
@@ -191,11 +144,7 @@ describe("AgentRunner", () => {
     ]);
     const events = new EventBus();
     const sessions = new InMemorySessionStore();
-    const runner = new AgentRunner(
-      provider,
-      events,
-      sessions,
-    );
+    const runner = new AgentRunner(provider, events, sessions);
 
     const result = await runner.run(
       { ...simpleAgent, voices: [voice] },

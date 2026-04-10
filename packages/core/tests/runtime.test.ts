@@ -1,17 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
-import { TuttiRuntime } from "./runtime.js";
-import type { ChatResponse, LLMProvider, ScoreConfig } from "@tuttiai/types";
-
-function createMockProvider(text = "mock response"): LLMProvider {
-  return {
-    chat: vi.fn(async (): Promise<ChatResponse> => ({
-      id: "test-id",
-      content: [{ type: "text", text }],
-      stop_reason: "end_turn",
-      usage: { input_tokens: 10, output_tokens: 5 },
-    })),
-  };
-}
+import { describe, it, expect } from "vitest";
+import { TuttiRuntime } from "../src/runtime.js";
+import {
+  createSingleResponseProvider,
+  textResponse,
+  createMockProvider,
+} from "./helpers/mock-provider.js";
+import type { ScoreConfig, LLMProvider } from "@tuttiai/types";
 
 function createScore(
   provider: LLMProvider,
@@ -34,7 +28,7 @@ function createScore(
 
 describe("TuttiRuntime", () => {
   it("runs a named agent and returns the result", async () => {
-    const provider = createMockProvider("Hello!");
+    const provider = createSingleResponseProvider("Hello!");
     const runtime = new TuttiRuntime(createScore(provider));
 
     const result = await runtime.run("assistant", "Hi");
@@ -46,7 +40,7 @@ describe("TuttiRuntime", () => {
 
   it("throws for unknown agent names", async () => {
     const runtime = new TuttiRuntime(
-      createScore(createMockProvider()),
+      createScore(createSingleResponseProvider()),
     );
 
     await expect(
@@ -55,7 +49,7 @@ describe("TuttiRuntime", () => {
   });
 
   it("lists available agents in error message", async () => {
-    const provider = createMockProvider();
+    const provider = createSingleResponseProvider();
     const score = createScore(provider, {
       agents: {
         alpha: {
@@ -80,7 +74,7 @@ describe("TuttiRuntime", () => {
   });
 
   it("applies default_model when agent has no model", async () => {
-    const provider = createMockProvider();
+    const provider = createSingleResponseProvider();
     const score = createScore(provider, {
       default_model: "default-model-123",
       agents: {
@@ -88,7 +82,6 @@ describe("TuttiRuntime", () => {
           name: "bot",
           system_prompt: "hi",
           voices: [],
-          // no model set
         },
       },
     });
@@ -102,7 +95,7 @@ describe("TuttiRuntime", () => {
   });
 
   it("falls back to claude-sonnet-4-20250514 when no model is set anywhere", async () => {
-    const provider = createMockProvider();
+    const provider = createSingleResponseProvider();
     const score: ScoreConfig = {
       provider,
       agents: {
@@ -123,7 +116,10 @@ describe("TuttiRuntime", () => {
   });
 
   it("continues a session across multiple runs", async () => {
-    const provider = createMockProvider();
+    const provider = createMockProvider([
+      textResponse("first"),
+      textResponse("second"),
+    ]);
     const runtime = new TuttiRuntime(createScore(provider));
 
     const r1 = await runtime.run("assistant", "first");
@@ -135,7 +131,7 @@ describe("TuttiRuntime", () => {
 
   it("retrieves a session after a run", async () => {
     const runtime = new TuttiRuntime(
-      createScore(createMockProvider()),
+      createScore(createSingleResponseProvider()),
     );
 
     const result = await runtime.run("assistant", "test");
@@ -148,7 +144,7 @@ describe("TuttiRuntime", () => {
 
   it("returns undefined for unknown session", () => {
     const runtime = new TuttiRuntime(
-      createScore(createMockProvider()),
+      createScore(createSingleResponseProvider()),
     );
 
     expect(runtime.getSession("nonexistent")).toBeUndefined();
@@ -156,7 +152,7 @@ describe("TuttiRuntime", () => {
 
   it("exposes EventBus for subscribing to events", async () => {
     const runtime = new TuttiRuntime(
-      createScore(createMockProvider()),
+      createScore(createSingleResponseProvider()),
     );
 
     const events: string[] = [];

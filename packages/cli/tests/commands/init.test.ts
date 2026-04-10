@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, readFileSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 
-// We need to control process.cwd() and process.exit() for these tests.
-// Import the function under test after mocking.
 const originalCwd = process.cwd;
 const originalExit = process.exit;
 
@@ -25,7 +23,7 @@ afterEach(() => {
 
 describe("initCommand", () => {
   it("creates all expected files in the project directory", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("my-project");
 
@@ -47,7 +45,7 @@ describe("initCommand", () => {
   });
 
   it("writes valid JSON in package.json", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("json-test");
 
@@ -64,7 +62,7 @@ describe("initCommand", () => {
   });
 
   it("writes valid JSON in tsconfig.json", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("tsconfig-test");
 
@@ -76,7 +74,7 @@ describe("initCommand", () => {
   });
 
   it("writes a valid tutti.score.ts with defineScore import", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("score-test");
 
@@ -89,7 +87,7 @@ describe("initCommand", () => {
   });
 
   it("writes .env.example with ANTHROPIC_API_KEY placeholder", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("env-test");
 
@@ -100,7 +98,7 @@ describe("initCommand", () => {
   });
 
   it("writes .gitignore that excludes .env", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("git-test");
 
@@ -112,7 +110,7 @@ describe("initCommand", () => {
   });
 
   it("writes README with the project name", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("readme-test");
 
@@ -124,9 +122,8 @@ describe("initCommand", () => {
   });
 
   it("exits with code 1 if directory already exists", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
-    // Create the directory first
     mkdirSync(join(testDir, "existing-dir"));
 
     let exitCode: number | undefined;
@@ -142,15 +139,11 @@ describe("initCommand", () => {
   });
 
   it("does not create files outside the project directory", async () => {
-    const { initCommand } = await import("./init.js");
+    const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("sandboxed");
 
-    // Only the project dir should be created in testDir
-    const entries = existsSync(join(testDir, "sandboxed"));
-    expect(entries).toBe(true);
-
-    // Verify no file leaked to the parent of testDir
+    expect(existsSync(join(testDir, "sandboxed"))).toBe(true);
     expect(existsSync(join(testDir, "package.json"))).toBe(false);
     expect(existsSync(join(testDir, "tutti.score.ts"))).toBe(false);
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { EventBus } from "./event-bus.js";
+import { EventBus } from "../src/event-bus.js";
 import type { TuttiEvent } from "@tuttiai/types";
 
 describe("EventBus", () => {
