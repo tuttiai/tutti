@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Tutti CLI — scaffold and run multi-agent projects",
   "type": "module",
   "bin": {
@@ -21,7 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tuttiai/core": "^0.2.0",
+    "@tuttiai/core": "^0.3.0",
     "@tuttiai/types": "^0.2.0",
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
