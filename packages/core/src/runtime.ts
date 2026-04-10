@@ -5,15 +5,20 @@ import { InMemorySessionStore } from "./session-store.js";
 
 export class TuttiRuntime {
   readonly events: EventBus;
-  private sessions: InMemorySessionStore;
-  private runner: AgentRunner;
-  private score: ScoreConfig;
+  private _sessions: InMemorySessionStore;
+  private _runner: AgentRunner;
+  private _score: ScoreConfig;
 
   constructor(score: ScoreConfig) {
-    this.score = score;
+    this._score = score;
     this.events = new EventBus();
-    this.sessions = new InMemorySessionStore();
-    this.runner = new AgentRunner(score.provider, this.events, this.sessions);
+    this._sessions = new InMemorySessionStore();
+    this._runner = new AgentRunner(score.provider, this.events, this._sessions);
+  }
+
+  /** The score configuration this runtime was created with. */
+  get score(): ScoreConfig {
+    return this._score;
   }
 
   /**
@@ -25,9 +30,9 @@ export class TuttiRuntime {
     input: string,
     session_id?: string,
   ): Promise<AgentResult> {
-    const agent = this.score.agents[agent_name];
+    const agent = this._score.agents[agent_name];
     if (!agent) {
-      const available = Object.keys(this.score.agents).join(", ");
+      const available = Object.keys(this._score.agents).join(", ");
       throw new Error(
         `Agent "${agent_name}" not found. Available agents: ${available}`,
       );
@@ -36,13 +41,13 @@ export class TuttiRuntime {
     // Apply default model if agent doesn't specify one
     const resolvedAgent = agent.model
       ? agent
-      : { ...agent, model: this.score.default_model ?? "claude-sonnet-4-20250514" };
+      : { ...agent, model: this._score.default_model ?? "claude-sonnet-4-20250514" };
 
-    return this.runner.run(resolvedAgent, input, session_id);
+    return this._runner.run(resolvedAgent, input, session_id);
   }
 
   /** Retrieve an existing session. */
   getSession(id: string): Session | undefined {
-    return this.sessions.get(id);
+    return this._sessions.get(id);
   }
 }
