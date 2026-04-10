@@ -6,7 +6,9 @@
   "bin": {
     "tutti-ai": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -19,6 +21,7 @@
     "@tuttiai/types": "*",
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
+    "dotenv": "^17.4.1",
     "enquirer": "^2.4.0",
     "ora": "^8.2.0"
   },
