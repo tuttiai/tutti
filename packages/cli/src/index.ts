@@ -4,6 +4,7 @@ config();
 import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
+import { addCommand } from "./commands/add.js";
 
 const program = new Command();
 
@@ -24,6 +25,13 @@ program
   .description("Run a Tutti score interactively")
   .action(async (score?: string) => {
     await runCommand(score);
+  });
+
+program
+  .command("add <voice>")
+  .description("Add a voice to your project")
+  .action(async (voice: string) => {
+    await addCommand(voice);
   });
 
 program.parse();
