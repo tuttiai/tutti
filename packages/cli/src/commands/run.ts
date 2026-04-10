@@ -1,0 +1,104 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
+import chalk from "chalk";
+import ora from "ora";
+import { TuttiRuntime, ScoreLoader } from "@tuttiai/core";
+
+export async function runCommand(scorePath?: string): Promise<void> {
+  const file = resolve(scorePath ?? "./tutti.score.ts");
+
+  if (!existsSync(file)) {
+    console.error(chalk.red(`Score file not found: ${file}`));
+    console.error(
+      chalk.dim('Run "tutti-ai init" to create a new project.'),
+    );
+    process.exit(1);
+  }
+
+  let score;
+  try {
+    score = await ScoreLoader.load(file);
+  } catch (err) {
+    console.error(
+      chalk.red(
+        `Failed to load score: ${err instanceof Error ? err.message : err}`,
+      ),
+    );
+    process.exit(1);
+  }
+
+  const runtime = new TuttiRuntime(score);
+  const spinner = ora({ color: "cyan" });
+
+  // Event-based execution trace
+  runtime.events.on("agent:start", (e) => {
+    console.log(chalk.cyan(`Running agent: ${e.agent_name}`));
+  });
+
+  runtime.events.on("llm:request", () => {
+    spinner.start("Thinking...");
+  });
+
+  runtime.events.on("llm:response", () => {
+    spinner.stop();
+  });
+
+  runtime.events.on("tool:start", (e) => {
+    console.log(chalk.dim(`  Using tool: ${e.tool_name}`));
+  });
+
+  runtime.events.on("tool:end", (e) => {
+    console.log(chalk.dim(`  Done: ${e.tool_name}`));
+  });
+
+  runtime.events.on("tool:error", (e) => {
+    console.log(chalk.red(`  Error in tool: ${e.tool_name}`));
+  });
+
+  // REPL
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  console.log(chalk.dim('Tutti REPL — type "exit" to quit\n'));
+
+  let sessionId: string | undefined;
+
+  // Handle Ctrl+C
+  process.on("SIGINT", () => {
+    console.log(chalk.dim("\nGoodbye!"));
+    rl.close();
+    process.exit(0);
+  });
+
+  try {
+    while (true) {
+      const input = await rl.question(chalk.cyan("> "));
+      const trimmed = input.trim();
+
+      if (!trimmed) continue;
+      if (trimmed === "exit" || trimmed === "quit") break;
+
+      try {
+        const result = await runtime.run("assistant", trimmed, sessionId);
+        sessionId = result.session_id;
+        console.log(`\n${result.output}\n`);
+      } catch (err) {
+        spinner.stop();
+        console.error(
+          chalk.red(
+            `Error: ${err instanceof Error ? err.message : err}`,
+          ),
+        );
+      }
+    }
+  } catch {
+    // readline closed
+  }
+
+  console.log(chalk.dim("Goodbye!"));
+  rl.close();
+  process.exit(0);
+}

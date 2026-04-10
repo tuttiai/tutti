@@ -1,0 +1,24 @@
+{
+  "name": "@tuttiai/cli",
+  "version": "0.2.0",
+  "description": "Tutti CLI — scaffold and run multi-agent projects",
+  "type": "module",
+  "bin": {
+    "tutti-ai": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tuttiai/core": "*",
+    "@tuttiai/types": "*",
+    "chalk": "^5.4.0",
+    "commander": "^13.1.0",
+    "enquirer": "^2.4.0",
+    "ora": "^8.2.0"
+  },
+  "license": "MIT"
+}
