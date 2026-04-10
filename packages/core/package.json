@@ -21,11 +21,13 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.21.0",
     "@tuttiai/types": "^0.2.0",
+    "openai": "^4.0.0",
     "zod": "^3.24.0",
     "zod-to-json-schema": "^3.24.0"
   },
-  "keywords": ["tutti", "ai", "agents", "orchestration", "runtime", "llm", "anthropic"],
+  "keywords": ["tutti", "ai", "agents", "orchestration", "runtime", "llm", "anthropic", "openai", "gemini"],
   "license": "MIT",
   "repository": {
     "type": "git",

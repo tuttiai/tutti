@@ -10,6 +10,10 @@ export { defineScore } from "./define-score.js";
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";
 export type { AnthropicProviderOptions } from "./providers/anthropic.js";
+export { OpenAIProvider } from "./providers/openai.js";
+export type { OpenAIProviderOptions } from "./providers/openai.js";
+export { GeminiProvider } from "./providers/gemini.js";
+export type { GeminiProviderOptions } from "./providers/gemini.js";
 
 // Re-export all types for convenience
 export type {
