@@ -1,0 +1,35 @@
+{
+  "name": "@tuttiai/playwright",
+  "version": "0.1.0",
+  "description": "Tutti voice — control a browser like a human for QA and automation",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tuttiai/types": "^0.2.0",
+    "playwright": "^1.52.0",
+    "zod": "^3.24.0"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "voices/playwright"
+  },
+  "homepage": "https://tutti-ai.com",
+  "keywords": ["tutti", "ai", "agents", "playwright", "browser", "qa", "testing", "automation"]
+}
