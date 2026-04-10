@@ -106,15 +106,25 @@ console.log(result.output);
 
 ## Packages
 
-| Package                          | Description                          |
-| -------------------------------- | ------------------------------------ |
+| Package                              | Description                          |
+| ------------------------------------ | ------------------------------------ |
 | [`@tuttiai/types`](packages/types)   | All interfaces and type definitions  |
 | [`@tuttiai/core`](packages/core)     | Runtime, agent loop, providers       |
-| `@tuttiai/cli` *(v0.2)*              | CLI binary (`tutti-ai`)              |
+| [`@tuttiai/cli`](packages/cli)       | CLI binary (`tutti-ai`)              |
 
 ## Getting Started
 
-### Install
+### Quick Start with the CLI
+
+```bash
+npx @tuttiai/cli init my-project
+cd my-project
+cp .env.example .env       # add your ANTHROPIC_API_KEY
+npm install
+npx tutti-ai run
+```
+
+### Install as a Library
 
 ```bash
 npm install @tuttiai/core
@@ -188,6 +198,27 @@ tutti.events.on("tool:start", (e) => {
 tutti.events.onAny((e) => console.log(e.type, e));
 ```
 
+## Testing
+
+Tutti has comprehensive test coverage across all packages. Tests are written
+with [vitest](https://vitest.dev/) and run in parallel via Turborepo.
+
+```bash
+npm test                   # run all tests
+npm test -- --filter=core  # run only core tests
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on writing tests.
+
+## Security
+
+We take security seriously. See [SECURITY.md](./SECURITY.md) for:
+
+- How to report vulnerabilities (privately)
+- API key handling practices
+- Tool input validation (Zod)
+- Score file trust model
+
 ## Roadmap
 
 - [x] Core runtime (`TuttiRuntime`, `AgentRunner`)
@@ -195,7 +226,8 @@ tutti.events.onAny((e) => console.log(e.type, e));
 - [x] Anthropic provider
 - [x] EventBus observability
 - [x] `defineScore()` typed config
-- [ ] CLI (`tutti-ai init`, `tutti-ai run`)
+- [x] CLI (`tutti-ai init`, `tutti-ai run`)
+- [x] Test suite (52+ tests across core and CLI)
 - [ ] Voice interface spec & validation
 - [ ] First-party voices (Notion, GitHub, Playwright, Slack)
 - [ ] Multi-agent sections (agent-to-agent orchestration)

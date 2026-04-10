@@ -39,7 +39,10 @@ npm run typecheck    # strict TypeScript check across all packages
 ### Test
 
 ```bash
-npm run test         # runs vitest across all packages
+npm test                         # run all tests across all packages
+npm test -- --filter=core        # run only @tuttiai/core tests
+npm test -- --filter=cli         # run only @tuttiai/cli tests
+cd packages/core && npx vitest   # watch mode for core
 ```
 
 ## Project Structure
@@ -69,8 +72,15 @@ tutti/
 │   │       │   └── anthropic.ts    # AnthropicProvider (LLMProvider impl)
 │   │       └── index.ts            # barrel re-exports
 │   │
-│   └── cli/                # @tuttiai/cli (v0.2 — not yet implemented)
+│   └── cli/                # @tuttiai/cli — the tutti-ai binary
+│       └── src/
+│           ├── index.ts            # CLI entry point (commander.js)
+│           └── commands/
+│               ├── init.ts         # tutti-ai init [project-name]
+│               └── run.ts          # tutti-ai run [score]
 │
+├── examples/               # Runnable example scripts
+│   └── basic.ts            # Minimal TuttiRuntime proof-of-concept
 ├── voices/                 # Community voice packages (future)
 ├── turbo.json              # Turborepo pipeline config
 ├── tsconfig.base.json      # Shared strict TypeScript config
@@ -123,11 +133,67 @@ export class MyProvider implements LLMProvider {
 }
 ```
 
+## Writing Tests
+
+We use [vitest](https://vitest.dev/) for all tests. Tests live alongside
+source files with a `.test.ts` suffix.
+
+### Conventions
+
+- **Mock the LLM provider** — never make real API calls in tests. Create a
+  mock `LLMProvider` that returns canned `ChatResponse` objects.
+- **Use real Zod schemas** — test that tool input validation works with
+  actual Zod schemas, not mocks.
+- **Test event emission** — subscribe to the `EventBus` and assert the
+  correct event sequence is emitted.
+- **CLI tests use temp directories** — the init command tests create
+  isolated temp directories and mock `process.cwd()` to avoid side effects.
+
+### Test structure
+
+```
+packages/core/src/
+├── event-bus.ts
+├── event-bus.test.ts        # ← tests next to source
+├── session-store.ts
+├── session-store.test.ts
+├── agent-runner.ts
+├── agent-runner.test.ts
+├── runtime.ts
+├── runtime.test.ts
+├── define-score.ts
+└── define-score.test.ts
+
+packages/cli/src/commands/
+├── init.ts
+├── init.test.ts
+├── run.ts
+└── run.test.ts              # ← future
+```
+
+### Running a single test file
+
+```bash
+cd packages/core
+npx vitest run src/event-bus.test.ts
+```
+
+## Security
+
+See [SECURITY.md](./SECURITY.md) for our security policy. Key points
+for contributors:
+
+- Never commit API keys or secrets
+- All tool inputs must be Zod-validated before execution
+- Score files are dynamically imported — treat them like executable code
+- Run `npm audit` before submitting dependency changes
+
 ## Pull Request Guidelines
 
 - One feature or fix per PR
-- Add tests for new functionality
-- Run `npm run build && npm run typecheck` before submitting
+- **Add tests for new functionality** — PRs without tests for new code
+  will be asked to add them
+- Run `npm run build && npm run typecheck && npm test` before submitting
 - Update docs if behavior changes
 - Keep commit messages descriptive: `feat:`, `fix:`, `chore:`, `docs:`
 - Be kind — we're all composers here
