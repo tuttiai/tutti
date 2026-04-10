@@ -20,6 +20,10 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
+    if (!request.model) {
+      throw new Error("AnthropicProvider requires a model on ChatRequest");
+    }
+
     const response = await this.client.messages.create({
       model: request.model,
       max_tokens: request.max_tokens ?? 4096,

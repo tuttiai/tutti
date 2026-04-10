@@ -35,7 +35,7 @@ export interface ToolDefinition {
 }
 
 export interface ChatRequest {
-  model: string;
+  model?: string;
   messages: ChatMessage[];
   system?: string;
   tools?: ToolDefinition[];
