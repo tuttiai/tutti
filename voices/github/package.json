@@ -1,0 +1,35 @@
+{
+  "name": "@tuttiai/github",
+  "version": "0.1.0",
+  "description": "Tutti voice — interact with GitHub repositories, issues, and pull requests",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tuttiai/types": "^0.1.0",
+    "@octokit/rest": "^21.0.0",
+    "zod": "^3.24.0"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "voices/github"
+  },
+  "homepage": "https://tutti-ai.com",
+  "keywords": ["tutti", "ai", "agents", "github", "voice", "issues", "pull-requests"]
+}
