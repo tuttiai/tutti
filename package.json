@@ -10,12 +10,23 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/tuttiai/tutti"
   },
-  "homepage": "https://tutti-ai.com"
+  "homepage": "https://tutti-ai.com",
+  "packageManager": "npm@11.11.1",
+  "engines": {
+    "node": ">=20"
+  }
 }
