@@ -74,11 +74,11 @@ describe("GitHubVoice", () => {
 // ---------------------------------------------------------------------------
 
 describe("list_issues", () => {
-  it("returns formatted issue list", async () => {
+  it("returns formatted issue list with multi-line blocks", async () => {
     octokit.issues.listForRepo.mockResolvedValue({
       data: [
-        { number: 1, title: "Bug fix", state: "open", labels: [{ name: "bug" }] },
-        { number: 2, title: "Feature", state: "open", labels: [] },
+        { number: 1, title: "Bug fix", state: "open", labels: [{ name: "bug" }], html_url: "https://github.com/org/app/issues/1" },
+        { number: 2, title: "Feature", state: "open", labels: [], html_url: "https://github.com/org/app/issues/2" },
       ],
     });
 
@@ -89,16 +89,17 @@ describe("list_issues", () => {
     );
 
     expect(result.is_error).toBeUndefined();
-    expect(result.content).toContain("#1");
-    expect(result.content).toContain("Bug fix");
-    expect(result.content).toContain("[bug]");
-    expect(result.content).toContain("#2");
+    expect(result.content).toContain("#1 — Bug fix");
+    expect(result.content).toContain("State: open | Labels: bug");
+    expect(result.content).toContain("URL: https://github.com/org/app/issues/1");
+    expect(result.content).toContain("#2 — Feature");
+    expect(result.content).toContain("2 open issues");
   });
 
   it("filters out pull requests from issue list", async () => {
     octokit.issues.listForRepo.mockResolvedValue({
       data: [
-        { number: 1, title: "Issue", state: "open", labels: [] },
+        { number: 1, title: "Issue", state: "open", labels: [], html_url: "https://github.com/o/r/issues/1" },
         { number: 2, title: "PR", state: "open", labels: [], pull_request: {} },
       ],
     });
@@ -109,7 +110,7 @@ describe("list_issues", () => {
       ctx,
     );
 
-    expect(result.content).toContain("#1");
+    expect(result.content).toContain("#1 — Issue");
     expect(result.content).not.toContain("#2");
   });
 
@@ -127,7 +128,8 @@ describe("list_issues", () => {
     );
 
     expect(result.is_error).toBeUndefined();
-    expect(result.content).toContain("all were pull requests");
+    expect(result.content).toContain("only pull requests");
+    expect(result.content).toContain("list_pull_requests");
   });
 
   it("explains when zero results (possible rate limit)", async () => {
