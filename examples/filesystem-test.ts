@@ -1,5 +1,5 @@
 import { TuttiRuntime, AnthropicProvider, defineScore } from "@tuttiai/core";
-import { FilesystemVoice } from "@tuttiai/voice-filesystem";
+import { FilesystemVoice } from "@tuttiai/filesystem";
 
 const score = defineScore({
   name: "filesystem-test",
