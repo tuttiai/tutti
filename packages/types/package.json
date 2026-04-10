@@ -1,0 +1,24 @@
+{
+  "name": "@tuttiai/types",
+  "version": "0.1.0",
+  "description": "Type definitions for the Tutti multi-agent orchestration framework",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "license": "MIT"
+}
