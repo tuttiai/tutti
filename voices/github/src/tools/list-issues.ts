@@ -18,7 +18,7 @@ export function createListIssuesTool(octokit: Octokit): Tool<z.infer<typeof para
     parameters,
     execute: async (input) => {
       try {
-        const { data } = await octokit.issues.listForRepo({
+        const response = await octokit.issues.listForRepo({
           owner: input.owner,
           repo: input.repo,
           state: input.state,
@@ -26,11 +26,22 @@ export function createListIssuesTool(octokit: Octokit): Tool<z.infer<typeof para
           per_page: input.limit,
         });
 
+        const data = response.data;
+        const totalReturned = data.length;
+
         // Filter out pull requests (GitHub API includes them in issues)
         const issues = data.filter((i) => !i.pull_request);
 
-        if (issues.length === 0) {
-          return { content: `No ${input.state} issues in ${input.owner}/${input.repo}` };
+        if (totalReturned === 0) {
+          return {
+            content: `No ${input.state} issues found in ${input.owner}/${input.repo}. The repository may have no issues, or if unauthenticated, you may be rate-limited (check GITHUB_TOKEN).`,
+          };
+        }
+
+        if (issues.length === 0 && totalReturned > 0) {
+          return {
+            content: `${input.owner}/${input.repo} returned ${totalReturned} results but all were pull requests, not issues. The repository has no ${input.state} issues (only PRs).`,
+          };
         }
 
         const lines = issues.map((i) => {
@@ -43,7 +54,7 @@ export function createListIssuesTool(octokit: Octokit): Tool<z.infer<typeof para
         });
 
         return {
-          content: `${input.owner}/${input.repo} — ${input.state} issues:\n${lines.join("\n")}`,
+          content: `${input.owner}/${input.repo} — ${issues.length} ${input.state} issues (of ${totalReturned} results):\n${lines.join("\n")}`,
         };
       } catch (error) {
         return { content: ghErrorMessage(error), is_error: true };

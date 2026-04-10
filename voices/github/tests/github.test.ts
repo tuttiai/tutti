@@ -113,8 +113,41 @@ describe("list_issues", () => {
     expect(result.content).not.toContain("#2");
   });
 
-  it("returns error on API failure", async () => {
-    octokit.issues.listForRepo.mockRejectedValue(new Error("404 - Not Found"));
+  it("explains when all results are PRs, not issues", async () => {
+    octokit.issues.listForRepo.mockResolvedValue({
+      data: [
+        { number: 1, title: "PR only", state: "open", labels: [], pull_request: {} },
+      ],
+    });
+
+    const tool = createListIssuesTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({ owner: "o", repo: "r" }),
+      ctx,
+    );
+
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("all were pull requests");
+  });
+
+  it("explains when zero results (possible rate limit)", async () => {
+    octokit.issues.listForRepo.mockResolvedValue({ data: [] });
+
+    const tool = createListIssuesTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({ owner: "o", repo: "r" }),
+      ctx,
+    );
+
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("No open issues found");
+    expect(result.content).toContain("rate-limited");
+  });
+
+  it("includes status code on 404 error", async () => {
+    const err = new Error("Not Found");
+    (err as any).status = 404;
+    octokit.issues.listForRepo.mockRejectedValue(err);
 
     const tool = createListIssuesTool(octokit);
     const result = await tool.execute(
@@ -123,7 +156,40 @@ describe("list_issues", () => {
     );
 
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Not Found");
+    expect(result.content).toContain("[404]");
+    expect(result.content).toContain("Not found");
+  });
+
+  it("includes rate limit message on 403 error", async () => {
+    const err = new Error("API rate limit exceeded");
+    (err as any).status = 403;
+    octokit.issues.listForRepo.mockRejectedValue(err);
+
+    const tool = createListIssuesTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({ owner: "o", repo: "r" }),
+      ctx,
+    );
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("[403]");
+    expect(result.content).toContain("rate limited");
+  });
+
+  it("includes auth message on 401 error", async () => {
+    const err = new Error("Bad credentials");
+    (err as any).status = 401;
+    octokit.issues.listForRepo.mockRejectedValue(err);
+
+    const tool = createListIssuesTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({ owner: "o", repo: "r" }),
+      ctx,
+    );
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("[401]");
+    expect(result.content).toContain("Authentication failed");
   });
 });
 
