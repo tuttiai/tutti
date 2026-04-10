@@ -1,6 +1,7 @@
 // Runtime
 export { TuttiRuntime } from "./runtime.js";
 export { AgentRunner } from "./agent-runner.js";
+export { AgentRouter } from "./agent-router.js";
 export { EventBus } from "./event-bus.js";
 export { InMemorySessionStore } from "./session-store.js";
 export { ScoreLoader } from "./score-loader.js";
