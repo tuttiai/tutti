@@ -18,12 +18,16 @@ export function createListIssuesTool(octokit: Octokit): Tool<z.infer<typeof para
     parameters,
     execute: async (input) => {
       try {
+        // Over-fetch because GitHub's issues endpoint mixes in PRs.
+        // We filter those out, then slice to the requested limit.
+        const fetchSize = Math.min(Math.max(input.limit * 3, 50), 100);
+
         const response = await octokit.issues.listForRepo({
           owner: input.owner,
           repo: input.repo,
           state: input.state,
           labels: input.labels?.join(","),
-          per_page: input.limit,
+          per_page: fetchSize,
         });
 
         const data = response.data;
@@ -35,7 +39,7 @@ export function createListIssuesTool(octokit: Octokit): Tool<z.infer<typeof para
         }
 
         // Filter out pull requests (GitHub API includes them in issues)
-        const issues = data.filter((i) => !i.pull_request);
+        const issues = data.filter((i) => !i.pull_request).slice(0, input.limit);
 
         if (issues.length === 0) {
           return {

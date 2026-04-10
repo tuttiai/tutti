@@ -27,7 +27,7 @@ console.log("Running GitHub voice test...\n");
 
 const result = await tutti.run(
   "coder",
-  "List the top 5 open issues in the vercel/next.js repository",
+  "List the top 5 open issues (not pull requests) in the microsoft/typescript repository",
 );
 
 console.log("\n--- Result ---");
