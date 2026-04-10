@@ -6,7 +6,7 @@ import type { Voice } from "./voice.js";
 export interface AgentConfig {
   name: string;
   description?: string;
-  model: string;
+  model?: string;
   system_prompt: string;
   voices: Voice[];
   max_turns?: number;

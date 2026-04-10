@@ -4,7 +4,7 @@ import type { AgentConfig } from "./agent.js";
 import type { LLMProvider } from "./llm.js";
 
 export interface ScoreConfig {
-  name: string;
+  name?: string;
   description?: string;
   agents: Record<string, AgentConfig>;
   provider: LLMProvider;
