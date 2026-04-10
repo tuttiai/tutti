@@ -1,0 +1,28 @@
+{
+  "name": "@tuttiai/voice-filesystem",
+  "version": "0.1.0",
+  "description": "Filesystem voice for Tutti — read, write, and search files",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tuttiai/types": "*",
+    "glob": "^11.0.0",
+    "zod": "^3.24.0"
+  },
+  "license": "MIT"
+}
