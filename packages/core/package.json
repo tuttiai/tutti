@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tutti runtime — multi-agent orchestration for TypeScript",
   "type": "module",
   "exports": {
@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@tuttiai/types": "^0.1.0",
+    "@tuttiai/types": "^0.2.0",
     "zod": "^3.24.0",
     "zod-to-json-schema": "^3.24.0"
   },

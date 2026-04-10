@@ -21,8 +21,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tuttiai/core": "^0.1.0",
-    "@tuttiai/types": "^0.1.0",
+    "@tuttiai/core": "^0.2.0",
+    "@tuttiai/types": "^0.2.0",
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
     "dotenv": "^17.4.1",
