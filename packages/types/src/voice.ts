@@ -15,7 +15,7 @@ export interface ToolContext {
 export interface Tool<T = unknown> {
   name: string;
   description: string;
-  parameters: ZodType<T>;
+  parameters: ZodType<T, any, any>;
   execute(input: T, context: ToolContext): Promise<ToolResult>;
 }
 
