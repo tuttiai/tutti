@@ -28,6 +28,7 @@ export type {
 } from "./agent.js";
 
 export type {
+  MemoryConfig,
   ScoreConfig,
 } from "./score.js";
 

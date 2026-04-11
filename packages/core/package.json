@@ -11,7 +11,11 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -24,15 +28,29 @@
     "@google/generative-ai": "0.21.0",
     "@tuttiai/types": "*",
     "openai": "4.104.0",
+    "pg": "8.20.0",
     "zod": "3.25.76",
     "zod-to-json-schema": "3.25.2"
   },
-  "keywords": ["tutti", "ai", "agents", "orchestration", "runtime", "llm", "anthropic", "openai", "gemini"],
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "orchestration",
+    "runtime",
+    "llm",
+    "anthropic",
+    "openai",
+    "gemini"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/tuttiai/tutti",
     "directory": "packages/core"
   },
-  "homepage": "https://tutti-ai.com"
+  "homepage": "https://tutti-ai.com",
+  "devDependencies": {
+    "@types/pg": "8.20.0"
+  }
 }

@@ -1,20 +1,54 @@
-import type { AgentResult, ScoreConfig, Session } from "@tuttiai/types";
+import type { AgentResult, ScoreConfig, Session, SessionStore } from "@tuttiai/types";
 import { AgentRunner } from "./agent-runner.js";
 import { EventBus } from "./event-bus.js";
 import { InMemorySessionStore } from "./session-store.js";
+import { PostgresSessionStore } from "./memory/postgres.js";
 import { PermissionGuard } from "./permission-guard.js";
 
 export class TuttiRuntime {
   readonly events: EventBus;
-  private _sessions: InMemorySessionStore;
+  private _sessions: SessionStore;
   private _runner: AgentRunner;
   private _score: ScoreConfig;
 
   constructor(score: ScoreConfig) {
     this._score = score;
     this.events = new EventBus();
-    this._sessions = new InMemorySessionStore();
+    this._sessions = TuttiRuntime.createStore(score);
     this._runner = new AgentRunner(score.provider, this.events, this._sessions);
+  }
+
+  /**
+   * Create a runtime with async initialization (required for Postgres).
+   * Prefer this over `new TuttiRuntime()` when using a database-backed store.
+   */
+  static async create(score: ScoreConfig): Promise<TuttiRuntime> {
+    const runtime = new TuttiRuntime(score);
+    if (runtime._sessions instanceof PostgresSessionStore) {
+      await runtime._sessions.initialize();
+    }
+    return runtime;
+  }
+
+  private static createStore(score: ScoreConfig): SessionStore {
+    const memory = score.memory;
+    if (!memory || memory.provider === "in-memory") {
+      return new InMemorySessionStore();
+    }
+    if (memory.provider === "postgres") {
+      const url = memory.url ?? process.env.DATABASE_URL;
+      if (!url) {
+        throw new Error(
+          "PostgreSQL session store requires a connection URL.\n" +
+          "Set memory.url in your score, or DATABASE_URL in your .env file.",
+        );
+      }
+      return new PostgresSessionStore(url);
+    }
+    throw new Error(
+      `Unsupported memory provider: "${memory.provider}".\n` +
+      `Supported: "in-memory", "postgres"`,
+    );
   }
 
   /** The score configuration this runtime was created with. */

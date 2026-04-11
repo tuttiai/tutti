@@ -29,6 +29,20 @@ const OFFICIAL_VOICES: Record<string, { package: string; setup: string }> = {
     ${chalk.cyan('import { PlaywrightVoice } from "@tuttiai/playwright"')}
     ${chalk.cyan("voices: [new PlaywrightVoice()]")}`,
   },
+  postgres: {
+    package: "pg",
+    setup: `  Add ${chalk.bold("DATABASE_URL")} to your .env file:
+    ${chalk.cyan("DATABASE_URL=postgres://user:pass@localhost:5432/tutti")}
+
+  Add to your score:
+    ${chalk.cyan("memory: { provider: 'postgres' }")}
+
+  Or with an explicit URL:
+    ${chalk.cyan("memory: { provider: 'postgres', url: process.env.DATABASE_URL }")}
+
+  Use the async factory for initialization:
+    ${chalk.cyan("const tutti = await TuttiRuntime.create(score)")}`,
+  },
 };
 
 function resolvePackageName(input: string): string {
