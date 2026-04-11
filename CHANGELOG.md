@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.11.0] - 2026-04-11
+
+### Added
+- `PostgresSessionStore` — sessions persist to PostgreSQL across restarts
+- `InMemorySemanticStore` — cross-session semantic (long-term) memory
+- `SemanticMemoryStore` interface for custom memory backends
+- `MemoryEntry` type for semantic memory records
+- `memory.remember()` / `recall()` / `forget()` helpers on `ToolContext`
+- `AgentMemoryConfig` — per-agent `semantic_memory` configuration
+- `MemoryConfig` on `ScoreConfig` — `provider: 'in-memory' | 'postgres'`
+- `TuttiRuntime.create()` async factory for database-backed stores
+- `tutti-ai add postgres` with setup instructions
+- `ToolMemoryHelpers` type for tool-level memory access
+
+### Published
+- `@tuttiai/types@0.3.0`
+- `@tuttiai/core@0.5.0`
+- `tutti-ai@0.5.0`
+
 ## [0.10.0] - 2026-04-11
 
 ### Added
