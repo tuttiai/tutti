@@ -15,6 +15,7 @@ export type {
 export type {
   Permission,
   ToolResult,
+  ToolMemoryHelpers,
   ToolContext,
   Tool,
   VoiceContext,
@@ -23,6 +24,7 @@ export type {
 
 export type {
   BudgetConfig,
+  AgentMemoryConfig,
   AgentConfig,
   AgentResult,
 } from "./agent.js";

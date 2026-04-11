@@ -9,9 +9,20 @@ export interface ToolResult {
   is_error?: boolean;
 }
 
+export interface ToolMemoryHelpers {
+  /** Store a fact the agent should remember across sessions. */
+  remember(content: string, metadata?: Record<string, unknown>): Promise<void>;
+  /** Search for relevant memories. */
+  recall(query: string, limit?: number): Promise<{ id: string; content: string }[]>;
+  /** Delete a specific memory by ID. */
+  forget(id: string): Promise<void>;
+}
+
 export interface ToolContext {
   session_id: string;
   agent_name: string;
+  /** Semantic memory helpers — only available when agent.semantic_memory.enabled is true. */
+  memory?: ToolMemoryHelpers;
 }
 
 export interface Tool<T = unknown> {

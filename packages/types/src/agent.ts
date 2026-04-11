@@ -11,6 +11,15 @@ export interface BudgetConfig {
   warn_at_percent?: number;
 }
 
+export interface AgentMemoryConfig {
+  /** Enable semantic memory for this agent. */
+  enabled: boolean;
+  /** Max memory entries to inject per LLM call (default 5). */
+  max_memories?: number;
+  /** Inject memories into the system prompt (default true). */
+  inject_system?: boolean;
+}
+
 export interface AgentConfig {
   name: string;
   description?: string;
@@ -22,6 +31,8 @@ export interface AgentConfig {
   max_tool_calls?: number;
   tool_timeout_ms?: number;
   budget?: BudgetConfig;
+  /** Semantic (long-term) memory configuration. */
+  semantic_memory?: AgentMemoryConfig;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];
   /** Role in the orchestration — orchestrator receives input first. */

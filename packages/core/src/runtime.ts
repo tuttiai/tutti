@@ -3,10 +3,13 @@ import { AgentRunner } from "./agent-runner.js";
 import { EventBus } from "./event-bus.js";
 import { InMemorySessionStore } from "./session-store.js";
 import { PostgresSessionStore } from "./memory/postgres.js";
+import { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
+import type { SemanticMemoryStore } from "./memory/semantic.js";
 import { PermissionGuard } from "./permission-guard.js";
 
 export class TuttiRuntime {
   readonly events: EventBus;
+  readonly semanticMemory: SemanticMemoryStore;
   private _sessions: SessionStore;
   private _runner: AgentRunner;
   private _score: ScoreConfig;
@@ -15,7 +18,13 @@ export class TuttiRuntime {
     this._score = score;
     this.events = new EventBus();
     this._sessions = TuttiRuntime.createStore(score);
-    this._runner = new AgentRunner(score.provider, this.events, this._sessions);
+    this.semanticMemory = new InMemorySemanticStore();
+    this._runner = new AgentRunner(
+      score.provider,
+      this.events,
+      this._sessions,
+      this.semanticMemory,
+    );
   }
 
   /**

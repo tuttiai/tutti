@@ -17,6 +17,7 @@ import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
+import type { SemanticMemoryStore } from "./memory/semantic.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
@@ -27,6 +28,7 @@ export class AgentRunner {
     private provider: LLMProvider,
     private events: EventBus,
     private sessions: SessionStore,
+    private semanticMemory?: SemanticMemoryStore,
   ) {}
 
   async run(
@@ -83,9 +85,32 @@ export class AgentRunner {
         turn: turns,
       });
 
+      // Inject semantic memories into system prompt if enabled
+      let systemPrompt = agent.system_prompt;
+      const memCfg = agent.semantic_memory;
+      if (memCfg?.enabled && this.semanticMemory) {
+        const maxMemories = memCfg.max_memories ?? 5;
+        const injectSystem = memCfg.inject_system !== false;
+        if (injectSystem) {
+          const memories = await this.semanticMemory.search(
+            input,
+            agent.name,
+            maxMemories,
+          );
+          if (memories.length > 0) {
+            const memoryBlock = memories
+              .map((m) => `- ${m.content}`)
+              .join("\n");
+            systemPrompt +=
+              "\n\nRelevant context from previous sessions:\n" +
+              memoryBlock;
+          }
+        }
+      }
+
       const request = {
         model: agent.model,
-        system: agent.system_prompt,
+        system: systemPrompt,
         messages,
         tools: toolDefs.length > 0 ? toolDefs : undefined,
       };
@@ -165,12 +190,32 @@ export class AgentRunner {
       }
 
       const toolTimeoutMs = agent.tool_timeout_ms ?? DEFAULT_TOOL_TIMEOUT_MS;
+      const toolContext: ToolContext = {
+        session_id: session.id,
+        agent_name: agent.name,
+      };
+
+      // Attach memory helpers if semantic memory is enabled
+      if (memCfg?.enabled && this.semanticMemory) {
+        const sm = this.semanticMemory;
+        const agentName = agent.name;
+        toolContext.memory = {
+          remember: async (content, metadata = {}) => {
+            await sm.add({ agent_name: agentName, content, metadata });
+          },
+          recall: async (query, limit) => {
+            const entries = await sm.search(query, agentName, limit);
+            return entries.map((e) => ({ id: e.id, content: e.content }));
+          },
+          forget: async (id) => {
+            await sm.delete(id);
+          },
+        };
+      }
+
       const toolResults: ToolResultBlock[] = await Promise.all(
         toolUseBlocks.map((block) =>
-          this.executeTool(allTools, block, {
-            session_id: session.id,
-            agent_name: agent.name,
-          }, toolTimeoutMs),
+          this.executeTool(allTools, block, toolContext, toolTimeoutMs),
         ),
       );
 
