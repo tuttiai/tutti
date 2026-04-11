@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AgentConfig, AgentResult, Tool, Voice } from "@tuttiai/types";
+import type { AgentResult, Tool, Voice } from "@tuttiai/types";
 import { TuttiRuntime } from "./runtime.js";
 import type { EventBus } from "./event-bus.js";
 import type { ScoreConfig } from "@tuttiai/types";

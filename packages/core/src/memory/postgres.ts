@@ -59,7 +59,7 @@ export class PostgresSessionStore implements SessionStore {
     return session;
   }
 
-  get(id: string): Session | undefined {
+  get(_id: string): Session | undefined {
     // The synchronous interface returns from an in-memory cache.
     // For Postgres, use getAsync() instead for reliable reads.
     // This returns undefined — the runtime creates a new session on miss.
