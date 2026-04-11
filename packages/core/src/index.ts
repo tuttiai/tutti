@@ -6,6 +6,7 @@ export { EventBus } from "./event-bus.js";
 export { InMemorySessionStore } from "./session-store.js";
 export { ScoreLoader } from "./score-loader.js";
 export { defineScore } from "./define-score.js";
+export { SecretsManager } from "./secrets.js";
 
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";

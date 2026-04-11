@@ -5,6 +5,7 @@ import type {
   ChatResponse,
   ContentBlock,
 } from "@tuttiai/types";
+import { SecretsManager } from "../secrets.js";
 
 export interface AnthropicProviderOptions {
   api_key?: string;
@@ -15,7 +16,7 @@ export class AnthropicProvider implements LLMProvider {
 
   constructor(options: AnthropicProviderOptions = {}) {
     this.client = new Anthropic({
-      apiKey: options.api_key,
+      apiKey: options.api_key ?? SecretsManager.optional("ANTHROPIC_API_KEY"),
     });
   }
 

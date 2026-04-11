@@ -1,4 +1,5 @@
 import type { TuttiEvent, TuttiEventType } from "@tuttiai/types";
+import { SecretsManager } from "./secrets.js";
 
 type Handler = (event: never) => void;
 
@@ -29,10 +30,12 @@ export class EventBus {
   }
 
   emit(event: TuttiEvent): void {
-    const handlers = this.listeners.get(event.type);
+    const redacted = SecretsManager.redactObject(event) as TuttiEvent;
+
+    const handlers = this.listeners.get(redacted.type);
     if (handlers) {
       for (const handler of handlers) {
-        (handler as (event: TuttiEvent) => void)(event);
+        (handler as (event: TuttiEvent) => void)(redacted);
       }
     }
 
@@ -40,7 +43,7 @@ export class EventBus {
     const wildcardHandlers = this.listeners.get("*");
     if (wildcardHandlers) {
       for (const handler of wildcardHandlers) {
-        (handler as (event: TuttiEvent) => void)(event);
+        (handler as (event: TuttiEvent) => void)(redacted);
       }
     }
   }

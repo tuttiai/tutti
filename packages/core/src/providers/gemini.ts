@@ -11,6 +11,7 @@ import type {
   ChatResponse,
   ContentBlock,
 } from "@tuttiai/types";
+import { SecretsManager } from "../secrets.js";
 
 export interface GeminiProviderOptions {
   /** Gemini API key. Defaults to GEMINI_API_KEY env var. */
@@ -21,7 +22,7 @@ export class GeminiProvider implements LLMProvider {
   private client: GoogleGenerativeAI;
 
   constructor(options: GeminiProviderOptions = {}) {
-    const apiKey = options.api_key ?? process.env.GEMINI_API_KEY;
+    const apiKey = options.api_key ?? SecretsManager.optional("GEMINI_API_KEY");
     if (!apiKey) {
       throw new Error(
         "GeminiProvider requires an API key. Set GEMINI_API_KEY or pass api_key option.",

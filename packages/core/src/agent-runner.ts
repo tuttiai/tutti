@@ -14,6 +14,7 @@ import type {
   TokenUsage,
 } from "@tuttiai/types";
 import type { EventBus } from "./event-bus.js";
+import { SecretsManager } from "./secrets.js";
 
 const DEFAULT_MAX_TURNS = 10;
 
@@ -204,7 +205,7 @@ export class AgentRunner {
       return {
         type: "tool_result",
         tool_use_id: block.id,
-        content: `Tool execution error: ${message}`,
+        content: SecretsManager.redact(`Tool execution error: ${message}`),
         is_error: true,
       };
     }

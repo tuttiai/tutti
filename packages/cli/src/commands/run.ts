@@ -3,7 +3,14 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import chalk from "chalk";
 import ora from "ora";
-import { TuttiRuntime, ScoreLoader } from "@tuttiai/core";
+import {
+  TuttiRuntime,
+  ScoreLoader,
+  AnthropicProvider,
+  OpenAIProvider,
+  GeminiProvider,
+  SecretsManager,
+} from "@tuttiai/core";
 
 export async function runCommand(scorePath?: string): Promise<void> {
   const file = resolve(scorePath ?? "./tutti.score.ts");
@@ -26,6 +33,28 @@ export async function runCommand(scorePath?: string): Promise<void> {
       ),
     );
     process.exit(1);
+  }
+
+  // Validate that the provider has a valid API key
+  const providerKeyMap: [unknown, string][] = [
+    [AnthropicProvider, "ANTHROPIC_API_KEY"],
+    [OpenAIProvider, "OPENAI_API_KEY"],
+    [GeminiProvider, "GEMINI_API_KEY"],
+  ];
+
+  for (const [ProviderClass, envVar] of providerKeyMap) {
+    if (score.provider instanceof (ProviderClass as new (...args: unknown[]) => unknown)) {
+      const key = SecretsManager.optional(envVar);
+      if (!key) {
+        console.error(
+          chalk.red(
+            `Missing API key: ${envVar}\n` +
+              `Add it to your .env file: ${envVar}=your_value_here`,
+          ),
+        );
+        process.exit(1);
+      }
+    }
   }
 
   const runtime = new TuttiRuntime(score);

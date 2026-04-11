@@ -5,6 +5,7 @@ import type {
   ChatResponse,
   ContentBlock,
 } from "@tuttiai/types";
+import { SecretsManager } from "../secrets.js";
 
 export interface OpenAIProviderOptions {
   /** OpenAI API key. Defaults to OPENAI_API_KEY env var. */
@@ -18,7 +19,7 @@ export class OpenAIProvider implements LLMProvider {
 
   constructor(options: OpenAIProviderOptions = {}) {
     this.client = new OpenAI({
-      apiKey: options.api_key,
+      apiKey: options.api_key ?? SecretsManager.optional("OPENAI_API_KEY"),
       baseURL: options.base_url,
     });
   }
