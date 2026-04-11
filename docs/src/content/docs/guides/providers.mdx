@@ -1,0 +1,127 @@
+---
+title: "Providers"
+description: "Switch between Claude, GPT-4o, and Gemini"
+sidebar:
+  order: 5
+---
+
+Tutti ships with three built-in LLM providers. They all implement the same `LLMProvider` interface, so you can swap them with a single line change.
+
+## Anthropic (Claude)
+
+```ts
+import { AnthropicProvider } from "@tuttiai/core";
+
+const provider = new AnthropicProvider();
+// or with explicit key:
+const provider = new AnthropicProvider({ api_key: "sk-ant-..." });
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `api_key` | `ANTHROPIC_API_KEY` env var | API key |
+
+**Models:** `claude-sonnet-4-20250514`, `claude-opus-4-20250514`, `claude-haiku-4-20250514`
+
+## OpenAI (GPT)
+
+```ts
+import { OpenAIProvider } from "@tuttiai/core";
+
+const provider = new OpenAIProvider();
+// or with custom config:
+const provider = new OpenAIProvider({
+  api_key: "sk-...",
+  base_url: "https://your-azure-endpoint.openai.azure.com",
+});
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `api_key` | `OPENAI_API_KEY` env var | API key |
+| `base_url` | OpenAI default | Custom endpoint (Azure, proxies) |
+
+**Models:** `gpt-4o`, `gpt-4o-mini`, or any model your endpoint supports.
+
+## Google Gemini
+
+```ts
+import { GeminiProvider } from "@tuttiai/core";
+
+const provider = new GeminiProvider();
+// or with explicit key:
+const provider = new GeminiProvider({ api_key: "AIza..." });
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `api_key` | `GEMINI_API_KEY` env var | API key |
+
+**Models:** `gemini-2.0-flash` (default), `gemini-2.0-pro`
+
+:::caution
+Gemini requires an API key — it will throw at construction time if neither `api_key` nor `GEMINI_API_KEY` is set.
+:::
+
+## Switching providers
+
+Just change the `provider` in your score:
+
+```ts title="tutti.score.ts"
+import { OpenAIProvider, defineScore } from "@tuttiai/core";
+
+export default defineScore({
+  provider: new OpenAIProvider(),
+  default_model: "gpt-4o",
+  agents: {
+    assistant: {
+      name: "assistant",
+      system_prompt: "You are helpful.",
+      voices: [],
+    },
+  },
+});
+```
+
+## Per-agent model overrides
+
+The `default_model` in the score applies to all agents. Individual agents can override it:
+
+```ts
+agents: {
+  fast: {
+    name: "Fast Agent",
+    model: "claude-haiku-4-20250514",  // cheap and fast
+    system_prompt: "Quick answers only.",
+    voices: [],
+  },
+  smart: {
+    name: "Smart Agent",
+    model: "claude-opus-4-20250514",   // expensive and thorough
+    system_prompt: "Think deeply.",
+    voices: [],
+  },
+}
+```
+
+## Token budget by model
+
+Different models have different pricing. The `TokenBudget` knows about each model's rates:
+
+| Model | Input $/M tokens | Output $/M tokens |
+| ----- | ---------------- | ----------------- |
+| `claude-sonnet-4-20250514` | $3.00 | $15.00 |
+| `claude-opus-4-20250514` | $15.00 | $75.00 |
+| `claude-haiku-4-20250514` | $0.25 | $1.25 |
+| `gpt-4o` | $2.50 | $10.00 |
+| `gemini-2.0-flash` | $0.10 | $0.40 |
+
+```ts
+{
+  assistant: {
+    model: "claude-sonnet-4-20250514",
+    budget: { max_cost_usd: 0.50 },  // Stop at 50 cents
+    // ...
+  },
+}
+```

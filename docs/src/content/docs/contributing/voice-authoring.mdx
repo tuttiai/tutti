@@ -1,0 +1,198 @@
+---
+title: "Voice Authoring Guide"
+description: "Detailed guide to building, testing, and publishing Tutti voices"
+sidebar:
+  order: 3
+---
+
+This is the comprehensive guide for building a Tutti voice. For a quick walkthrough, see [Building a Voice](/guides/building-a-voice).
+
+## Voice anatomy
+
+A voice is an npm package that exports a class implementing the `Voice` interface:
+
+```ts
+interface Voice {
+  name: string;
+  description?: string;
+  tools: Tool[];
+  required_permissions: Permission[];
+  setup?(context: VoiceContext): Promise<void>;
+  teardown?(): Promise<void>;
+}
+```
+
+## Tool anatomy
+
+Each tool in a voice has:
+
+```ts
+interface Tool<T = unknown> {
+  name: string;
+  description: string;
+  parameters: ZodType<T>;
+  execute(input: T, context: ToolContext): Promise<ToolResult>;
+}
+```
+
+| Field | Purpose |
+| ----- | ------- |
+| `name` | Unique identifier the LLM calls (e.g. `read_file`) |
+| `description` | Tells the LLM what the tool does |
+| `parameters` | Zod schema — validated before `execute` is called |
+| `execute` | The actual implementation |
+
+### Tool naming conventions
+
+- Use `snake_case` (e.g. `list_issues`, `get_file_contents`)
+- Start with a verb (`get_`, `list_`, `create_`, `search_`, `delete_`)
+- Be specific (`search_code` not `search`)
+
+### Tool results
+
+Always return `{ content: string, is_error?: boolean }`.
+
+```ts
+// Success
+return { content: "Created file: hello.txt (42 bytes)" };
+
+// Error — sent back to the LLM as context, not thrown
+return { content: "File not found: hello.txt", is_error: true };
+```
+
+:::tip
+Prefer returning `is_error: true` over throwing exceptions. This gives the LLM a chance to recover (e.g. try a different file path). Thrown exceptions also work — they're caught by the runner and converted to error results.
+:::
+
+### Zod parameter schemas
+
+Use descriptive `.describe()` on every field — these become the tool descriptions the LLM sees:
+
+```ts
+const parameters = z.object({
+  owner: z.string().describe("GitHub username or organization"),
+  repo: z.string().describe("Repository name"),
+  state: z
+    .enum(["open", "closed", "all"])
+    .default("open")
+    .describe("Filter issues by state"),
+});
+```
+
+## Permissions
+
+Declare what your voice needs:
+
+```ts
+type Permission = "network" | "filesystem" | "shell" | "browser";
+```
+
+| Permission | When to use |
+| ---------- | ----------- |
+| `network` | Making HTTP requests, API calls |
+| `filesystem` | Reading or writing local files |
+| `shell` | Executing shell commands |
+| `browser` | Automating a browser |
+
+Be honest — only request what you actually need. Users see these permissions in their score file.
+
+## Testing voices
+
+### Unit test individual tools
+
+```ts
+import { describe, it, expect } from "vitest";
+import { myTool } from "../src/tools/my-tool.js";
+
+const ctx = { session_id: "test", agent_name: "test" };
+
+describe("myTool", () => {
+  it("returns expected output", async () => {
+    const result = await myTool.execute({ input: "value" }, ctx);
+    expect(result.content).toContain("expected");
+    expect(result.is_error).toBeUndefined();
+  });
+
+  it("handles errors gracefully", async () => {
+    const result = await myTool.execute({ input: "bad" }, ctx);
+    expect(result.is_error).toBe(true);
+  });
+});
+```
+
+### Test the voice class
+
+```ts
+import { MyVoice } from "../src/index.js";
+
+describe("MyVoice", () => {
+  it("implements Voice correctly", () => {
+    const voice = new MyVoice();
+    expect(voice.name).toBe("my-voice");
+    expect(voice.required_permissions).toEqual(["network"]);
+    expect(voice.tools.length).toBeGreaterThan(0);
+  });
+});
+```
+
+### Integration test with AgentRunner
+
+```ts
+import { AgentRunner, EventBus, InMemorySessionStore } from "@tuttiai/core";
+import { createMockProvider, toolUseResponse, textResponse } from "@tuttiai/core/tests/helpers/mock-provider";
+
+const provider = createMockProvider([
+  toolUseResponse("my_tool", { input: "test" }),
+  textResponse("Done!"),
+]);
+
+const runner = new AgentRunner(provider, new EventBus(), new InMemorySessionStore());
+const result = await runner.run(
+  { name: "test", system_prompt: "Test", voices: [new MyVoice()], permissions: ["network"] },
+  "Do the thing",
+);
+expect(result.output).toBe("Done!");
+```
+
+## Publishing
+
+### package.json essentials
+
+```json
+{
+  "name": "@yourscope/my-voice",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@tuttiai/types": "*",
+    "zod": "3.25.76"
+  }
+}
+```
+
+### Checklist before publishing
+
+- [ ] Voice implements the `Voice` interface correctly
+- [ ] All tools have descriptive names and `description` fields
+- [ ] All parameters have `.describe()` annotations
+- [ ] `required_permissions` is accurate
+- [ ] Tests pass
+- [ ] README explains what the voice does and how to use it
+- [ ] No secrets or API keys in the published package
+
+```bash
+npm publish --access public
+```
+
+Once published, users install with:
+
+```bash
+npx tutti-ai add @yourscope/my-voice
+```

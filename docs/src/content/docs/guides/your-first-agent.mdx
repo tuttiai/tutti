@@ -1,0 +1,132 @@
+---
+title: "Your First Agent"
+description: "Step-by-step guide to building your first Tutti agent"
+sidebar:
+  order: 1
+---
+
+This guide walks through creating a project from scratch, configuring an agent, and running it interactively.
+
+## Step 1: Initialize
+
+```bash
+npx tutti-ai init todo-bot
+cd todo-bot
+npm install
+cp .env.example .env
+```
+
+Add your API key to `.env`:
+
+```bash title=".env"
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+## Step 2: Give it filesystem tools
+
+```bash
+npx tutti-ai add filesystem
+```
+
+## Step 3: Configure the score
+
+```ts title="tutti.score.ts"
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+
+export default defineScore({
+  name: "todo-bot",
+  provider: new AnthropicProvider(),
+  agents: {
+    assistant: {
+      name: "Todo Assistant",
+      model: "claude-sonnet-4-20250514",
+      system_prompt: `You are a todo list manager. You can create, read, and update a todo.md file.
+When asked to add a task, append it to todo.md with a checkbox: - [ ] task
+When asked to complete a task, change [ ] to [x].
+Always show the current todo list after making changes.`,
+      voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
+    },
+  },
+});
+```
+
+## Step 4: Validate
+
+```bash
+npx tutti-ai check
+```
+
+```
+Checking tutti.score.ts...
+  ✔ Score file is valid
+  ✔ Provider: AnthropicProvider (ANTHROPIC_API_KEY is set)
+  ✔ 1 agent configured
+  ✔ Voice: filesystem on assistant (installed)
+All checks passed. Run tutti-ai run to start.
+```
+
+## Step 5: Run
+
+```bash
+npx tutti-ai run
+```
+
+```
+Tutti REPL — type "exit" to quit
+
+> Add "Write documentation" to my todo list
+
+Running agent: Todo Assistant
+  Using tool: write_file
+  Done: write_file
+
+I've created todo.md with your task:
+
+- [ ] Write documentation
+
+> Add "Review PRs" and mark "Write documentation" as done
+
+Running agent: Todo Assistant
+  Using tool: read_file
+  Done: read_file
+  Using tool: write_file
+  Done: write_file
+
+Updated todo.md:
+
+- [x] Write documentation
+- [ ] Review PRs
+```
+
+## Step 6: Use programmatically
+
+You can also use the runtime directly in your own code:
+
+```ts title="run.ts"
+import { TuttiRuntime } from "@tuttiai/core";
+import score from "./tutti.score.js";
+
+const tutti = new TuttiRuntime(score);
+
+const result = await tutti.run("assistant", 'Add "Ship v1.0" to my todos');
+console.log(result.output);
+console.log(`Turns: ${result.turns}, Tokens: ${result.usage.input_tokens + result.usage.output_tokens}`);
+```
+
+Run it:
+
+```bash
+npx tsx run.ts
+```
+
+## What's happening under the hood
+
+1. The runtime sends your message + the system prompt to Claude
+2. Claude decides to call `write_file` (or `read_file` first, then `write_file`)
+3. The filesystem voice executes the tool and returns the result
+4. Claude sees the tool result and generates a human-readable response
+5. The runtime returns the final output to you
+
+Each of these steps emits an event you can listen to — see [Core Concepts](/getting-started/core-concepts#events).

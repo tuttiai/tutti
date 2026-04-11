@@ -1,0 +1,120 @@
+---
+title: "Filesystem Voice"
+description: "@tuttiai/filesystem — read, write, search, and manage local files"
+sidebar:
+  order: 2
+---
+
+The Filesystem voice gives agents the ability to read, write, search, and manage files on the local filesystem.
+
+## Installation
+
+```bash
+npx tutti-ai add filesystem
+```
+
+## Required permissions
+
+```ts
+permissions: ["filesystem"]
+```
+
+## Required environment variables
+
+None.
+
+## Tool reference
+
+| Tool | Description | Key inputs |
+| ---- | ----------- | ---------- |
+| `read_file` | Read file contents | `path`, `encoding` (`utf-8` or `base64`) |
+| `write_file` | Write or append to a file | `path`, `content`, `append` |
+| `list_directory` | List files and directories | `path`, `recursive`, `pattern` (glob) |
+| `create_directory` | Create a directory (recursive) | `path` |
+| `delete_file` | Delete a file (with confirmation) | `path`, `require_confirmation` |
+| `move_file` | Move or rename a file | `source`, `destination`, `overwrite` |
+| `search_files` | Search file contents by text pattern | `directory`, `pattern`, `file_pattern`, `case_sensitive` |
+
+### read_file
+
+Reads the contents of a file.
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `path` | `string` | — | File path (absolute or relative) |
+| `encoding` | `"utf-8" \| "base64"` | `"utf-8"` | Encoding |
+
+### write_file
+
+Writes content to a file. Creates the file if it doesn't exist.
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `path` | `string` | — | File path |
+| `content` | `string` | — | Content to write |
+| `append` | `boolean` | `false` | Append instead of overwrite |
+
+### list_directory
+
+Lists files and directories with optional glob filtering.
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `path` | `string` | — | Directory path |
+| `recursive` | `boolean` | `false` | List recursively |
+| `pattern` | `string?` | — | Glob filter (e.g. `"*.ts"`) |
+
+### search_files
+
+Searches file contents for a text pattern across a directory.
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `directory` | `string` | — | Directory to search |
+| `pattern` | `string` | — | Text pattern to find |
+| `file_pattern` | `string?` | — | Glob to filter files (e.g. `"*.ts"`) |
+| `case_sensitive` | `boolean` | `false` | Case-sensitive search |
+
+## Security
+
+- **Path traversal protection** — blocks access to `/etc/passwd`, `~/.ssh`, `/proc`, `/sys`, `/dev`, and other system paths
+- **Max file size** — reads are limited to 10MB by default
+
+## Example
+
+```ts title="tutti.score.ts"
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    coder: {
+      name: "Coder",
+      model: "claude-sonnet-4-20250514",
+      system_prompt: `You are a TypeScript developer. You can read and write files.
+When asked to create a file, use write_file. When asked to find code, use search_files.`,
+      voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
+    },
+  },
+});
+```
+
+```
+> Find all files that import "zod" in the src/ directory
+
+  Using tool: search_files
+  Done: search_files
+
+Found 3 files importing "zod":
+
+src/schema.ts
+  1: import { z } from "zod";
+
+src/tools/weather.ts
+  2: import { z } from "zod";
+
+src/index.ts
+  4: import { z } from "zod";
+```

@@ -1,0 +1,108 @@
+---
+title: "Adding Voices"
+description: "Install and configure voice packages for your agents"
+sidebar:
+  order: 3
+---
+
+Voices give agents the ability to interact with external systems. This guide covers installing official voices and using them in your score.
+
+## Install a voice
+
+```bash
+npx tutti-ai add filesystem
+npx tutti-ai add github
+npx tutti-ai add playwright
+```
+
+The `add` command installs the npm package and prints setup instructions.
+
+## Use a voice in your score
+
+```ts title="tutti.score.ts"
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+import { GitHubVoice } from "@tuttiai/github";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    coder: {
+      name: "Coder",
+      system_prompt: "You are a developer with file and GitHub access.",
+      voices: [new FilesystemVoice(), new GitHubVoice()],
+      permissions: ["filesystem", "network"],
+    },
+  },
+});
+```
+
+:::caution
+You must grant the permissions each voice requires. If you forget, the runtime throws a clear error:
+
+```
+Voice filesystem requires permissions not granted: filesystem
+
+Grant them in your score file:
+  permissions: ['filesystem']
+```
+:::
+
+## Voice configuration
+
+Some voices accept options:
+
+```ts
+// GitHubVoice with a custom token
+new GitHubVoice({ token: process.env.MY_GITHUB_TOKEN })
+
+// PlaywrightVoice with options
+new PlaywrightVoice({
+  headless: true,
+  slowMo: 100,
+  timeout: 15000,
+})
+```
+
+## Environment variables
+
+| Voice | Env var | Required? |
+| ----- | ------- | --------- |
+| Filesystem | — | No |
+| GitHub | `GITHUB_TOKEN` | Yes (for authenticated API access) |
+| Playwright | — | No (but needs `npx playwright install chromium`) |
+
+## Community voices
+
+You can install any npm package that exports a `Voice` implementation:
+
+```bash
+npx tutti-ai add @someone/custom-voice
+```
+
+Or install directly:
+
+```bash
+npm install @someone/custom-voice
+```
+
+See [Building a Voice](/guides/building-a-voice) to create your own.
+
+## Multiple voices per agent
+
+An agent can have any number of voices. All tools from all voices are merged and made available to the LLM:
+
+```ts
+{
+  fullstack: {
+    name: "Full Stack Agent",
+    system_prompt: "You can read/write files, manage GitHub issues, and test in the browser.",
+    voices: [
+      new FilesystemVoice(),
+      new GitHubVoice(),
+      new PlaywrightVoice(),
+    ],
+    permissions: ["filesystem", "network", "browser"],
+  },
+}
+```

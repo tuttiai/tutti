@@ -1,0 +1,111 @@
+---
+title: "Multi-Agent Orchestration"
+description: "Use an orchestrator agent to delegate tasks to specialists"
+sidebar:
+  order: 2
+---
+
+Tutti supports multi-agent workflows where an **orchestrator** routes tasks to **specialist** agents. Each specialist has its own system prompt, tools, and constraints.
+
+## The pattern
+
+```
+User → Orchestrator → [Coder, PM, QA] → Orchestrator → User
+```
+
+The orchestrator receives the user's request, decides which specialist to delegate to, and summarizes the results.
+
+## Define the score
+
+```ts title="tutti.score.ts"
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+
+export default defineScore({
+  name: "dev-team",
+  provider: new AnthropicProvider(),
+  default_model: "claude-sonnet-4-20250514",
+  entry: "orchestrator",
+  agents: {
+    orchestrator: {
+      name: "Orchestrator",
+      role: "orchestrator",
+      system_prompt: `You receive user requests and delegate them to the right specialist.
+Think about which specialist is best suited before delegating.
+Summarize results clearly.`,
+      voices: [],
+      delegates: ["coder", "pm", "qa"],
+    },
+    coder: {
+      name: "Coder",
+      role: "specialist",
+      system_prompt: `You are a senior TypeScript developer.
+Write clean, tested, production-ready code.`,
+      voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
+    },
+    pm: {
+      name: "Product Manager",
+      role: "specialist",
+      system_prompt: `You are a senior product manager.
+Write clear specs, break down features, think about UX.`,
+      voices: [],
+    },
+    qa: {
+      name: "QA Engineer",
+      role: "specialist",
+      system_prompt: `You are a thorough QA engineer.
+Think about edge cases, write test plans, identify bugs.`,
+      voices: [],
+    },
+  },
+});
+```
+
+## Run with the AgentRouter
+
+```ts title="run.ts"
+import { AgentRouter } from "@tuttiai/core";
+import score from "./tutti.score.js";
+
+const router = new AgentRouter(score);
+
+// Subscribe to delegation events
+router.events.on("delegate:start", (e) => {
+  console.log(`[delegation] ${e.from} → ${e.to}: "${e.task}"`);
+});
+router.events.on("delegate:end", (e) => {
+  console.log(`[delegation] ${e.to} finished (${e.output.length} chars)`);
+});
+
+const result = await router.run(
+  "Write a function that reverses a string and save it to reverse.ts",
+);
+console.log(result.output);
+```
+
+## How it works
+
+1. `AgentRouter` wraps `TuttiRuntime` and injects a `delegate_to_agent` tool into the orchestrator
+2. The orchestrator's system prompt is enhanced with descriptions of available specialists
+3. When the orchestrator calls `delegate_to_agent({ agent_id: "coder", task: "..." })`, the router runs the specialist agent and returns its output
+4. The orchestrator can delegate to multiple specialists in sequence
+
+## Delegation events
+
+Listen to these events to track the flow:
+
+| Event | Fields | When |
+| ----- | ------ | ---- |
+| `delegate:start` | `from`, `to`, `task` | Orchestrator delegates to a specialist |
+| `delegate:end` | `from`, `to`, `output` | Specialist returns its result |
+
+## Tips
+
+:::tip
+Give each specialist a clear, focused system prompt. The orchestrator works best when it can match tasks to well-defined roles.
+:::
+
+:::caution
+Each delegation is a separate agent run with its own token usage. Set `budget` on specialists to prevent runaway costs.
+:::

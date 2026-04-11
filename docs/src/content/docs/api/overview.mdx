@@ -1,0 +1,133 @@
+---
+title: "API Reference"
+description: "TypeScript API reference for Tutti packages"
+sidebar:
+  order: 1
+---
+
+Tutti is fully typed with TypeScript. This page provides a quick reference for the main exports.
+
+## @tuttiai/core
+
+The runtime package. Main exports:
+
+### Classes
+
+| Export | Description |
+| ------ | ----------- |
+| `TuttiRuntime` | Main runtime — takes a score, runs agents |
+| `AgentRunner` | Low-level agentic loop (used internally by the runtime) |
+| `AgentRouter` | Multi-agent orchestration with delegation |
+| `EventBus` | Typed event emitter |
+| `InMemorySessionStore` | Default session storage |
+| `ScoreLoader` | Dynamic import + Zod validation for score files |
+| `SecretsManager` | API key redaction and env var access |
+| `PermissionGuard` | Voice permission enforcement |
+| `PromptGuard` | Prompt injection detection and wrapping |
+| `TokenBudget` | Token/cost tracking and budget enforcement |
+
+### Functions
+
+| Export | Description |
+| ------ | ----------- |
+| `defineScore(config)` | Typed identity function for score definitions |
+| `validateScore(config)` | Zod-validate a score config object |
+
+### Providers
+
+| Export | Description |
+| ------ | ----------- |
+| `AnthropicProvider` | Claude API provider |
+| `OpenAIProvider` | OpenAI / GPT provider |
+| `GeminiProvider` | Google Gemini provider |
+
+## @tuttiai/types
+
+Type definitions. All types are re-exported from `@tuttiai/core` for convenience.
+
+### Core types
+
+```ts
+import type {
+  // Score
+  ScoreConfig,
+
+  // Agent
+  AgentConfig,
+  AgentResult,
+  BudgetConfig,
+
+  // Voice
+  Voice,
+  Tool,
+  ToolResult,
+  ToolContext,
+  VoiceContext,
+  Permission,     // "network" | "filesystem" | "shell" | "browser"
+
+  // LLM
+  LLMProvider,
+  ChatRequest,
+  ChatResponse,
+  ChatMessage,
+  ContentBlock,
+  TokenUsage,
+
+  // Session
+  Session,
+  SessionStore,
+
+  // Events
+  TuttiEvent,
+  TuttiEventType,
+  TuttiEventHandler,
+} from "@tuttiai/types";
+```
+
+### TuttiRuntime
+
+```ts
+class TuttiRuntime {
+  constructor(score: ScoreConfig);
+  readonly events: EventBus;
+  get score(): ScoreConfig;
+  run(agent_name: string, input: string, session_id?: string): Promise<AgentResult>;
+  getSession(id: string): Session | undefined;
+}
+```
+
+### AgentRouter
+
+```ts
+class AgentRouter {
+  constructor(score: ScoreConfig);
+  readonly events: EventBus;
+  run(input: string, session_id?: string): Promise<AgentResult>;
+}
+```
+
+### AgentResult
+
+```ts
+interface AgentResult {
+  session_id: string;
+  output: string;
+  messages: ChatMessage[];
+  turns: number;
+  usage: TokenUsage;
+}
+```
+
+### LLMProvider
+
+The interface all providers implement:
+
+```ts
+interface LLMProvider {
+  chat(request: ChatRequest): Promise<ChatResponse>;
+}
+```
+
+:::caution[Coming soon]
+Auto-generated TypeDoc API reference is planned. For now, the source code in `packages/core/src/` and `packages/types/src/` is the definitive reference.
+:::

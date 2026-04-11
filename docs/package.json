@@ -1,0 +1,14 @@
+{
+  "name": "@tuttiai/docs",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^5.0.0",
+    "@astrojs/starlight": "^0.33.0",
+    "sharp": "^0.33.0"
+  }
+}

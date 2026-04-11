@@ -1,0 +1,92 @@
+---
+title: "Memory & Sessions"
+description: "Persist conversations across turns and runs"
+sidebar:
+  order: 6
+---
+
+Sessions let agents remember previous turns in a conversation. This guide covers how sessions work and how to use them.
+
+## How sessions work
+
+When you call `tutti.run()`, the runtime creates a new session automatically. The session stores the full message history (user messages, assistant responses, tool calls, and tool results).
+
+```ts
+const r1 = await tutti.run("assistant", "My name is Alice.");
+// r1.session_id = "abc-123"
+
+const r2 = await tutti.run("assistant", "What's my name?", r1.session_id);
+// r2.output = "Your name is Alice."
+```
+
+Without a `session_id`, the agent starts fresh with no memory of prior turns.
+
+## Session in the REPL
+
+The `tutti-ai run` REPL manages sessions automatically. Each message in the same REPL session continues the same conversation:
+
+```
+> My favorite color is blue.
+I'll remember that!
+
+> What's my favorite color?
+Your favorite color is blue.
+```
+
+## What's stored in a session
+
+A session contains:
+
+```ts
+interface Session {
+  id: string;
+  agent_name: string;
+  messages: ChatMessage[];
+  created_at: Date;
+  updated_at: Date;
+}
+```
+
+Messages follow the Anthropic API format:
+- `{ role: "user", content: "Hello" }`
+- `{ role: "assistant", content: [{ type: "text", text: "Hi!" }] }`
+- `{ role: "user", content: [{ type: "tool_result", ... }] }`
+
+## In-memory session store
+
+The default `InMemorySessionStore` keeps sessions in memory. They are lost when the process exits.
+
+```ts
+const tutti = new TuttiRuntime(score);
+const session = tutti.getSession("abc-123");
+console.log(session?.messages.length); // number of messages so far
+```
+
+:::caution[Coming soon]
+Persistent session stores (SQLite, PostgreSQL, Redis) are planned for a future release. For now, sessions live only as long as the Node.js process.
+:::
+
+## Multi-turn agent runs
+
+Each `run()` call is one turn in the agentic loop (which may involve multiple LLM calls if tools are used). Across multiple `run()` calls with the same session, the full history accumulates:
+
+```ts
+// Turn 1: agent creates a file
+const r1 = await tutti.run("coder", "Create hello.ts", session_id);
+// Turn 2: agent can reference what it did
+const r2 = await tutti.run("coder", "Now add a test for it", r1.session_id);
+```
+
+## Token usage across sessions
+
+Token usage is reported per `run()` call, not per session. Each run returns:
+
+```ts
+result.usage.input_tokens   // tokens sent to the LLM
+result.usage.output_tokens  // tokens received from the LLM
+result.turns                // number of agentic loop iterations
+```
+
+:::tip
+Long sessions accumulate large message histories, which increases input token counts. Consider starting fresh sessions for unrelated tasks.
+:::

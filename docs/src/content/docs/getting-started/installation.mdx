@@ -1,0 +1,95 @@
+---
+title: "Installation"
+description: "Install Tutti and set up your environment"
+sidebar:
+  order: 2
+---
+
+## Prerequisites
+
+- **Node.js 20+** — Tutti uses ES modules and modern Node APIs
+- **TypeScript 5+** — all packages ship ESM with `.d.ts` types
+- An **LLM API key** — Anthropic, OpenAI, or Google Gemini
+
+## Create a new project
+
+The fastest way to start is with the CLI scaffolding:
+
+```bash
+npx tutti-ai init my-project
+cd my-project
+npm install
+```
+
+This creates a project with:
+
+```
+my-project/
+├── tutti.score.ts    # Your agent configuration
+├── .env.example      # API key placeholders
+├── .gitignore
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+Copy the example env file and add your API key:
+
+```bash
+cp .env.example .env
+```
+
+```bash title=".env"
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+## Add to an existing project
+
+```bash
+npm install @tuttiai/core @tuttiai/types
+```
+
+Then install any voices you need:
+
+```bash
+npm install @tuttiai/filesystem
+npm install @tuttiai/github
+npm install @tuttiai/playwright
+```
+
+Or use the CLI helper:
+
+```bash
+npx tutti-ai add filesystem
+npx tutti-ai add github
+npx tutti-ai add playwright
+```
+
+## Verify your setup
+
+```bash
+npx tutti-ai check
+```
+
+This validates your score file, checks API keys, and reports the health of your configuration:
+
+```
+Checking tutti.score.ts...
+
+  ✔ Score file is valid
+  ✔ Provider: AnthropicProvider (ANTHROPIC_API_KEY is set)
+  ✔ 1 agent configured
+  ✔ Voice: filesystem on assistant (installed)
+
+All checks passed. Run tutti-ai run to start.
+```
+
+## Supported LLM providers
+
+| Provider | Package | Env var |
+| -------- | ------- | ------- |
+| Anthropic (Claude) | Built into `@tuttiai/core` | `ANTHROPIC_API_KEY` |
+| OpenAI (GPT) | Built into `@tuttiai/core` | `OPENAI_API_KEY` |
+| Google Gemini | Built into `@tuttiai/core` | `GEMINI_API_KEY` |
+
+See the [Providers guide](/guides/providers) for details on each.

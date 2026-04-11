@@ -1,0 +1,156 @@
+---
+title: "Core Concepts"
+description: "Understand agents, voices, scores, and the Tutti runtime"
+sidebar:
+  order: 4
+---
+
+## Score
+
+A **score** is the top-level configuration file (`tutti.score.ts`). It defines which LLM provider to use and what agents are available.
+
+```ts
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+
+export default defineScore({
+  name: "my-project",
+  provider: new AnthropicProvider(),
+  default_model: "claude-sonnet-4-20250514",
+  agents: {
+    assistant: { /* ... */ },
+    coder: { /* ... */ },
+  },
+});
+```
+
+The `defineScore()` function is a typed identity function — it gives you autocomplete and type checking with zero runtime overhead. The score is Zod-validated when loaded.
+
+## Agents
+
+An **agent** is an LLM-powered worker. Each agent has:
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `name` | Yes | Display name |
+| `system_prompt` | Yes | Instructions for the LLM |
+| `voices` | Yes | Array of voice instances (can be empty) |
+| `model` | No | Overrides `default_model` from the score |
+| `permissions` | No | Permissions granted to this agent's voices |
+| `max_turns` | No | Max agentic loop iterations (default: 10) |
+| `max_tool_calls` | No | Max tool calls per run (default: 20) |
+| `tool_timeout_ms` | No | Per-tool timeout in ms (default: 30000) |
+| `budget` | No | Token/cost budget for this agent |
+| `delegates` | No | Agent IDs this orchestrator can delegate to |
+| `role` | No | `"orchestrator"` or `"specialist"` |
+
+```ts
+{
+  coder: {
+    name: "Coder",
+    model: "claude-sonnet-4-20250514",
+    system_prompt: "You are a senior TypeScript developer.",
+    voices: [new FilesystemVoice()],
+    permissions: ["filesystem"],
+    max_turns: 15,
+    budget: { max_tokens: 50_000, warn_at_percent: 80 },
+  },
+}
+```
+
+## Voices
+
+A **voice** is a pluggable package that gives agents tools. Think of it as a capability module — filesystem access, GitHub integration, browser control, or anything you build.
+
+Each voice declares:
+- `name` — identifier
+- `tools` — array of tool definitions (name, description, Zod schema, execute function)
+- `required_permissions` — what permissions the agent must grant
+
+```ts
+import { FilesystemVoice } from "@tuttiai/filesystem";
+
+// This voice provides: read_file, write_file, list_directory,
+// create_directory, delete_file, move_file, search_files
+const fs = new FilesystemVoice();
+fs.name;                  // "filesystem"
+fs.required_permissions;  // ["filesystem"]
+fs.tools.length;          // 7
+```
+
+Official voices:
+
+| Voice | Package | Permissions | Tools |
+| ----- | ------- | ----------- | ----- |
+| Filesystem | `@tuttiai/filesystem` | `filesystem` | 7 tools |
+| GitHub | `@tuttiai/github` | `network` | 10 tools |
+| Playwright | `@tuttiai/playwright` | `network`, `browser` | 12 tools |
+
+## Runtime
+
+The **runtime** (`TuttiRuntime`) is the engine. It takes a score, creates the event bus and session store, and runs the agentic loop.
+
+```ts
+const tutti = new TuttiRuntime(score);
+
+// Run an agent
+const result = await tutti.run("coder", "Fix the bug in index.ts");
+
+// Continue a conversation
+const result2 = await tutti.run("coder", "Now add tests", result.session_id);
+```
+
+The agentic loop works like this:
+
+1. Send the conversation to the LLM
+2. If the LLM returns text — done
+3. If the LLM returns tool calls — execute them, append results, go to step 1
+4. Repeat until `max_turns` or budget is exhausted
+
+## Events
+
+Every step emits a typed event on the **event bus**:
+
+```ts
+tutti.events.on("tool:start", (e) => {
+  console.log(`Using tool: ${e.tool_name}`);
+});
+
+tutti.events.on("budget:warning", (e) => {
+  console.log(`Budget warning: ${e.tokens} tokens, $${e.cost_usd}`);
+});
+
+tutti.events.onAny((e) => {
+  console.log(`[${e.type}]`, JSON.stringify(e));
+});
+```
+
+Available events: `agent:start`, `agent:end`, `llm:request`, `llm:response`, `tool:start`, `tool:end`, `tool:error`, `turn:start`, `turn:end`, `delegate:start`, `delegate:end`, `security:injection_detected`, `budget:warning`, `budget:exceeded`.
+
+## Sessions
+
+Sessions track conversation history. The runtime creates a session automatically on the first `run()` call and returns a `session_id`. Pass it back to continue the conversation.
+
+```ts
+const r1 = await tutti.run("assistant", "Hello");
+const r2 = await tutti.run("assistant", "What did I just say?", r1.session_id);
+// r2 has full context of the prior turn
+```
+
+## Permissions
+
+Voices declare what they need. Agents declare what they grant. If there's a mismatch, the runtime throws before executing anything.
+
+```ts
+{
+  coder: {
+    voices: [new FilesystemVoice()],  // requires: ["filesystem"]
+    permissions: ["filesystem"],       // granted — OK
+  },
+  reader: {
+    voices: [new FilesystemVoice()],  // requires: ["filesystem"]
+    permissions: [],                   // not granted — throws!
+  },
+}
+```
+
+The four permission types: `filesystem`, `network`, `shell`, `browser`.

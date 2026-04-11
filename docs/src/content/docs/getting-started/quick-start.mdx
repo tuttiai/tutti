@@ -1,0 +1,117 @@
+---
+title: "Quick Start"
+description: "Build and run your first Tutti agent in under 5 minutes"
+sidebar:
+  order: 3
+---
+
+This guide gets you from zero to a working AI agent in under 5 minutes.
+
+## 1. Create a project
+
+```bash
+npx tutti-ai init my-agent
+cd my-agent
+npm install
+```
+
+## 2. Add your API key
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and paste your Anthropic API key:
+
+```bash title=".env"
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+## 3. Edit your score
+
+Open `tutti.score.ts` — this is already generated for you:
+
+```ts title="tutti.score.ts"
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+
+export default defineScore({
+  name: "my-agent",
+  provider: new AnthropicProvider(),
+  agents: {
+    assistant: {
+      name: "assistant",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You are a helpful assistant. Answer clearly and concisely.",
+      voices: [],
+    },
+  },
+});
+```
+
+## 4. Run it
+
+```bash
+npx tutti-ai run
+```
+
+You'll see the Tutti REPL:
+
+```
+Tutti REPL — type "exit" to quit
+
+> What is the capital of France?
+
+Running agent: assistant
+
+The capital of France is Paris.
+
+>
+```
+
+## 5. Add tools
+
+Let's give the agent filesystem access:
+
+```bash
+npx tutti-ai add filesystem
+```
+
+Update your score:
+
+```ts title="tutti.score.ts" ins={2,12-13}
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+
+export default defineScore({
+  name: "my-agent",
+  provider: new AnthropicProvider(),
+  agents: {
+    assistant: {
+      name: "assistant",
+      model: "claude-sonnet-4-20250514",
+      system_prompt: "You are a helpful assistant with filesystem access.",
+      voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
+    },
+  },
+});
+```
+
+Now run it again:
+
+```
+> Create a file called hello.txt with "Hello from Tutti!"
+
+Running agent: assistant
+  Using tool: write_file
+  Done: write_file
+
+Done! I created hello.txt with the content "Hello from Tutti!".
+```
+
+## Next steps
+
+- [Core Concepts](/getting-started/core-concepts) — understand agents, voices, and scores
+- [Multi-Agent Orchestration](/guides/multi-agent) — delegate between specialist agents
+- [Security](/guides/security) — permissions, budgets, and secret management

@@ -1,0 +1,119 @@
+---
+title: "Development Setup"
+description: "Clone, install, build, and test the Tutti monorepo"
+sidebar:
+  order: 2
+---
+
+## Prerequisites
+
+- Node.js 20+
+- npm 10+
+- Git
+
+## Clone and install
+
+```bash
+git clone https://github.com/tuttiai/tutti.git
+cd tutti
+npm install
+```
+
+This installs all dependencies for all packages in the monorepo (npm workspaces).
+
+## Monorepo structure
+
+```
+tutti/
+├── packages/
+│   ├── types/          # @tuttiai/types — shared TypeScript interfaces
+│   ├── core/           # @tuttiai/core — runtime, providers, security
+│   ├── cli/            # @tuttiai/cli — CLI commands (init, run, add, check)
+│   └── tutti-ai/       # tutti-ai — the npm bin wrapper
+├── voices/
+│   ├── filesystem/     # @tuttiai/filesystem — 7 file tools
+│   ├── github/         # @tuttiai/github — 10 GitHub tools
+│   └── playwright/     # @tuttiai/playwright — 12 browser tools
+├── examples/           # Example score files
+├── docs/               # Documentation site (Astro Starlight)
+└── .github/workflows/  # CI pipeline
+```
+
+### Dependency graph
+
+```
+@tuttiai/types  ← @tuttiai/core  ← @tuttiai/cli ← tutti-ai
+                ← @tuttiai/filesystem
+                ← @tuttiai/github
+                ← @tuttiai/playwright
+```
+
+`@tuttiai/types` is the leaf — every other package depends on it. `@tuttiai/core` depends on types. Voices depend on types. The CLI depends on core.
+
+## Build
+
+```bash
+npm run build
+```
+
+Uses [Turborepo](https://turbo.build) to build all packages in dependency order. Each package uses [tsup](https://tsup.egoist.dev) to bundle ESM + `.d.ts` types.
+
+## Test
+
+```bash
+# All tests
+npx vitest run
+
+# Specific package
+npx vitest run packages/core/tests/
+
+# Watch mode
+npx vitest
+```
+
+Test stack: [Vitest](https://vitest.dev) with `vi.fn()` for mocks.
+
+## Typecheck
+
+```bash
+npm run typecheck
+```
+
+Runs `tsc --noEmit` in all packages via Turborepo.
+
+## Key conventions
+
+### TypeScript
+
+- Strict mode (`"strict": true`)
+- ESM only — all packages use `"type": "module"`
+- `.js` extensions in imports (e.g. `import { Foo } from "./foo.js"`)
+- No `any` unless absolutely necessary
+
+### Schemas
+
+- All tool inputs validated with [Zod](https://zod.dev)
+- Score files validated with Zod at load time
+- No runtime `as` casts on external input
+
+### Testing
+
+- Every new feature needs tests
+- Bug fixes need a regression test
+- Mock the LLM provider using `createMockProvider()` from `tests/helpers/mock-provider.ts`
+- Test tools by calling `tool.execute()` directly
+
+### Package conventions
+
+- Internal workspace deps use `"*"` (npm resolves to local workspace)
+- External deps pinned to exact versions (no `^`)
+- All packages ship ESM with `.d.ts` types via tsup
+
+## CI pipeline
+
+GitHub Actions runs on every push and PR:
+
+1. **security** job: `npm ci` → `npm audit --audit-level=high` → `npm run build` → `npx vitest run`
+2. **typecheck** job: `npm ci` → `npm run typecheck`
+
+See [`.github/workflows/ci.yml`](https://github.com/tuttiai/tutti/blob/main/.github/workflows/ci.yml).

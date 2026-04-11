@@ -1,0 +1,148 @@
+---
+title: "Playwright Voice"
+description: "@tuttiai/playwright — browser automation, screenshots, and page interaction"
+sidebar:
+  order: 4
+---
+
+The Playwright voice gives agents full browser control — navigate pages, click elements, fill forms, take screenshots, and extract content.
+
+## Installation
+
+```bash
+npx tutti-ai add playwright
+npx playwright install chromium
+```
+
+:::note
+The `npx playwright install chromium` step downloads the Chromium browser binary (~150MB). This is required for Playwright to work.
+:::
+
+## Required permissions
+
+```ts
+permissions: ["network", "browser"]
+```
+
+## Required environment variables
+
+None.
+
+## Configuration
+
+```ts
+// Defaults: headless, no slowdown, 10s timeout
+new PlaywrightVoice()
+
+// Custom options
+new PlaywrightVoice({
+  headless: false,    // show the browser window
+  slowMo: 100,        // 100ms between actions (for debugging)
+  timeout: 15000,     // 15s default timeout
+})
+```
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `headless` | `boolean` | `true` | Run browser without a visible window |
+| `slowMo` | `number` | — | Milliseconds between actions |
+| `timeout` | `number` | `10000` | Default timeout in ms |
+
+## Tool reference
+
+| Tool | Description | Key inputs |
+| ---- | ----------- | ---------- |
+| `navigate` | Go to a URL | `url`, `wait_until` |
+| `click` | Click an element | `selector` |
+| `type` | Type text into an input | `selector`, `text`, `clear` |
+| `screenshot` | Take a screenshot | `path`, `full_page` |
+| `get_text` | Get text content | `selector` |
+| `get_page_content` | Get full page URL, title, and text | — |
+| `wait_for` | Wait for an element or condition | `selector`, `state`, `timeout` |
+| `select_option` | Select from a dropdown | `selector`, `value` |
+| `check_element` | Check if element exists and is visible | `selector` |
+| `scroll` | Scroll the page | `direction`, `amount` |
+| `evaluate` | Execute JavaScript in the page | `script` |
+| `get_attribute` | Get an element's attribute value | `selector`, `attribute` |
+
+### navigate
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `url` | `string` | — | Full URL (must be `http://` or `https://`) |
+| `wait_until` | `"load" \| "domcontentloaded" \| "networkidle"` | `"load"` | Navigation complete condition |
+
+### screenshot
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `path` | `string` | — | File path to save the screenshot |
+| `full_page` | `boolean` | `false` | Capture the full scrollable page |
+
+### type
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `selector` | `string` | — | CSS selector of the input |
+| `text` | `string` | — | Text to type |
+| `clear` | `boolean` | `false` | Clear the field first |
+
+## Security
+
+- **URL sanitization** — blocks `file:`, `javascript:`, `data:` schemes and private network ranges (`10.x`, `172.16-31.x`, `192.168.x`)
+- Requires both `network` and `browser` permissions
+
+## Teardown
+
+The Playwright voice has a `teardown()` method that closes the browser. Call it when you're done:
+
+```ts
+const voice = new PlaywrightVoice();
+// ... use it ...
+await voice.teardown();
+```
+
+## Example
+
+```ts title="tutti.score.ts"
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+import { PlaywrightVoice } from "@tuttiai/playwright";
+
+const playwright = new PlaywrightVoice({ headless: true });
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    qa: {
+      name: "QA Agent",
+      model: "claude-sonnet-4-20250514",
+      system_prompt: `You are a QA engineer. Navigate to websites, test functionality,
+take screenshots to document findings, and report bugs clearly.`,
+      voices: [playwright],
+      permissions: ["network", "browser"],
+    },
+  },
+});
+```
+
+```
+> Test the login page at https://example.com/login
+
+  Using tool: navigate
+  Done: navigate
+  Using tool: screenshot
+  Done: screenshot
+  Using tool: type
+  Done: type
+  Using tool: click
+  Done: click
+  Using tool: screenshot
+  Done: screenshot
+
+QA Report for https://example.com/login:
+1. Page loads correctly (screenshot: login-before.png)
+2. Username and password fields are present and functional
+3. Login button submits the form
+4. After login, redirected to dashboard (screenshot: login-after.png)
+No issues found.
+```

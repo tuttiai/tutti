@@ -1,0 +1,61 @@
+---
+title: "Voices Overview"
+description: "What voices are and the official voice repertoire"
+sidebar:
+  order: 1
+---
+
+A **voice** is a pluggable package that gives agents tools and capabilities. Each voice is an npm package that exports a class implementing the `Voice` interface.
+
+## Official voices
+
+| Voice | Package | Permissions | Tools | Description |
+| ----- | ------- | ----------- | ----- | ----------- |
+| [Filesystem](/voices/filesystem) | `@tuttiai/filesystem` | `filesystem` | 7 | Read, write, search, and manage local files |
+| [GitHub](/voices/github) | `@tuttiai/github` | `network` | 10 | Issues, PRs, repos, code search |
+| [Playwright](/voices/playwright) | `@tuttiai/playwright` | `network`, `browser` | 12 | Browser automation, screenshots, page interaction |
+
+## Installing a voice
+
+```bash
+npx tutti-ai add filesystem
+npx tutti-ai add github
+npx tutti-ai add playwright
+```
+
+## Using a voice
+
+```ts
+import { FilesystemVoice } from "@tuttiai/filesystem";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    coder: {
+      name: "Coder",
+      system_prompt: "You can read and write files.",
+      voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
+    },
+  },
+});
+```
+
+## The Voice interface
+
+Every voice implements:
+
+```ts
+interface Voice {
+  name: string;
+  description?: string;
+  tools: Tool[];
+  required_permissions: Permission[];
+  setup?(context: VoiceContext): Promise<void>;
+  teardown?(): Promise<void>;
+}
+```
+
+## Community voices
+
+Anyone can build and publish a voice. See [Building a Voice](/guides/building-a-voice) for a step-by-step guide.

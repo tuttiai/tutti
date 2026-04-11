@@ -1,0 +1,32 @@
+---
+title: "Tutti Docs"
+description: "Open-source multi-agent orchestration framework for TypeScript"
+template: splash
+hero:
+  tagline: "Define a team of AI agents, give them voices, and let them work together."
+  actions:
+    - text: Get Started
+      link: /getting-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/tuttiai/tutti
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="Quick Start" icon="rocket">
+    Build a working agent in under 5 minutes. [Get started](/getting-started/quick-start/)
+  </Card>
+  <Card title="Voices" icon="puzzle">
+    Give agents filesystem, GitHub, and browser tools. [Browse voices](/voices/overview/)
+  </Card>
+  <Card title="Multi-Agent" icon="random">
+    Orchestrate specialist agents that delegate to each other. [Learn more](/guides/multi-agent/)
+  </Card>
+  <Card title="Security" icon="warning">
+    Permissions, secret redaction, prompt injection defense. [Security guide](/guides/security/)
+  </Card>
+</CardGrid>

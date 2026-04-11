@@ -1,0 +1,167 @@
+---
+title: "CLI Reference"
+description: "Complete reference for all tutti-ai CLI commands"
+sidebar:
+  order: 1
+---
+
+The `tutti-ai` CLI helps you scaffold, run, and validate Tutti projects.
+
+## Installation
+
+```bash
+npm install -g tutti-ai
+# or use npx:
+npx tutti-ai <command>
+```
+
+---
+
+## `tutti-ai init [project-name]`
+
+Create a new Tutti project with scaffolded files.
+
+```bash
+tutti-ai init my-project
+```
+
+**What it creates:**
+
+```
+my-project/
+├── tutti.score.ts    # Agent configuration
+├── .env.example      # API key placeholders
+├── .gitignore        # Ignores .env, node_modules, dist
+├── package.json      # Dependencies and scripts
+├── tsconfig.json     # TypeScript config
+└── README.md         # Project description
+```
+
+**Interactive mode:** If you omit the project name, it will prompt you.
+
+---
+
+## `tutti-ai run [score]`
+
+Run a Tutti score interactively in a REPL.
+
+```bash
+tutti-ai run                    # uses ./tutti.score.ts
+tutti-ai run ./path/to/score.ts # custom path
+```
+
+**Output:**
+
+```
+Tutti REPL — type "exit" to quit
+
+> Hello!
+Running agent: assistant
+
+Hello! How can I help you today?
+
+> exit
+Goodbye!
+```
+
+**Behavior:**
+
+- Loads `.env` automatically via `dotenv`
+- Validates the API key for the detected provider
+- Maintains a session across REPL turns
+- Shows tool usage, errors, security warnings, and budget events
+- Ctrl+C to exit gracefully
+
+---
+
+## `tutti-ai add <voice>`
+
+Install a voice package and print setup instructions.
+
+```bash
+tutti-ai add filesystem
+tutti-ai add github
+tutti-ai add playwright
+tutti-ai add @someone/custom-voice
+```
+
+**Official voices:**
+
+| Shorthand | Package installed |
+| --------- | ---------------- |
+| `filesystem` | `@tuttiai/filesystem` |
+| `github` | `@tuttiai/github` |
+| `playwright` | `@tuttiai/playwright` |
+
+For unknown names, it tries `@tuttiai/<name>` first, then the literal package name.
+
+**Example output:**
+
+```
+✔ Installed @tuttiai/github
+
+  Setup:
+  Add GITHUB_TOKEN to your .env file:
+    GITHUB_TOKEN=ghp_your_token_here
+
+  Add to your score:
+    import { GitHubVoice } from "@tuttiai/github"
+    voices: [new GitHubVoice()]
+```
+
+---
+
+## `tutti-ai check [score]`
+
+Validate a score file without running it. Checks configuration, API keys, and installed voices.
+
+```bash
+tutti-ai check                    # uses ./tutti.score.ts
+tutti-ai check ./path/to/score.ts # custom path
+```
+
+**Example output (all passing):**
+
+```
+Checking tutti.score.ts...
+
+  ✔ Score file is valid
+  ✔ Provider: AnthropicProvider (ANTHROPIC_API_KEY is set)
+  ✔ 2 agents configured
+  ✔ Voice: filesystem on coder (installed)
+  ✔ Voice: github on coder (GITHUB_TOKEN is set)
+
+All checks passed. Run tutti-ai run to start.
+```
+
+**Example output (failures):**
+
+```
+Checking tutti.score.ts...
+
+  ✘ Score validation failed
+  Invalid score file:
+  - provider: Required
+  - agents.coder.max_turns: max_turns must be a positive number
+```
+
+**What it checks:**
+
+1. Score file exists and can be loaded
+2. Zod schema validation (required fields, valid types, cross-references)
+3. Provider API key is set in the environment
+4. Voices that need env vars (e.g. `GITHUB_TOKEN`) have them set
+
+---
+
+## Global options
+
+```bash
+tutti-ai --version    # Print version
+tutti-ai --help       # Show help
+tutti-ai <cmd> --help # Show command help
+```
+
+## Error handling
+
+The CLI installs global handlers for `unhandledRejection` and `uncaughtException`, ensuring a clean error message and exit code 1 on unexpected failures.

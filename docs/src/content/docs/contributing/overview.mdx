@@ -1,0 +1,61 @@
+---
+title: "Contributing"
+description: "How to contribute to Tutti"
+sidebar:
+  order: 1
+---
+
+Tutti is open source and we welcome contributions. Here's how to get involved.
+
+## Ways to contribute
+
+- **Report bugs** — open an issue on [GitHub](https://github.com/tuttiai/tutti/issues)
+- **Fix bugs** — pick an issue labeled `good first issue` and submit a PR
+- **Add features** — discuss in an issue first, then implement
+- **Improve docs** — every page has an "Edit this page" link
+- **Build a voice** — publish your own voice package to npm
+- **Write tests** — help us improve coverage
+
+## Code of conduct
+
+Be respectful, constructive, and collaborative. We don't tolerate harassment of any kind.
+
+## Pull request guidelines
+
+1. **One concern per PR** — don't mix bug fixes with features
+2. **Write tests** — new features need tests; bug fixes need a regression test
+3. **Run the full suite** — `npm run build && npx vitest run` must pass
+4. **Match the code style** — TypeScript strict mode, Zod for all schemas, ESM only
+5. **Write clear commit messages** — use conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`)
+6. **Keep PRs small** — easier to review, faster to merge
+
+## Development workflow
+
+```bash
+# Fork and clone
+git clone https://github.com/YOUR_USERNAME/tutti.git
+cd tutti
+npm install
+npm run build
+
+# Make changes
+git checkout -b feat/my-feature
+
+# Test
+npx vitest run
+
+# Commit and push
+git add .
+git commit -m "feat: add my feature"
+git push origin feat/my-feature
+```
+
+Then open a PR against `main`.
+
+## Project structure
+
+See [Development Setup](/contributing/development-setup) for a full breakdown of the monorepo.
+
+## Security vulnerabilities
+
+If you discover a security vulnerability, **do not open a public issue.** Email security@tutti-ai.com instead. See [SECURITY.md](https://github.com/tuttiai/tutti/blob/main/SECURITY.md) for details.

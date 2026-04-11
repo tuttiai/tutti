@@ -1,0 +1,118 @@
+---
+title: "GitHub Voice"
+description: "@tuttiai/github — interact with GitHub repositories, issues, and PRs"
+sidebar:
+  order: 3
+---
+
+The GitHub voice gives agents access to the GitHub API — issues, pull requests, repositories, and code search.
+
+## Installation
+
+```bash
+npx tutti-ai add github
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+| Var | Description |
+| --- | ----------- |
+| `GITHUB_TOKEN` | GitHub personal access token (or fine-grained token) |
+
+Add to your `.env`:
+
+```bash title=".env"
+GITHUB_TOKEN=ghp_your_token_here
+```
+
+## Configuration
+
+```ts
+// Default: reads GITHUB_TOKEN from env
+new GitHubVoice()
+
+// Explicit token
+new GitHubVoice({ token: "ghp_..." })
+```
+
+## Tool reference
+
+| Tool | Description | Key inputs |
+| ---- | ----------- | ---------- |
+| `list_issues` | List issues in a repo | `owner`, `repo`, `state`, `labels`, `limit` |
+| `get_issue` | Get issue details | `owner`, `repo`, `issue_number` |
+| `create_issue` | Create a new issue | `owner`, `repo`, `title`, `body`, `labels` |
+| `comment_on_issue` | Add a comment | `owner`, `repo`, `issue_number`, `body` |
+| `list_pull_requests` | List PRs | `owner`, `repo`, `state`, `limit` |
+| `get_pull_request` | Get PR details | `owner`, `repo`, `pull_number` |
+| `get_file_contents` | Get a file from a repo | `owner`, `repo`, `path`, `ref` |
+| `search_code` | Search code across GitHub | `query`, `limit` |
+| `list_repositories` | List repos for a user/org | `owner`, `type`, `limit` |
+| `get_repository` | Get repo details | `owner`, `repo` |
+
+### list_issues
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `owner` | `string` | — | Repository owner |
+| `repo` | `string` | — | Repository name |
+| `state` | `"open" \| "closed" \| "all"` | `"open"` | Filter by state |
+| `labels` | `string?` | — | Comma-separated labels |
+| `limit` | `number` | `20` | Max results (1-100) |
+
+### create_issue
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `owner` | `string` | — | Repository owner |
+| `repo` | `string` | — | Repository name |
+| `title` | `string` | — | Issue title |
+| `body` | `string?` | — | Issue body (Markdown) |
+| `labels` | `string[]?` | — | Labels to apply |
+
+### search_code
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `query` | `string` | — | GitHub code search query |
+| `limit` | `number` | `10` | Max results |
+
+## Example
+
+```ts title="tutti.score.ts"
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+import { GitHubVoice } from "@tuttiai/github";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    triager: {
+      name: "Issue Triager",
+      model: "claude-sonnet-4-20250514",
+      system_prompt: `You help triage GitHub issues. When asked about a repo,
+list the open issues, summarize them, and suggest priorities.`,
+      voices: [new GitHubVoice()],
+      permissions: ["network"],
+    },
+  },
+});
+```
+
+```
+> What are the top open issues in facebook/react?
+
+  Using tool: list_issues
+  Done: list_issues
+
+Here are the top open issues in facebook/react:
+
+1. #28123 — useEffect cleanup order with Suspense (bug, 45 comments)
+2. #28089 — Server Components streaming error handling (enhancement)
+...
+```

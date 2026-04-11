@@ -1,0 +1,164 @@
+---
+title: "Security"
+description: "Permissions, secret management, prompt injection defense, and budgets"
+sidebar:
+  order: 7
+---
+
+Tutti has multiple layers of security built in. This guide covers each one and how to configure them.
+
+## Permission system
+
+Voices declare `required_permissions`. Agents must explicitly grant them.
+
+```ts
+{
+  coder: {
+    voices: [new FilesystemVoice()],  // requires: ["filesystem"]
+    permissions: ["filesystem"],       // must be granted explicitly
+  },
+}
+```
+
+If permissions are missing, the runtime throws before executing anything:
+
+```
+Voice filesystem requires permissions not granted: filesystem
+
+Grant them in your score file:
+  permissions: ['filesystem']
+```
+
+The four permission types:
+
+| Permission | Grants access to |
+| ---------- | ---------------- |
+| `filesystem` | Local file read/write |
+| `network` | HTTP requests, API calls |
+| `shell` | Shell command execution |
+| `browser` | Browser automation |
+
+:::tip
+The runtime logs a warning for agents with `filesystem` or `shell` permissions, since these are the most powerful.
+:::
+
+## Secret redaction
+
+The `SecretsManager` automatically redacts known API key patterns from:
+
+- Event bus payloads (so logging doesn't leak keys)
+- Tool error messages (so the LLM doesn't see raw keys)
+
+Detected patterns: Anthropic keys (`sk-ant-*`), OpenAI keys (`sk-*`), GitHub tokens (`ghp_*`), Google API keys (`AIza*`), Bearer tokens.
+
+```ts
+SecretsManager.redact("Key is sk-ant-api03-abcdef...")
+// → "Key is [REDACTED]"
+```
+
+## Path traversal protection
+
+The filesystem voice blocks access to system paths:
+
+- `/etc/passwd`, `/etc/shadow`, `/etc/hosts`
+- `~/.ssh`, `~/.aws`
+- `/proc`, `/sys`, `/dev`
+
+It also enforces a maximum file size on reads (default 10MB).
+
+```
+> Read /etc/passwd
+  Error: Access to system path not allowed: /etc/passwd
+```
+
+## URL sanitization
+
+The Playwright voice blocks dangerous URL schemes:
+
+- `file:`, `javascript:`, `data:` — local file access, script injection
+- Private network ranges (`10.x`, `172.16-31.x`, `192.168.x`) — SSRF prevention
+
+## Prompt injection defense
+
+Tool results are scanned by `PromptGuard` for common injection patterns:
+
+- "Ignore all previous instructions"
+- "You are now..."
+- "New instructions:"
+- "System prompt:"
+- "Forget everything"
+- "Your new role/purpose/goal"
+
+When a pattern is detected:
+1. The content is wrapped with boundary markers and a data-only warning
+2. A `security:injection_detected` event is emitted
+
+```ts
+tutti.events.on("security:injection_detected", (e) => {
+  console.warn(`Injection detected in ${e.tool_name}:`, e.patterns);
+});
+```
+
+:::note
+The PromptGuard does not block content — it wraps it with markers that instruct the LLM to treat it as data, not instructions. The original content is preserved.
+:::
+
+## Token budget
+
+Set per-agent budgets to prevent runaway costs:
+
+```ts
+{
+  assistant: {
+    budget: {
+      max_tokens: 50_000,       // hard limit on total tokens
+      max_cost_usd: 1.00,       // hard limit on estimated cost
+      warn_at_percent: 80,       // emit warning at 80% (default)
+    },
+  },
+}
+```
+
+Events:
+- `budget:warning` — emitted when usage crosses the `warn_at_percent` threshold
+- `budget:exceeded` — emitted when the limit is hit; the agent loop stops
+
+## Tool rate limiting
+
+Two rate limits protect against runaway tool execution:
+
+| Config | Default | Description |
+| ------ | ------- | ----------- |
+| `max_tool_calls` | 20 | Max tool calls per `run()` |
+| `tool_timeout_ms` | 30000 | Per-tool timeout in milliseconds |
+
+```ts
+{
+  assistant: {
+    max_tool_calls: 10,
+    tool_timeout_ms: 15_000,
+  },
+}
+```
+
+If a tool exceeds the timeout, the error is returned as a `tool_result` (not thrown), so the LLM can recover gracefully.
+
+## Score validation
+
+Score files are Zod-validated when loaded. Common mistakes are caught early:
+
+- Missing `provider`
+- Agent with empty `name` or `system_prompt`
+- Negative `max_turns` or `max_tool_calls`
+- Delegates referencing agents that don't exist
+- Invalid permission values
+
+Run `npx tutti-ai check` to validate without running.
+
+## Best practices
+
+1. **Least privilege** — only grant the permissions each agent actually needs
+2. **Set budgets** — always set `max_tokens` or `max_cost_usd` in production
+3. **Monitor events** — subscribe to `security:injection_detected` and `budget:warning`
+4. **Keep .env out of git** — the `.gitignore` template already excludes it
+5. **Pin dependencies** — all Tutti packages pin exact dependency versions

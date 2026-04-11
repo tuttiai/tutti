@@ -1,0 +1,57 @@
+---
+title: "Introduction"
+description: "What Tutti is, why it exists, and how it works"
+sidebar:
+  order: 1
+---
+
+Tutti is an open-source multi-agent orchestration framework for TypeScript. Define a team of AI agents, give them voices (tools and integrations), and let them work together.
+
+```ts
+import { TuttiRuntime, AnthropicProvider, defineScore } from "@tuttiai/core";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+import { GitHubVoice } from "@tuttiai/github";
+
+const score = defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    coder: {
+      name: "Coder",
+      system_prompt: "You are a senior TypeScript developer.",
+      voices: [new FilesystemVoice(), new GitHubVoice()],
+      permissions: ["filesystem", "network"],
+    },
+  },
+});
+
+const tutti = new TuttiRuntime(score);
+const result = await tutti.run("coder", "Fix the bug in src/index.ts");
+console.log(result.output);
+```
+
+## Why Tutti?
+
+LLM APIs give you text in, text out. But real tasks need agents that can **read files**, **call APIs**, **control browsers**, and **delegate to each other**. Tutti gives you:
+
+- **Agents** — LLM-powered workers with system prompts and capabilities
+- **Voices** — pluggable tool packages (filesystem, GitHub, Playwright, or build your own)
+- **Orchestration** — an orchestrator agent can delegate tasks to specialist agents
+- **Observability** — every LLM call, tool execution, and delegation is emitted as a typed event
+- **Security** — permission enforcement, secret redaction, prompt injection detection, token budgets
+
+## How it works
+
+1. You write a **score file** (`tutti.score.ts`) that defines your agents and their voices
+2. The **runtime** runs the agentic loop: send messages to the LLM, execute tool calls, repeat
+3. **Voices** provide the tools that agents can call (read files, create GitHub issues, navigate browsers)
+4. The **event bus** emits typed events at every step for logging, debugging, and monitoring
+
+## What's a "Score"?
+
+In music, a score tells each instrument what to play. In Tutti, a score tells each agent what to do — their role, their tools, and their boundaries. The name "Tutti" means "all together" in Italian, the musical direction for the entire ensemble to play.
+
+## Next steps
+
+- [Installation](/getting-started/installation) — set up your environment
+- [Quick Start](/getting-started/quick-start) — a working agent in under 5 minutes
+- [Core Concepts](/getting-started/core-concepts) — understand agents, voices, and scores
