@@ -29,8 +29,8 @@ export function createListRepositoriesTool(octokit: Octokit): Tool<z.infer<typeo
         } catch {
           const { data } = await octokit.repos.listForUser({
             username: input.owner,
-            type: input.type === "private" ? "owner" : input.type === "all" ? "all" : "public",
-            per_page: input.limit,
+            type: input.type === "private" ? "owner" : input.type === "all" ? "all" : "owner",
+            per_page: input.limit ?? 20,
             sort: "updated",
           });
           repos = data;
@@ -43,7 +43,7 @@ export function createListRepositoriesTool(octokit: Octokit): Tool<z.infer<typeo
         const lines = repos.map((r) => {
           const desc = r.description ? `  ${truncate(r.description, 50)}` : "";
           const lang = r.language ?? "";
-          const stars = formatNumber(r.stargazers_count);
+          const stars = formatNumber(r.stargazers_count ?? 0);
           return `  ${r.name}  ★${stars}  ${lang}${desc}`;
         });
 
