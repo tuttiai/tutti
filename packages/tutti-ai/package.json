@@ -7,7 +7,7 @@
     "tutti-ai": "./bin/tutti-ai.js"
   },
   "dependencies": {
-    "@tuttiai/cli": "0.3.0"
+    "@tuttiai/cli": "*"
   },
   "files": ["bin", "README.md"],
   "license": "MIT",

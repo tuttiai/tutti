@@ -21,13 +21,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tuttiai/core": "^0.3.0",
-    "@tuttiai/types": "^0.2.0",
-    "chalk": "^5.4.0",
-    "commander": "^13.1.0",
-    "dotenv": "^17.4.1",
-    "enquirer": "^2.4.0",
-    "ora": "^8.2.0"
+    "@tuttiai/core": "*",
+    "@tuttiai/types": "*",
+    "chalk": "5.6.2",
+    "commander": "4.1.1",
+    "dotenv": "17.4.1",
+    "enquirer": "2.4.1",
+    "ora": "8.2.0"
   },
   "keywords": ["tutti", "ai", "agents", "orchestration", "cli", "scaffold"],
   "license": "MIT",
