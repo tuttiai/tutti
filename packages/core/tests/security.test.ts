@@ -4,9 +4,8 @@
  * Covers: secret redaction, permission enforcement, path traversal,
  * prompt injection, token budget, and tool timeout.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { SecretsManager } from "../src/secrets.js";
 import { PermissionGuard } from "../src/permission-guard.js";
 import { PromptGuard } from "../src/prompt-guard.js";
 import { AgentRunner } from "../src/agent-runner.js";

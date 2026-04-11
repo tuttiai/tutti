@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ToolContext } from "@tuttiai/types";
 import { GitHubVoice } from "../src/index.js";
-import { createOctokit } from "../src/client.js";
 import { createListIssuesTool } from "../src/tools/list-issues.js";
 import { createGetIssueTool } from "../src/tools/get-issue.js";
 import { createCreateIssueTool } from "../src/tools/create-issue.js";

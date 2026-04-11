@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { TokenBudget } from "../src/token-budget.js";
 import { AgentRunner } from "../src/agent-runner.js";
 import { EventBus } from "../src/event-bus.js";
@@ -6,7 +6,6 @@ import { InMemorySessionStore } from "../src/session-store.js";
 import {
   createMockProvider,
   textResponse,
-  toolUseResponse,
   simpleAgent,
 } from "./helpers/mock-provider.js";
 import type { TuttiEvent } from "@tuttiai/types";
