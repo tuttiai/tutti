@@ -4,6 +4,13 @@ import type { ChatMessage, TokenUsage } from "./llm.js";
 import type { Permission } from "./voice.js";
 import type { Voice } from "./voice.js";
 
+export interface BudgetConfig {
+  max_tokens?: number;
+  max_cost_usd?: number;
+  /** Percentage at which to emit a warning (default 80). */
+  warn_at_percent?: number;
+}
+
 export interface AgentConfig {
   name: string;
   description?: string;
@@ -13,6 +20,7 @@ export interface AgentConfig {
   permissions?: Permission[];
   max_turns?: number;
   max_tool_calls?: number;
+  budget?: BudgetConfig;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];
   /** Role in the orchestration — orchestrator receives input first. */

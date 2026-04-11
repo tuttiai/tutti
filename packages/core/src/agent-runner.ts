@@ -16,6 +16,7 @@ import type {
 import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
+import { TokenBudget } from "./token-budget.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
@@ -59,6 +60,9 @@ export class AgentRunner {
 
     const maxTurns = agent.max_turns ?? DEFAULT_MAX_TURNS;
     const maxToolCalls = agent.max_tool_calls ?? DEFAULT_MAX_TOOL_CALLS;
+    const budget = agent.budget
+      ? new TokenBudget(agent.budget, agent.model ?? "")
+      : undefined;
     const totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
     let turns = 0;
     let totalToolCalls = 0;
@@ -97,6 +101,29 @@ export class AgentRunner {
 
       totalUsage.input_tokens += response.usage.input_tokens;
       totalUsage.output_tokens += response.usage.output_tokens;
+
+      // Check token budget
+      if (budget) {
+        budget.add(response.usage.input_tokens, response.usage.output_tokens);
+        const status = budget.check();
+        if (status === "warning") {
+          this.events.emit({
+            type: "budget:warning",
+            agent_name: agent.name,
+            tokens: budget.total_tokens,
+            cost_usd: budget.estimated_cost_usd,
+          });
+        } else if (status === "exceeded") {
+          this.events.emit({
+            type: "budget:exceeded",
+            agent_name: agent.name,
+            tokens: budget.total_tokens,
+            cost_usd: budget.estimated_cost_usd,
+          });
+          messages.push({ role: "assistant", content: response.content });
+          break;
+        }
+      }
 
       // Add assistant message
       messages.push({ role: "assistant", content: response.content });

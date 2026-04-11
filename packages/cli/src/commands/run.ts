@@ -93,6 +93,14 @@ export async function runCommand(scorePath?: string): Promise<void> {
     );
   });
 
+  runtime.events.on("budget:warning", () => {
+    console.log(chalk.yellow("  Approaching token budget (80%)"));
+  });
+
+  runtime.events.on("budget:exceeded", () => {
+    console.log(chalk.red("  Token budget exceeded. Stopping."));
+  });
+
   // REPL
   const rl = createInterface({
     input: process.stdin,

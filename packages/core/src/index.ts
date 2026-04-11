@@ -9,6 +9,7 @@ export { defineScore } from "./define-score.js";
 export { SecretsManager } from "./secrets.js";
 export { PermissionGuard } from "./permission-guard.js";
 export { PromptGuard } from "./prompt-guard.js";
+export { TokenBudget } from "./token-budget.js";
 
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";
@@ -40,6 +41,7 @@ export type {
   VoiceContext,
   Voice,
   // Agent
+  BudgetConfig,
   AgentConfig,
   AgentResult,
   // Score

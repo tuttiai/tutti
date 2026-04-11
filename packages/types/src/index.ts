@@ -22,6 +22,7 @@ export type {
 } from "./voice.js";
 
 export type {
+  BudgetConfig,
   AgentConfig,
   AgentResult,
 } from "./agent.js";
