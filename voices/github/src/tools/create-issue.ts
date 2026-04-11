@@ -32,7 +32,7 @@ export function createCreateIssueTool(octokit: Octokit): Tool<z.infer<typeof par
           content: `Created issue #${issue.number}: ${issue.title}\n${issue.html_url}`,
         };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.owner + "/" + input.repo), is_error: true };
       }
     },
   };

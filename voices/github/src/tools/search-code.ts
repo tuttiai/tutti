@@ -41,7 +41,7 @@ export function createSearchCodeTool(octokit: Octokit): Tool<z.infer<typeof para
           content: `${data.total_count} results (showing ${data.items.length}):\n${lines.join("\n")}`,
         };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.query), is_error: true };
       }
     },
   };

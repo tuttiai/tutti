@@ -134,7 +134,12 @@ export async function runCommand(scorePath?: string): Promise<void> {
         spinner.stop();
         console.error(
           chalk.red(
-            `Error: ${err instanceof Error ? err.message : err}`,
+            `[tutti] Something went wrong: ${err instanceof Error ? err.message : err}`,
+          ),
+        );
+        console.error(
+          chalk.dim(
+            'Run "tutti-ai check" to validate your score file.',
           ),
         );
       }

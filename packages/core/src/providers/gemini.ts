@@ -25,7 +25,9 @@ export class GeminiProvider implements LLMProvider {
     const apiKey = options.api_key ?? SecretsManager.optional("GEMINI_API_KEY");
     if (!apiKey) {
       throw new Error(
-        "GeminiProvider requires an API key. Set GEMINI_API_KEY or pass api_key option.",
+        "GeminiProvider requires an API key.\n" +
+        "Set GEMINI_API_KEY in your .env file, or pass api_key to the constructor:\n" +
+        "  new GeminiProvider({ api_key: 'your-key' })",
       );
     }
     this.client = new GoogleGenerativeAI(apiKey);
@@ -100,14 +102,23 @@ export class GeminiProvider implements LLMProvider {
       }
     }
 
-    const result = await generativeModel.generateContent({
-      contents,
-      generationConfig: {
-        maxOutputTokens: request.max_tokens,
-        temperature: request.temperature,
-        stopSequences: request.stop_sequences,
-      },
-    });
+    let result;
+    try {
+      result = await generativeModel.generateContent({
+        contents,
+        generationConfig: {
+          maxOutputTokens: request.max_tokens,
+          temperature: request.temperature,
+          stopSequences: request.stop_sequences,
+        },
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Gemini API error: ${msg}\n` +
+        `Check that GEMINI_API_KEY is set correctly in your .env file.`,
+      );
+    }
 
     const response = result.response;
     const candidate = response.candidates?.[0];

@@ -26,7 +26,7 @@ export function createNavigateTool(browser: BrowserManager): Tool<z.infer<typeof
         const finalUrl = page.url();
         return { content: `Navigated to ${finalUrl}\nTitle: ${title}` };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.url), is_error: true };
       }
     },
   };

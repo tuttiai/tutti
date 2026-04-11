@@ -191,7 +191,7 @@ describe("list_issues", () => {
 
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("[401]");
-    expect(result.content).toContain("Authentication failed");
+    expect(result.content).toContain("authentication failed");
   });
 });
 

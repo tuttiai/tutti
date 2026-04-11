@@ -48,7 +48,7 @@ describe("ScoreLoader", () => {
     );
 
     await expect(ScoreLoader.load(path)).rejects.toThrow(
-      "must have a default export",
+      "has no default export",
     );
   });
 

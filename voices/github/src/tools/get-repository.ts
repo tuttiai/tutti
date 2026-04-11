@@ -37,7 +37,7 @@ export function createGetRepositoryTool(octokit: Octokit): Tool<z.infer<typeof p
 
         return { content: lines.join("\n") };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.owner + "/" + input.repo), is_error: true };
       }
     },
   };

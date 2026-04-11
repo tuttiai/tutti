@@ -33,7 +33,7 @@ export function createWaitForTool(browser: BrowserManager): Tool<z.infer<typeof 
         await page.waitForTimeout(input.timeout);
         return { content: `Waited ${input.timeout}ms` };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.selector), is_error: true };
       }
     },
   };

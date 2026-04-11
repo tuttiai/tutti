@@ -27,7 +27,7 @@ export function createClickTool(browser: BrowserManager): Tool<z.infer<typeof pa
         const label = text ? ` "${text.slice(0, 50)}"` : "";
         return { content: `Clicked <${tag}>${label}` };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.selector), is_error: true };
       }
     },
   };

@@ -22,25 +22,37 @@ export class AnthropicProvider implements LLMProvider {
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
     if (!request.model) {
-      throw new Error("AnthropicProvider requires a model on ChatRequest");
+      throw new Error(
+        "AnthropicProvider requires a model on ChatRequest.\n" +
+        "Set model on the agent or default_model on the score.",
+      );
     }
 
-    const response = await this.client.messages.create({
-      model: request.model,
-      max_tokens: request.max_tokens ?? 4096,
-      system: request.system ?? "",
-      messages: request.messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content as Anthropic.MessageCreateParams["messages"][number]["content"],
-      })),
-      tools: request.tools?.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.input_schema as Anthropic.Tool["input_schema"],
-      })),
-      ...(request.temperature != null && { temperature: request.temperature }),
-      ...(request.stop_sequences && { stop_sequences: request.stop_sequences }),
-    });
+    let response;
+    try {
+      response = await this.client.messages.create({
+        model: request.model,
+        max_tokens: request.max_tokens ?? 4096,
+        system: request.system ?? "",
+        messages: request.messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content as Anthropic.MessageCreateParams["messages"][number]["content"],
+        })),
+        tools: request.tools?.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          input_schema: tool.input_schema as Anthropic.Tool["input_schema"],
+        })),
+        ...(request.temperature != null && { temperature: request.temperature }),
+        ...(request.stop_sequences && { stop_sequences: request.stop_sequences }),
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Anthropic API error: ${msg}\n` +
+        `Check that ANTHROPIC_API_KEY is set correctly in your .env file.`,
+      );
+    }
 
     const content: ContentBlock[] = response.content.map((block) => {
       if (block.type === "text") {

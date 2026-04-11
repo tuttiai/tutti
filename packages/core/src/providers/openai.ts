@@ -26,7 +26,10 @@ export class OpenAIProvider implements LLMProvider {
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
     if (!request.model) {
-      throw new Error("OpenAIProvider requires a model on ChatRequest");
+      throw new Error(
+        "OpenAIProvider requires a model on ChatRequest.\n" +
+        "Set model on the agent or default_model on the score.",
+      );
     }
 
     // Map messages to OpenAI format
@@ -97,14 +100,23 @@ export class OpenAIProvider implements LLMProvider {
       }),
     );
 
-    const response = await this.client.chat.completions.create({
-      model: request.model,
-      messages,
-      tools: tools && tools.length > 0 ? tools : undefined,
-      max_tokens: request.max_tokens,
-      temperature: request.temperature,
-      stop: request.stop_sequences,
-    });
+    let response;
+    try {
+      response = await this.client.chat.completions.create({
+        model: request.model,
+        messages,
+        tools: tools && tools.length > 0 ? tools : undefined,
+        max_tokens: request.max_tokens,
+        temperature: request.temperature,
+        stop: request.stop_sequences,
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `OpenAI API error: ${msg}\n` +
+        `Check that OPENAI_API_KEY is set correctly in your .env file.`,
+      );
+    }
 
     const choice = response.choices[0];
     const content: ContentBlock[] = [];

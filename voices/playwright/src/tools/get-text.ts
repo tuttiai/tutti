@@ -31,7 +31,7 @@ export function createGetTextTool(browser: BrowserManager): Tool<z.infer<typeof 
         const text = await page.locator(input.selector).innerText();
         return { content: text };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.selector), is_error: true };
       }
     },
   };

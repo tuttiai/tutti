@@ -28,7 +28,7 @@ export function createTypeTool(browser: BrowserManager): Tool<z.infer<typeof par
         await locator.fill(input.text);
         return { content: `Typed "${input.text}" into ${input.selector}` };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.selector), is_error: true };
       }
     },
   };

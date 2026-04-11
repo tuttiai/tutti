@@ -24,7 +24,7 @@ export function createSelectOptionTool(browser: BrowserManager): Tool<z.infer<ty
         );
         return { content: `Selected "${input.value}" from ${input.selector} (${selected.length} option${selected.length === 1 ? "" : "s"})` };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.selector), is_error: true };
       }
     },
   };

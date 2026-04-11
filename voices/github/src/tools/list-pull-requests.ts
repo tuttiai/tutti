@@ -38,7 +38,7 @@ export function createListPullRequestsTool(octokit: Octokit): Tool<z.infer<typeo
           content: `${input.owner}/${input.repo} — ${input.state} PRs:\n${lines.join("\n")}`,
         };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.owner + "/" + input.repo), is_error: true };
       }
     },
   };

@@ -37,7 +37,7 @@ export function createScreenshotTool(browser: BrowserManager): Tool<z.infer<type
         const dims = viewport ? `${viewport.width}x${viewport.height}` : "unknown";
         return { content: `Screenshot saved to ${input.path} (${dims})` };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.path), is_error: true };
       }
     },
   };

@@ -59,7 +59,7 @@ export function createListIssuesTool(octokit: Octokit): Tool<z.infer<typeof para
         const header = `${input.owner}/${input.repo} — ${issues.length} ${input.state} issue${issues.length === 1 ? "" : "s"}:`;
         return { content: `${header}\n\n${blocks.join("\n\n")}` };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.owner + "/" + input.repo), is_error: true };
       }
     },
   };

@@ -24,7 +24,7 @@ export function createEvaluateTool(browser: BrowserManager): Tool<z.infer<typeof
               : JSON.stringify(result, null, 2);
         return { content: output };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.script), is_error: true };
       }
     },
   };

@@ -28,7 +28,7 @@ export function createCommentOnIssueTool(octokit: Octokit): Tool<z.infer<typeof 
           content: `Comment added to #${input.issue_number}\n${comment.html_url}`,
         };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.owner + "/" + input.repo), is_error: true };
       }
     },
   };

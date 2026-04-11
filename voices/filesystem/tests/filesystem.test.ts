@@ -88,7 +88,7 @@ describe("read_file", () => {
     );
 
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Not found");
+    expect(result.content).toContain("not found");
   });
 });
 
@@ -131,7 +131,7 @@ describe("write_file", () => {
     );
 
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Not found");
+    expect(result.content).toContain("not found");
   });
 });
 
@@ -176,7 +176,7 @@ describe("list_directory", () => {
     );
 
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Not found");
+    expect(result.content).toContain("not found");
   });
 
   it("handles empty directory", async () => {
@@ -279,7 +279,7 @@ describe("delete_file", () => {
     );
 
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Not found");
+    expect(result.content).toContain("not found");
   });
 });
 
@@ -344,7 +344,7 @@ describe("move_file", () => {
     );
 
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Not found");
+    expect(result.content).toContain("not found");
   });
 });
 
@@ -424,6 +424,6 @@ describe("search_files", () => {
     );
 
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Not found");
+    expect(result.content).toContain("not found");
   });
 });

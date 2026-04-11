@@ -45,7 +45,7 @@ export function createCheckElementTool(browser: BrowserManager): Tool<z.infer<ty
 
         return { content: lines.join("\n") };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.selector), is_error: true };
       }
     },
   };

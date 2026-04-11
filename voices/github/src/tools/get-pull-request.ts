@@ -37,7 +37,7 @@ export function createGetPullRequestTool(octokit: Octokit): Tool<z.infer<typeof 
 
         return { content: lines.join("\n") };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.owner + "/" + input.repo), is_error: true };
       }
     },
   };

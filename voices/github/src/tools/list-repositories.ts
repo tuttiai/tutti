@@ -51,7 +51,7 @@ export function createListRepositoriesTool(octokit: Octokit): Tool<z.infer<typeo
           content: `${input.owner} — repositories:\n${lines.join("\n")}`,
         };
       } catch (error) {
-        return { content: ghErrorMessage(error), is_error: true };
+        return { content: ghErrorMessage(error, input.owner), is_error: true };
       }
     },
   };

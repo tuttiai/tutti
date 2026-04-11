@@ -25,7 +25,7 @@ export function createGetAttributeTool(browser: BrowserManager): Tool<z.infer<ty
         }
         return { content: value };
       } catch (error) {
-        return { content: pwErrorMessage(error), is_error: true };
+        return { content: pwErrorMessage(error, input.selector), is_error: true };
       }
     },
   };

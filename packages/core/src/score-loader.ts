@@ -16,7 +16,9 @@ export class ScoreLoader {
 
     if (!mod.default) {
       throw new Error(
-        `Score file must have a default export: ${path}`,
+        `Score file has no default export: ${path}\n` +
+        `Your score must use: export default defineScore({ ... })\n` +
+        `See https://docs.tutti-ai.com/getting-started/core-concepts`,
       );
     }
 

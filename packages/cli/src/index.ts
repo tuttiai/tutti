@@ -53,4 +53,11 @@ program
     await checkCommand(score);
   });
 
+program
+  .command("doctor [score]")
+  .description("Alias for check — validate a score file")
+  .action(async (score?: string) => {
+    await checkCommand(score);
+  });
+
 program.parse();

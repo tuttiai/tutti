@@ -35,7 +35,9 @@ export class TuttiRuntime {
     if (!agent) {
       const available = Object.keys(this._score.agents).join(", ");
       throw new Error(
-        `Agent "${agent_name}" not found. Available agents: ${available}`,
+        `Agent "${agent_name}" not found in your score.\n` +
+        `Available agents: ${available}\n` +
+        `Check your tutti.score.ts — the agent ID must match the key in the agents object.`,
       );
     }
 

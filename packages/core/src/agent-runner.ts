@@ -40,7 +40,11 @@ export class AgentRunner {
       : this.sessions.create(agent.name);
 
     if (!session) {
-      throw new Error(`Session not found: ${session_id}`);
+      throw new Error(
+        `Session not found: ${session_id}\n` +
+        `The session may have expired or the ID is incorrect.\n` +
+        `Omit session_id to start a new conversation.`,
+      );
     }
 
     this.events.emit({
@@ -211,7 +215,8 @@ export class AgentRunner {
           () =>
             reject(
               new Error(
-                "Tool " + toolName + " timed out after " + timeoutMs + "ms",
+                `Tool "${toolName}" timed out after ${timeoutMs}ms.\n` +
+                `Increase tool_timeout_ms in your agent config, or check if the tool is hanging.`,
               ),
             ),
           timeoutMs,
@@ -228,10 +233,11 @@ export class AgentRunner {
   ): Promise<ToolResultBlock> {
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
+      const available = tools.map((t) => t.name).join(", ") || "(none)";
       return {
         type: "tool_result",
         tool_use_id: block.id,
-        content: `Tool not found: ${block.name}`,
+        content: `Tool "${block.name}" not found. Available tools: ${available}`,
         is_error: true,
       };
     }
