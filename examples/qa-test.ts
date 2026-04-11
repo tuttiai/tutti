@@ -20,6 +20,7 @@ const score = defineScore({
       role: "specialist",
       system_prompt: `You are a thorough QA engineer with browser control. Test web applications like a real user would. Take screenshots to document your findings. Report bugs clearly with steps to reproduce.`,
       voices: [playwrightVoice],
+      permissions: ["network", "browser"],
     },
   },
 });

@@ -11,6 +11,7 @@ const score = defineScore({
       system_prompt:
         "You are a helpful assistant with filesystem access. Use the tools provided to complete tasks.",
       voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
     },
   },
 });

@@ -74,6 +74,7 @@ describe("AgentRunner", () => {
 
     const voice: Voice = {
       name: "math",
+      required_permissions: [],
       tools: [
         {
           name: "double",
@@ -126,6 +127,7 @@ describe("AgentRunner", () => {
   it("returns error result when tool throws", async () => {
     const voice: Voice = {
       name: "failing",
+      required_permissions: [],
       tools: [
         {
           name: "fail",
@@ -157,6 +159,7 @@ describe("AgentRunner", () => {
   it("returns error when tool input fails Zod validation", async () => {
     const voice: Voice = {
       name: "strict",
+      required_permissions: [],
       tools: [
         {
           name: "strict_tool",
@@ -256,6 +259,7 @@ describe("AgentRunner", () => {
   it("emits tool events during tool execution", async () => {
     const voice: Voice = {
       name: "tools",
+      required_permissions: [],
       tools: [
         {
           name: "echo",
@@ -288,6 +292,7 @@ describe("AgentRunner", () => {
   it("emits tool:error when a tool throws", async () => {
     const voice: Voice = {
       name: "broken",
+      required_permissions: [],
       tools: [
         {
           name: "boom",

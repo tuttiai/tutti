@@ -1,4 +1,4 @@
-import type { Voice, Tool } from "@tuttiai/types";
+import type { Permission, Voice, Tool } from "@tuttiai/types";
 import { createOctokit } from "./client.js";
 import { createListIssuesTool } from "./tools/list-issues.js";
 import { createGetIssueTool } from "./tools/get-issue.js";
@@ -19,6 +19,7 @@ export interface GitHubVoiceOptions {
 export class GitHubVoice implements Voice {
   name = "github";
   description = "Interact with GitHub repositories, issues, and pull requests";
+  required_permissions: Permission[] = ["network"];
   tools: Tool[];
 
   constructor(options: GitHubVoiceOptions = {}) {

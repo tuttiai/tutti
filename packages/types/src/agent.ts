@@ -1,6 +1,7 @@
 /** Agent configuration and result types. */
 
 import type { ChatMessage, TokenUsage } from "./llm.js";
+import type { Permission } from "./voice.js";
 import type { Voice } from "./voice.js";
 
 export interface AgentConfig {
@@ -9,6 +10,7 @@ export interface AgentConfig {
   model?: string;
   system_prompt: string;
   voices: Voice[];
+  permissions?: Permission[];
   max_turns?: number;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];

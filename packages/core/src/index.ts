@@ -7,6 +7,7 @@ export { InMemorySessionStore } from "./session-store.js";
 export { ScoreLoader } from "./score-loader.js";
 export { defineScore } from "./define-score.js";
 export { SecretsManager } from "./secrets.js";
+export { PermissionGuard } from "./permission-guard.js";
 
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";
@@ -31,6 +32,7 @@ export type {
   TokenUsage,
   LLMProvider,
   // Voice
+  Permission,
   ToolResult,
   ToolContext,
   Tool,

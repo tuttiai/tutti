@@ -2,6 +2,8 @@
 
 import type { ZodType } from "zod";
 
+export type Permission = "network" | "filesystem" | "shell" | "browser";
+
 export interface ToolResult {
   content: string;
   is_error?: boolean;
@@ -28,6 +30,7 @@ export interface Voice {
   name: string;
   description?: string;
   tools: Tool[];
+  required_permissions: Permission[];
   setup?(context: VoiceContext): Promise<void>;
   teardown?(): Promise<void>;
 }

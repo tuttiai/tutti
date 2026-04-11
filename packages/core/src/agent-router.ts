@@ -73,6 +73,7 @@ export class AgentRouter {
     // Build a voice that carries the delegate tool
     const routerVoice: Voice = {
       name: "__tutti_router",
+      required_permissions: [],
       tools: [delegateTool],
     };
 

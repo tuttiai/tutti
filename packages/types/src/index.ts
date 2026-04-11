@@ -13,6 +13,7 @@ export type {
 } from "./llm.js";
 
 export type {
+  Permission,
   ToolResult,
   ToolContext,
   Tool,

@@ -1,4 +1,4 @@
-import type { Voice } from "@tuttiai/types";
+import type { Permission, Voice } from "@tuttiai/types";
 import { readFileTool } from "./tools/read-file.js";
 import { writeFileTool } from "./tools/write-file.js";
 import { listDirectoryTool } from "./tools/list-directory.js";
@@ -10,6 +10,7 @@ import { searchFilesTool } from "./tools/search-files.js";
 export class FilesystemVoice implements Voice {
   name = "filesystem";
   description = "Read and write files on the local filesystem";
+  required_permissions: Permission[] = ["filesystem"];
   tools = [
     readFileTool,
     writeFileTool,

@@ -20,6 +20,7 @@ Always think about which specialist is best suited before delegating. Be concise
       role: "specialist",
       system_prompt: `You are an expert TypeScript developer. You write clean, well-tested, production-ready code. You have access to the filesystem to read and write files.`,
       voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
     },
     pm: {
       name: "Product Manager Agent",

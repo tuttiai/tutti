@@ -10,6 +10,7 @@ const score = defineScore({
       system_prompt:
         "You are a helpful assistant with GitHub access. Use the tools to answer questions about repositories.",
       voices: [new GitHubVoice()],
+      permissions: ["network"],
     },
   },
 });

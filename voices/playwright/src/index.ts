@@ -1,4 +1,4 @@
-import type { Voice, Tool } from "@tuttiai/types";
+import type { Permission, Voice, Tool } from "@tuttiai/types";
 import { BrowserManager, type BrowserOptions } from "./browser.js";
 import { createNavigateTool } from "./tools/navigate.js";
 import { createClickTool } from "./tools/click.js";
@@ -25,6 +25,7 @@ export interface PlaywrightVoiceOptions {
 export class PlaywrightVoice implements Voice {
   name = "playwright";
   description = "Control a browser like a human — navigate, click, type, screenshot";
+  required_permissions: Permission[] = ["network", "browser"];
   tools: Tool[];
   private browser: BrowserManager;
 
