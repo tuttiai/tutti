@@ -10,6 +10,7 @@ export { SecretsManager } from "./secrets.js";
 export { PermissionGuard } from "./permission-guard.js";
 export { PromptGuard } from "./prompt-guard.js";
 export { TokenBudget } from "./token-budget.js";
+export { validateScore } from "./score-schema.js";
 
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";

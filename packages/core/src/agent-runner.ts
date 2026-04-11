@@ -20,6 +20,7 @@ import { TokenBudget } from "./token-budget.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
+const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 
 export class AgentRunner {
   constructor(
@@ -159,12 +160,13 @@ export class AgentRunner {
         break;
       }
 
+      const toolTimeoutMs = agent.tool_timeout_ms ?? DEFAULT_TOOL_TIMEOUT_MS;
       const toolResults: ToolResultBlock[] = await Promise.all(
         toolUseBlocks.map((block) =>
           this.executeTool(allTools, block, {
             session_id: session.id,
             agent_name: agent.name,
-          }),
+          }, toolTimeoutMs),
         ),
       );
 
@@ -197,10 +199,32 @@ export class AgentRunner {
     };
   }
 
+  private async executeWithTimeout<T>(
+    fn: () => Promise<T>,
+    timeoutMs: number,
+    toolName: string,
+  ): Promise<T> {
+    return Promise.race([
+      fn(),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                "Tool " + toolName + " timed out after " + timeoutMs + "ms",
+              ),
+            ),
+          timeoutMs,
+        ),
+      ),
+    ]);
+  }
+
   private async executeTool(
     tools: Tool[],
     block: ToolUseBlock,
     context: ToolContext,
+    timeoutMs: number,
   ): Promise<ToolResultBlock> {
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
@@ -222,7 +246,11 @@ export class AgentRunner {
     try {
       // Validate input with Zod
       const parsed = tool.parameters.parse(block.input);
-      const result = await tool.execute(parsed, context);
+      const result = await this.executeWithTimeout(
+        () => tool.execute(parsed, context),
+        timeoutMs,
+        block.name,
+      );
 
       this.events.emit({
         type: "tool:end",

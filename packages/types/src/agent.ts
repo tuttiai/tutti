@@ -20,6 +20,7 @@ export interface AgentConfig {
   permissions?: Permission[];
   max_turns?: number;
   max_tool_calls?: number;
+  tool_timeout_ms?: number;
   budget?: BudgetConfig;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];

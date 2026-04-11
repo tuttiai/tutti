@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import type { ScoreConfig } from "@tuttiai/types";
+import { validateScore } from "./score-schema.js";
 
 export class ScoreLoader {
   /**
@@ -18,6 +19,8 @@ export class ScoreLoader {
         `Score file must have a default export: ${path}`,
       );
     }
+
+    validateScore(mod.default);
 
     return mod.default;
   }
