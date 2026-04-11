@@ -11,9 +11,11 @@
     "dev": "turbo run dev",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "test:coverage": "turbo run test -- --coverage"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "3.2.4",
     "tsup": "8.5.1",
     "tsx": "4.21.0",
     "turbo": "2.9.5",
