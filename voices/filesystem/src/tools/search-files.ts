@@ -1,9 +1,10 @@
 import { readFile, readdir, stat } from "node:fs/promises";
-import { resolve, join, relative } from "node:path";
+import { join, relative } from "node:path";
 import { z } from "zod";
 import { glob } from "glob";
 import type { Tool } from "@tuttiai/types";
 import { fsErrorMessage } from "../utils/format.js";
+import { PathSanitizer } from "../utils/sanitize.js";
 
 const parameters = z.object({
   directory: z.string().describe("Directory to search in"),
@@ -38,7 +39,14 @@ export const searchFilesTool: Tool<z.infer<typeof parameters>> = {
   description: "Search for files containing a specific text pattern",
   parameters,
   execute: async (input) => {
-    const dirPath = resolve(input.directory);
+    let dirPath: string;
+    try {
+      dirPath = PathSanitizer.sanitize(input.directory);
+      PathSanitizer.assertSafe(dirPath);
+    } catch (error) {
+      return { content: fsErrorMessage(error, input.directory), is_error: true };
+    }
+
     try {
       await stat(dirPath);
     } catch (error) {

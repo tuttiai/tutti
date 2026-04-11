@@ -17,6 +17,7 @@ import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
 
 const DEFAULT_MAX_TURNS = 10;
+const DEFAULT_MAX_TOOL_CALLS = 20;
 
 export class AgentRunner {
   constructor(
@@ -56,8 +57,10 @@ export class AgentRunner {
     ];
 
     const maxTurns = agent.max_turns ?? DEFAULT_MAX_TURNS;
+    const maxToolCalls = agent.max_tool_calls ?? DEFAULT_MAX_TOOL_CALLS;
     const totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
     let turns = 0;
+    let totalToolCalls = 0;
 
     // Agentic loop
     while (turns < maxTurns) {
@@ -113,6 +116,20 @@ export class AgentRunner {
       const toolUseBlocks = response.content.filter(
         (b): b is ToolUseBlock => b.type === "tool_use",
       );
+
+      totalToolCalls += toolUseBlocks.length;
+      if (totalToolCalls > maxToolCalls) {
+        messages.push({
+          role: "user",
+          content: toolUseBlocks.map((block) => ({
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: `Tool call rate limit exceeded: ${totalToolCalls} calls (max: ${maxToolCalls})`,
+            is_error: true,
+          })),
+        });
+        break;
+      }
 
       const toolResults: ToolResultBlock[] = await Promise.all(
         toolUseBlocks.map((block) =>

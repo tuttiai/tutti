@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Tool } from "@tuttiai/types";
 import type { BrowserManager } from "../browser.js";
 import { pwErrorMessage } from "../utils/format.js";
+import { UrlSanitizer } from "../utils/sanitize.js";
 
 const parameters = z.object({
   url: z.string().url().describe("Full URL including protocol"),
@@ -18,6 +19,7 @@ export function createNavigateTool(browser: BrowserManager): Tool<z.infer<typeof
     parameters,
     execute: async (input) => {
       try {
+        UrlSanitizer.validate(input.url);
         const page = await browser.getPage();
         await page.goto(input.url, { waitUntil: input.wait_until });
         const title = await page.title();

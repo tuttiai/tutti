@@ -1,8 +1,8 @@
 import { rename, access } from "node:fs/promises";
-import { resolve } from "node:path";
 import { z } from "zod";
 import type { Tool } from "@tuttiai/types";
 import { fsErrorMessage } from "../utils/format.js";
+import { PathSanitizer } from "../utils/sanitize.js";
 
 const parameters = z.object({
   source: z.string().describe("Source path"),
@@ -18,9 +18,11 @@ export const moveFileTool: Tool<z.infer<typeof parameters>> = {
   description: "Move or rename a file or directory",
   parameters,
   execute: async (input) => {
-    const src = resolve(input.source);
-    const dest = resolve(input.destination);
     try {
+      const src = PathSanitizer.sanitize(input.source);
+      PathSanitizer.assertSafe(src);
+      const dest = PathSanitizer.sanitize(input.destination);
+      PathSanitizer.assertSafe(dest);
       if (!input.overwrite) {
         try {
           await access(dest);
@@ -35,7 +37,7 @@ export const moveFileTool: Tool<z.infer<typeof parameters>> = {
       await rename(src, dest);
       return { content: `Moved ${src} → ${dest}` };
     } catch (error) {
-      return { content: fsErrorMessage(error, src), is_error: true };
+      return { content: fsErrorMessage(error, input.source), is_error: true };
     }
   },
 };

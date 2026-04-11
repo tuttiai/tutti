@@ -1,8 +1,8 @@
 import { unlink } from "node:fs/promises";
-import { resolve } from "node:path";
 import { z } from "zod";
 import type { Tool } from "@tuttiai/types";
 import { fsErrorMessage } from "../utils/format.js";
+import { PathSanitizer } from "../utils/sanitize.js";
 
 const parameters = z.object({
   path: z.string().describe("File path to delete"),
@@ -17,8 +17,9 @@ export const deleteFileTool: Tool<z.infer<typeof parameters>> = {
   description: "Delete a file",
   parameters,
   execute: async (input) => {
-    const filePath = resolve(input.path);
     try {
+      const filePath = PathSanitizer.sanitize(input.path);
+      PathSanitizer.assertSafe(filePath);
       if (input.require_confirmation) {
         return {
           content:
@@ -29,7 +30,7 @@ export const deleteFileTool: Tool<z.infer<typeof parameters>> = {
       await unlink(filePath);
       return { content: `Deleted: ${filePath}` };
     } catch (error) {
-      return { content: fsErrorMessage(error, filePath), is_error: true };
+      return { content: fsErrorMessage(error, input.path), is_error: true };
     }
   },
 };

@@ -1,9 +1,10 @@
 import { readdir, stat } from "node:fs/promises";
-import { resolve, join, relative } from "node:path";
+import { join, relative } from "node:path";
 import { z } from "zod";
 import { glob } from "glob";
 import type { Tool } from "@tuttiai/types";
 import { formatBytes, fsErrorMessage } from "../utils/format.js";
+import { PathSanitizer } from "../utils/sanitize.js";
 
 const parameters = z.object({
   path: z.string().describe("Directory path"),
@@ -22,8 +23,9 @@ export const listDirectoryTool: Tool<z.infer<typeof parameters>> = {
   description: "List files and directories at a given path",
   parameters,
   execute: async (input) => {
-    const dirPath = resolve(input.path);
     try {
+      const dirPath = PathSanitizer.sanitize(input.path);
+      PathSanitizer.assertSafe(dirPath);
       if (input.pattern) {
         const matches = await glob(input.pattern, {
           cwd: dirPath,
@@ -78,7 +80,7 @@ export const listDirectoryTool: Tool<z.infer<typeof parameters>> = {
 
       return { content: `${dirPath}/\n${lines.join("\n")}` };
     } catch (error) {
-      return { content: fsErrorMessage(error, dirPath), is_error: true };
+      return { content: fsErrorMessage(error, input.path), is_error: true };
     }
   },
 };

@@ -12,6 +12,7 @@ export interface AgentConfig {
   voices: Voice[];
   permissions?: Permission[];
   max_turns?: number;
+  max_tool_calls?: number;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];
   /** Role in the orchestration — orchestrator receives input first. */
