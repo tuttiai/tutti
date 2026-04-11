@@ -85,6 +85,14 @@ export async function runCommand(scorePath?: string): Promise<void> {
     console.log(chalk.red(`  Error in tool: ${e.tool_name}`));
   });
 
+  runtime.events.on("security:injection_detected", (e) => {
+    console.log(
+      chalk.yellow(
+        `  [security] Potential prompt injection detected in: ${e.tool_name}`,
+      ),
+    );
+  });
+
   // REPL
   const rl = createInterface({
     input: process.stdin,

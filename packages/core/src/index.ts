@@ -8,6 +8,7 @@ export { ScoreLoader } from "./score-loader.js";
 export { defineScore } from "./define-score.js";
 export { SecretsManager } from "./secrets.js";
 export { PermissionGuard } from "./permission-guard.js";
+export { PromptGuard } from "./prompt-guard.js";
 
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";

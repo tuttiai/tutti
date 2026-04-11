@@ -15,6 +15,7 @@ import type {
 } from "@tuttiai/types";
 import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
+import { PromptGuard } from "./prompt-guard.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
@@ -203,10 +204,21 @@ export class AgentRunner {
         result,
       });
 
+      // Scan for prompt injection and wrap content
+      const scan = PromptGuard.scan(result.content);
+      if (!scan.safe) {
+        this.events.emit({
+          type: "security:injection_detected",
+          agent_name: context.agent_name,
+          tool_name: block.name,
+          patterns: scan.found,
+        });
+      }
+
       return {
         type: "tool_result",
         tool_use_id: block.id,
-        content: result.content,
+        content: PromptGuard.wrap(block.name, result.content),
         is_error: result.is_error,
       };
     } catch (error) {
