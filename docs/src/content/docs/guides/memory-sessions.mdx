@@ -1,15 +1,18 @@
 ---
 title: "Memory & Sessions"
-description: "Persist conversations across turns and runs"
+description: "Session persistence, PostgreSQL storage, and semantic long-term memory"
 sidebar:
   order: 6
 ---
 
-Sessions let agents remember previous turns in a conversation. This guide covers how sessions work and how to use them.
+Tutti has two kinds of memory:
 
-## How sessions work
+- **Session memory** — conversation history within a single session (short-term)
+- **Semantic memory** — facts the agent remembers across sessions (long-term)
 
-When you call `tutti.run()`, the runtime creates a new session automatically. The session stores the full message history (user messages, assistant responses, tool calls, and tool results).
+## Session memory
+
+When you call `tutti.run()`, the runtime creates a session automatically. The session stores the full message history.
 
 ```ts
 const r1 = await tutti.run("assistant", "My name is Alice.");
@@ -19,74 +22,165 @@ const r2 = await tutti.run("assistant", "What's my name?", r1.session_id);
 // r2.output = "Your name is Alice."
 ```
 
-Without a `session_id`, the agent starts fresh with no memory of prior turns.
+Without a `session_id`, the agent starts fresh with no memory.
 
-## Session in the REPL
+### In-memory store (default)
 
-The `tutti-ai run` REPL manages sessions automatically. Each message in the same REPL session continues the same conversation:
-
-```
-> My favorite color is blue.
-I'll remember that!
-
-> What's my favorite color?
-Your favorite color is blue.
-```
-
-## What's stored in a session
-
-A session contains:
-
-```ts
-interface Session {
-  id: string;
-  agent_name: string;
-  messages: ChatMessage[];
-  created_at: Date;
-  updated_at: Date;
-}
-```
-
-Messages follow the Anthropic API format:
-- `{ role: "user", content: "Hello" }`
-- `{ role: "assistant", content: [{ type: "text", text: "Hi!" }] }`
-- `{ role: "user", content: [{ type: "tool_result", ... }] }`
-
-## In-memory session store
-
-The default `InMemorySessionStore` keeps sessions in memory. They are lost when the process exits.
+Sessions live in memory. They're lost when the process exits.
 
 ```ts
 const tutti = new TuttiRuntime(score);
-const session = tutti.getSession("abc-123");
-console.log(session?.messages.length); // number of messages so far
+// sessions are in-memory by default
 ```
 
-:::caution[Coming soon]
-Persistent session stores (SQLite, PostgreSQL, Redis) are planned for a future release. For now, sessions live only as long as the Node.js process.
-:::
+### PostgreSQL store
 
-## Multi-turn agent runs
+Sessions persist across process restarts:
 
-Each `run()` call is one turn in the agentic loop (which may involve multiple LLM calls if tools are used). Across multiple `run()` calls with the same session, the full history accumulates:
+```bash
+npx tutti-ai add postgres
+```
+
+```bash title=".env"
+DATABASE_URL=postgres://user:pass@localhost:5432/tutti
+```
+
+```ts title="tutti.score.ts"
+export default defineScore({
+  provider: new AnthropicProvider(),
+  memory: { provider: "postgres" },
+  agents: { /* ... */ },
+});
+```
+
+Use the async factory — it creates the `tutti_sessions` table on first run:
 
 ```ts
-// Turn 1: agent creates a file
-const r1 = await tutti.run("coder", "Create hello.ts", session_id);
-// Turn 2: agent can reference what it did
-const r2 = await tutti.run("coder", "Now add a test for it", r1.session_id);
+const tutti = await TuttiRuntime.create(score);
 ```
 
-## Token usage across sessions
+The table schema:
 
-Token usage is reported per `run()` call, not per session. Each run returns:
+| Column | Type | Description |
+| ------ | ---- | ----------- |
+| `id` | `TEXT PRIMARY KEY` | Session UUID |
+| `agent_name` | `TEXT` | Agent that owns the session |
+| `messages` | `JSONB` | Full conversation history |
+| `created_at` | `TIMESTAMPTZ` | Session creation time |
+| `updated_at` | `TIMESTAMPTZ` | Last update time |
+
+:::tip
+For production, always use `TuttiRuntime.create()` instead of `new TuttiRuntime()` — it handles the async database initialization.
+:::
+
+## Semantic memory (long-term)
+
+Semantic memory lets agents remember facts across sessions. When a user tells the coder agent "I prefer 2-space indentation", the agent remembers this in the next session.
+
+### Enable it per agent
+
+```ts
+{
+  coder: {
+    name: "Coder",
+    system_prompt: "You are a TypeScript developer.",
+    semantic_memory: {
+      enabled: true,
+      max_memories: 5,        // inject up to 5 relevant memories (default)
+      inject_system: true,    // append to system prompt (default)
+    },
+    voices: [new FilesystemVoice()],
+    permissions: ["filesystem"],
+  },
+}
+```
+
+### How it works
+
+1. Before each LLM call, the runner searches semantic memory using the user's input as a query
+2. The top N relevant memories are appended to the system prompt:
+   ```
+   Relevant context from previous sessions:
+   - User prefers 2-space indentation
+   - Project uses ESM modules
+   ```
+3. The LLM sees these as context and can act on them
+
+### Storing memories from tools
+
+Tools receive `context.memory` helpers when semantic memory is enabled:
+
+```ts
+execute: async (input, context) => {
+  // Store a fact
+  await context.memory?.remember("User prefers dark mode");
+
+  // Search for relevant memories
+  const prefs = await context.memory?.recall("UI preferences");
+  // → [{ id: "abc", content: "User prefers dark mode" }]
+
+  // Delete a memory
+  await context.memory?.forget("abc");
+
+  return { content: "Preferences updated." };
+}
+```
+
+### Storing memories from your code
+
+Access the semantic memory store directly on the runtime:
+
+```ts
+const tutti = new TuttiRuntime(score);
+
+await tutti.semanticMemory.add({
+  agent_name: "coder",
+  content: "User prefers 2-space indentation",
+  metadata: { source: "onboarding" },
+});
+
+const memories = await tutti.semanticMemory.search(
+  "code style",
+  "coder",
+  5,
+);
+```
+
+### How search works (v1)
+
+The `InMemorySemanticStore` uses keyword overlap scoring — no embeddings needed. It tokenises the query and each stored entry into word sets, scores by overlap ratio, and returns the top N.
+
+This is simple and predictable. Future versions will support embedding-based search via custom `SemanticMemoryStore` implementations.
+
+### Memory lifecycle
+
+| Method | What it does |
+| ------ | ------------ |
+| `store.add({ agent_name, content, metadata })` | Store a new memory |
+| `store.search(query, agent_name, limit)` | Search by keyword overlap |
+| `store.delete(id)` | Delete one memory |
+| `store.clear(agent_name)` | Delete all memories for an agent |
+
+## Multi-turn sessions
+
+Each `run()` is one turn (which may involve multiple LLM calls if tools are used). Across multiple `run()` calls with the same session, the full history accumulates:
+
+```ts
+const r1 = await tutti.run("coder", "Create hello.ts");
+const r2 = await tutti.run("coder", "Add tests for it", r1.session_id);
+// r2 has full context of r1
+```
+
+## Token usage
+
+Usage is reported per `run()`, not per session:
 
 ```ts
 result.usage.input_tokens   // tokens sent to the LLM
-result.usage.output_tokens  // tokens received from the LLM
-result.turns                // number of agentic loop iterations
+result.usage.output_tokens  // tokens received
+result.turns                // agentic loop iterations
 ```
 
 :::tip
-Long sessions accumulate large message histories, which increases input token counts. Consider starting fresh sessions for unrelated tasks.
+Long sessions accumulate large message histories, increasing input token counts. Start fresh sessions for unrelated tasks, and use semantic memory for facts that should persist.
 :::

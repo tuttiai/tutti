@@ -5,8 +5,8 @@
 
   <p>
     <a href="https://tutti-ai.com">Website</a> ·
-    <a href="https://tutti-ai.com/docs">Docs</a> ·
-    <a href="https://tutti-ai.com/voices">Voice Registry</a> ·
+    <a href="https://docs.tutti-ai.com">Docs</a> ·
+    <a href="https://github.com/tuttiai/tutti/issues">Issues</a> ·
     <a href="https://discord.gg/tuttiai">Discord</a>
   </p>
 
@@ -17,232 +17,214 @@
 
 ---
 
-> **Tutti is under active development.** Star the repo to follow along.
-
 ## What is Tutti?
 
-Tutti is a modular agent orchestration runtime for TypeScript. You compose
-AI agents from reusable **Voices** — pluggable modules that give your agents
-tools and connections — then wire them together in a typed **Score** file.
+Tutti is a multi-agent orchestration runtime for TypeScript. You compose AI agents from **Voices** (pluggable tool packages), wire them together in a typed **Score** file, and let them work together.
 
 ```ts
-// tutti.score.ts
-import { defineScore, AnthropicProvider } from "@tuttiai/core";
-import { notionVoice } from "@tuttiai/voice-notion";
-import { githubVoice } from "@tuttiai/voice-github";
+import { TuttiRuntime, AnthropicProvider, defineScore } from "@tuttiai/core";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+import { GitHubVoice } from "@tuttiai/github";
 
-export default defineScore({
-  name: "my-project",
+const score = defineScore({
   provider: new AnthropicProvider(),
   agents: {
-    researcher: {
-      name: "researcher",
+    coder: {
+      name: "Coder",
       model: "claude-sonnet-4-20250514",
-      system_prompt: "You research topics using Notion and GitHub.",
-      voices: [notionVoice(), githubVoice()],
+      system_prompt: "You are a senior TypeScript developer.",
+      voices: [new FilesystemVoice(), new GitHubVoice()],
+      permissions: ["filesystem", "network"],
     },
   },
 });
-```
 
-```ts
-// run.ts
-import { TuttiRuntime, ScoreLoader } from "@tuttiai/core";
-
-const score = await ScoreLoader.load("./tutti.score.ts");
 const tutti = new TuttiRuntime(score);
-
-const result = await tutti.run("researcher", "Summarize our open issues");
+const result = await tutti.run("coder", "Fix the bug in src/index.ts");
 console.log(result.output);
 ```
 
-## Core Concepts
-
-| Concept         | Tutti Term       | Description                                   |
-| --------------- | ---------------- | --------------------------------------------- |
-| Plugin / module | **Voice**        | Gives an agent tools (e.g. `voice-notion`)    |
-| Configuration   | **Score**        | `tutti.score.ts` — typed config, not YAML     |
-| Agent team      | **Section**      | A group of agents that collaborate             |
-| Plugin registry | **Repertoire**   | Community voice registry at tutti-ai.com       |
-| Contributor     | **Composer**     | You                                           |
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────┐
-│                  tutti.score.ts                   │
-│            (defineScore — typed config)           │
-├──────────────────────────────────────────────────┤
-│                  TuttiRuntime                     │
-│  ┌────────────┐  ┌──────────┐  ┌──────────────┐ │
-│  │ AgentRunner│  │ EventBus │  │ SessionStore │ │
-│  │  (loop)    │  │ (pub/sub)│  │ (in-memory)  │ │
-│  └─────┬──────┘  └──────────┘  └──────────────┘ │
-│        │                                         │
-│  ┌─────▼──────────────────────────────────────┐  │
-│  │            LLMProvider (generic)           │  │
-│  │  ┌──────────────────────────────────────┐  │  │
-│  │  │  AnthropicProvider (@anthropic-ai/sdk)│  │  │
-│  │  └──────────────────────────────────────┘  │  │
-│  └────────────────────────────────────────────┘  │
-│        │                                         │
-│  ┌─────▼──────────────────────────────────────┐  │
-│  │              Voices (plugins)              │  │
-│  │  ┌────────┐ ┌────────┐ ┌──────────────┐   │  │
-│  │  │ Notion │ │ GitHub │ │ Playwright   │   │  │
-│  │  └────────┘ └────────┘ └──────────────┘   │  │
-│  └────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────┘
-```
-
-### How the Agent Loop Works
-
-1. User sends a message to a named agent
-2. `AgentRunner` appends the message to the session and calls the LLM
-3. If the LLM returns `tool_use` blocks, the runner executes each tool
-   (Zod-validated), appends results, and loops back to step 2
-4. When the LLM returns `end_turn`, the final text is returned
-5. Every step emits events on the `EventBus` for full observability
-
-## Packages
-
-| Package                              | Description                          |
-| ------------------------------------ | ------------------------------------ |
-| [`@tuttiai/types`](packages/types)   | All interfaces and type definitions  |
-| [`@tuttiai/core`](packages/core)     | Runtime, agent loop, providers       |
-| [`@tuttiai/cli`](packages/cli)       | CLI binary (`tutti-ai`)              |
-
-## Getting Started
-
-### Quick Start with the CLI
+## Quick Start
 
 ```bash
-npx @tuttiai/cli init my-project
+npx tutti-ai init my-project
 cd my-project
 cp .env.example .env       # add your ANTHROPIC_API_KEY
 npm install
 npx tutti-ai run
 ```
 
-### Install as a Library
+## Packages
 
-```bash
-npm install @tuttiai/core
-```
+| Package | Version | Description |
+| ------- | ------- | ----------- |
+| [`@tuttiai/types`](packages/types) | 0.3.0 | Type definitions and interfaces |
+| [`@tuttiai/core`](packages/core) | 0.5.0 | Runtime, providers, security, memory |
+| [`@tuttiai/cli`](packages/cli) | 0.4.0 | CLI (`tutti-ai init`, `run`, `add`, `check`, `doctor`) |
+| [`@tuttiai/filesystem`](voices/filesystem) | 0.1.0 | 7 file tools (read, write, search, etc.) |
+| [`@tuttiai/github`](voices/github) | 0.1.0 | 10 GitHub tools (issues, PRs, repos, code search) |
+| [`@tuttiai/playwright`](voices/playwright) | 0.1.0 | 12 browser tools (navigate, click, type, screenshot) |
 
-### Programmatic Usage
+## Features
+
+### Multi-Agent Orchestration
+
+An orchestrator agent delegates to specialists via `AgentRouter`:
 
 ```ts
-import { TuttiRuntime, AnthropicProvider, defineScore } from "@tuttiai/core";
+import { AgentRouter, defineScore } from "@tuttiai/core";
 
 const score = defineScore({
-  name: "hello-tutti",
-  provider: new AnthropicProvider(), // uses ANTHROPIC_API_KEY env var
+  provider: new AnthropicProvider(),
+  entry: "orchestrator",
   agents: {
-    assistant: {
-      name: "assistant",
-      model: "claude-sonnet-4-20250514",
-      system_prompt: "You are a helpful assistant.",
+    orchestrator: {
+      name: "Orchestrator",
+      role: "orchestrator",
+      system_prompt: "Route tasks to the right specialist.",
       voices: [],
+      delegates: ["coder", "qa"],
     },
+    coder: { /* ... */ },
+    qa: { /* ... */ },
   },
 });
 
-const tutti = new TuttiRuntime(score);
-const result = await tutti.run("assistant", "Hello!");
-console.log(result.output);
+const router = new AgentRouter(score);
+const result = await router.run("Write and test a reverse function");
 ```
 
-### Building a Voice
-
-A Voice is a plugin that gives an agent tools:
+### Three LLM Providers
 
 ```ts
-import { z } from "zod";
-import type { Voice } from "@tuttiai/types";
+import { AnthropicProvider, OpenAIProvider, GeminiProvider } from "@tuttiai/core";
 
-export function myVoice(): Voice {
-  return {
-    name: "my-voice",
-    description: "Does something useful",
-    tools: [
-      {
-        name: "greet",
-        description: "Greets someone by name",
-        parameters: z.object({ name: z.string() }),
-        execute: async (input) => ({
-          content: `Hello, ${input.name}!`,
-        }),
-      },
-    ],
-  };
+new AnthropicProvider()          // ANTHROPIC_API_KEY
+new OpenAIProvider()             // OPENAI_API_KEY
+new GeminiProvider()             // GEMINI_API_KEY
+```
+
+### Persistent Sessions (PostgreSQL)
+
+```ts
+const score = defineScore({
+  provider: new AnthropicProvider(),
+  memory: { provider: "postgres" },  // uses DATABASE_URL
+  agents: { /* ... */ },
+});
+
+const tutti = await TuttiRuntime.create(score);  // async init for DB
+```
+
+### Semantic (Long-Term) Memory
+
+Agents remember facts across sessions:
+
+```ts
+{
+  coder: {
+    name: "Coder",
+    system_prompt: "You are a TypeScript developer.",
+    semantic_memory: { enabled: true, max_memories: 5 },
+    voices: [new FilesystemVoice()],
+    permissions: ["filesystem"],
+  },
 }
 ```
 
-### Observability
-
-Every action in the runtime emits typed events:
+Tools can explicitly store memories:
 
 ```ts
-const tutti = new TuttiRuntime(score);
+execute: async (input, context) => {
+  await context.memory?.remember("User prefers 2-space indentation");
+  const prefs = await context.memory?.recall("code style");
+  return { content: "Noted your preferences." };
+}
+```
 
-tutti.events.on("llm:response", (e) => {
-  console.log(`[${e.agent_name}] tokens: ${e.response.usage.input_tokens}in / ${e.response.usage.output_tokens}out`);
-});
+### Security
 
-tutti.events.on("tool:start", (e) => {
-  console.log(`[${e.agent_name}] calling tool: ${e.tool_name}`);
-});
+- **Permission system** — voices declare requirements, agents grant explicitly
+- **Secret redaction** — API keys scrubbed from events and error messages
+- **Prompt injection defense** — tool results scanned and wrapped with safety markers
+- **Path traversal protection** — system paths blocked in filesystem voice
+- **URL sanitization** — `file:`, `javascript:`, private IPs blocked in browser voice
+- **Token budgets** — per-agent limits on tokens and cost
+- **Tool rate limiting** — max calls per run + per-tool timeout
+- **Score validation** — Zod-validated on load
 
-// or subscribe to everything
-tutti.events.onAny((e) => console.log(e.type, e));
+### Observability
+
+Every step emits typed events:
+
+```ts
+tutti.events.on("tool:start", (e) => console.log(`Using: ${e.tool_name}`));
+tutti.events.on("budget:warning", (e) => console.log(`Budget: ${e.tokens} tokens`));
+tutti.events.on("security:injection_detected", (e) => console.warn(`Injection in: ${e.tool_name}`));
+```
+
+## CLI
+
+```bash
+tutti-ai init [project]     # Scaffold a new project
+tutti-ai run [score]        # Run a score interactively
+tutti-ai add <voice>        # Install a voice (filesystem, github, playwright, postgres)
+tutti-ai check [score]      # Validate a score without running it
+tutti-ai doctor [score]     # Alias for check
+```
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   tutti.score.ts                      │
+│             (defineScore — typed config)              │
+├──────────────────────────────────────────────────────┤
+│                   TuttiRuntime                        │
+│  ┌────────────┐  ┌──────────┐  ┌──────────────────┐ │
+│  │ AgentRunner│  │ EventBus │  │  SessionStore     │ │
+│  │  (loop)    │  │ (pub/sub)│  │  (memory/postgres)│ │
+│  └─────┬──────┘  └──────────┘  └──────────────────┘ │
+│        │                                             │
+│  ┌─────▼──────────────────────────────────────────┐  │
+│  │           LLMProvider (swappable)              │  │
+│  │  Anthropic  ·  OpenAI  ·  Gemini              │  │
+│  └────────────────────────────────────────────────┘  │
+│        │                                             │
+│  ┌─────▼──────────────────────────────────────────┐  │
+│  │              Voices (plugins)                  │  │
+│  │  Filesystem · GitHub · Playwright · yours      │  │
+│  └────────────────────────────────────────────────┘  │
+│        │                                             │
+│  ┌─────▼──────────────────────────────────────────┐  │
+│  │              Security Layer                    │  │
+│  │  Permissions · Secrets · PromptGuard · Budget  │  │
+│  └────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
 ```
 
 ## Testing
 
-Tutti has comprehensive test coverage across all packages. Tests are written
-with [vitest](https://vitest.dev/) and run in parallel via Turborepo.
+217 tests across 18 files. 96% line coverage on core.
 
 ```bash
-npm test                   # run all tests
-npm test -- --filter=core  # run only core tests
+npx vitest run              # all tests
+npm run test:coverage       # with v8 coverage
 ```
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on writing tests.
-
-## Security
-
-We take security seriously. See [SECURITY.md](./SECURITY.md) for:
-
-- How to report vulnerabilities (privately)
-- API key handling practices
-- Tool input validation (Zod)
-- Score file trust model
-
-## Roadmap
-
-- [x] Core runtime (`TuttiRuntime`, `AgentRunner`)
-- [x] Type system (`@tuttiai/types`)
-- [x] Anthropic provider
-- [x] EventBus observability
-- [x] `defineScore()` typed config
-- [x] CLI (`tutti-ai init`, `tutti-ai run`)
-- [x] Test suite (52+ tests across core and CLI)
-- [ ] Voice interface spec & validation
-- [ ] First-party voices (Notion, GitHub, Playwright, Slack)
-- [ ] Multi-agent sections (agent-to-agent orchestration)
-- [ ] Streaming responses
-- [ ] Persistent session stores (SQLite, Redis)
-- [ ] Voice registry (the Repertoire)
-- [ ] Docs site
 
 ## Contributing
 
-Tutti is built for contributors. Every voice you add makes the whole
-orchestra richer.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [contributing docs](https://docs.tutti-ai.com/contributing/overview/).
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, architecture
-details, and pull request guidelines.
+```bash
+git clone https://github.com/tuttiai/tutti.git
+cd tutti && npm install && npm run build
+npx vitest run
+```
+
+## Security
+
+See [SECURITY.md](./SECURITY.md). Report vulnerabilities to security@tutti-ai.com.
 
 ## License
 

@@ -82,16 +82,18 @@ Install a voice package and print setup instructions.
 tutti-ai add filesystem
 tutti-ai add github
 tutti-ai add playwright
+tutti-ai add postgres
 tutti-ai add @someone/custom-voice
 ```
 
-**Official voices:**
+**Official packages:**
 
-| Shorthand | Package installed |
-| --------- | ---------------- |
-| `filesystem` | `@tuttiai/filesystem` |
-| `github` | `@tuttiai/github` |
-| `playwright` | `@tuttiai/playwright` |
+| Shorthand | Package installed | What it provides |
+| --------- | ---------------- | ---------------- |
+| `filesystem` | `@tuttiai/filesystem` | 7 file tools |
+| `github` | `@tuttiai/github` | 10 GitHub tools |
+| `playwright` | `@tuttiai/playwright` | 12 browser tools |
+| `postgres` | `pg` | PostgreSQL session storage |
 
 For unknown names, it tries `@tuttiai/<name>` first, then the literal package name.
 
@@ -151,6 +153,17 @@ Checking tutti.score.ts...
 2. Zod schema validation (required fields, valid types, cross-references)
 3. Provider API key is set in the environment
 4. Voices that need env vars (e.g. `GITHUB_TOKEN`) have them set
+
+---
+
+## `tutti-ai doctor [score]`
+
+Alias for `check`. Validates a score file without running it.
+
+```bash
+tutti-ai doctor
+tutti-ai doctor ./path/to/score.ts
+```
 
 ---
 

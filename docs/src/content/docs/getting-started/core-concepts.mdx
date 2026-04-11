@@ -40,6 +40,7 @@ An **agent** is an LLM-powered worker. Each agent has:
 | `max_tool_calls` | No | Max tool calls per run (default: 20) |
 | `tool_timeout_ms` | No | Per-tool timeout in ms (default: 30000) |
 | `budget` | No | Token/cost budget for this agent |
+| `semantic_memory` | No | Long-term memory config (`{ enabled, max_memories }`) |
 | `delegates` | No | Agent IDs this orchestrator can delegate to |
 | `role` | No | `"orchestrator"` or `"specialist"` |
 
@@ -135,6 +136,30 @@ const r1 = await tutti.run("assistant", "Hello");
 const r2 = await tutti.run("assistant", "What did I just say?", r1.session_id);
 // r2 has full context of the prior turn
 ```
+
+By default, sessions live in memory. Add `memory: { provider: "postgres" }` to your score to persist them to PostgreSQL.
+
+## Memory
+
+Tutti has two kinds of memory:
+
+| Type | Scope | Survives restart? | Config |
+| ---- | ----- | ----------------- | ------ |
+| **Session** | One conversation | In-memory: no. Postgres: yes. | `score.memory` |
+| **Semantic** | Across all sessions | In-memory only (for now) | `agent.semantic_memory` |
+
+**Semantic memory** lets agents remember facts across sessions — preferences, project context, decisions. Enable it per agent:
+
+```ts
+{
+  coder: {
+    semantic_memory: { enabled: true, max_memories: 5 },
+    // ...
+  },
+}
+```
+
+Tools can explicitly store memories via `context.memory.remember()`. See the [Memory & Sessions guide](/guides/memory-sessions) for full details.
 
 ## Permissions
 
