@@ -28,6 +28,7 @@ export interface ToolContext {
 export interface Tool<T = unknown> {
   name: string;
   description: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parameters: ZodType<T, any, any>;
   execute(input: T, context: ToolContext): Promise<ToolResult>;
 }

@@ -81,11 +81,17 @@ export class PostgresSessionStore implements SessionStore {
 
     if (result.rows.length === 0) return undefined;
 
-    const row = result.rows[0];
+    const row = result.rows[0] as {
+      id: string;
+      agent_name: string;
+      messages: ChatMessage[];
+      created_at: string;
+      updated_at: string;
+    };
     return {
       id: row.id,
       agent_name: row.agent_name,
-      messages: row.messages as ChatMessage[],
+      messages: row.messages,
       created_at: new Date(row.created_at),
       updated_at: new Date(row.updated_at),
     };

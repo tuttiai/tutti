@@ -11,7 +11,7 @@ import type { MemoryEntry, SemanticMemoryStore } from "./semantic.js";
 export class InMemorySemanticStore implements SemanticMemoryStore {
   private entries: MemoryEntry[] = [];
 
-  async add(
+  add(
     entry: Omit<MemoryEntry, "id" | "created_at">,
   ): Promise<MemoryEntry> {
     const full: MemoryEntry = {
@@ -20,16 +20,16 @@ export class InMemorySemanticStore implements SemanticMemoryStore {
       created_at: new Date(),
     };
     this.entries.push(full);
-    return full;
+    return Promise.resolve(full);
   }
 
-  async search(
+  search(
     query: string,
     agent_name: string,
     limit = 5,
   ): Promise<MemoryEntry[]> {
     const queryTokens = tokenize(query);
-    if (queryTokens.size === 0) return [];
+    if (queryTokens.size === 0) return Promise.resolve([]);
 
     const agentEntries = this.entries.filter(
       (e) => e.agent_name === agent_name,
@@ -45,19 +45,23 @@ export class InMemorySemanticStore implements SemanticMemoryStore {
       return { entry, score };
     });
 
-    return scored
-      .filter((s) => s.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((s) => s.entry);
+    return Promise.resolve(
+      scored
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map((s) => s.entry),
+    );
   }
 
-  async delete(id: string): Promise<void> {
+  delete(id: string): Promise<void> {
     this.entries = this.entries.filter((e) => e.id !== id);
+    return Promise.resolve();
   }
 
-  async clear(agent_name: string): Promise<void> {
+  clear(agent_name: string): Promise<void> {
     this.entries = this.entries.filter((e) => e.agent_name !== agent_name);
+    return Promise.resolve();
   }
 }
 

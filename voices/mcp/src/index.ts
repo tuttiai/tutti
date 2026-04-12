@@ -131,7 +131,9 @@ export class McpVoice implements Voice {
 
     const result = await this.client.callTool({ name, arguments: args });
 
-    const blocks = Array.isArray(result.content) ? result.content : [];
+    const blocks: { type: string; text?: string }[] = Array.isArray(result.content)
+      ? (result.content as { type: string; text?: string }[])
+      : [];
     const text = blocks
       .filter((c): c is McpTextBlock => c.type === "text" && typeof c.text === "string")
       .map((c) => c.text)
