@@ -19,6 +19,7 @@ import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { addCommand } from "./commands/add.js";
 import { checkCommand } from "./commands/check.js";
+import { studioCommand } from "./commands/studio.js";
 
 const program = new Command();
 
@@ -60,6 +61,13 @@ program
   .description("Alias for check — validate a score file")
   .action(async (score?: string) => {
     await checkCommand(score);
+  });
+
+program
+  .command("studio [score]")
+  .description("Launch Tutti Studio — local web UI for inspecting agent runs")
+  .action(async (score?: string) => {
+    await studioCommand(score);
   });
 
 program.parse();
