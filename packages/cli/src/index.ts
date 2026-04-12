@@ -21,6 +21,7 @@ import { addCommand } from "./commands/add.js";
 import { checkCommand } from "./commands/check.js";
 import { studioCommand } from "./commands/studio.js";
 import { searchCommand, voicesCommand } from "./commands/search.js";
+import { publishCommand } from "./commands/publish.js";
 
 const program = new Command();
 
@@ -83,6 +84,14 @@ program
   .description("List all available official voices and install status")
   .action(async () => {
     await voicesCommand();
+  });
+
+program
+  .command("publish")
+  .description("Publish the current voice to npm and the voice registry")
+  .option("--dry-run", "Run all checks without publishing")
+  .action(async (opts: { dryRun?: boolean }) => {
+    await publishCommand(opts);
   });
 
 program.parse();
