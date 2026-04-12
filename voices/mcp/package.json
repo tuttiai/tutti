@@ -1,5 +1,5 @@
 {
-  "name": "tuttiai-mcp",
+  "name": "@tuttiai/mcp",
   "version": "0.1.0",
   "description": "MCP bridge voice for Tutti — wrap any MCP server as a Tutti voice",
   "type": "module",

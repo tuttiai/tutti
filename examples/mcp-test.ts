@@ -1,5 +1,5 @@
 import { TuttiRuntime, AnthropicProvider, defineScore, createLogger } from "@tuttiai/core";
-import { McpVoice } from "tuttiai-mcp";
+import { McpVoice } from "@tuttiai/mcp";
 
 const logger = createLogger("mcp-example");
 
