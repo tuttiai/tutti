@@ -20,6 +20,7 @@ import { runCommand } from "./commands/run.js";
 import { addCommand } from "./commands/add.js";
 import { checkCommand } from "./commands/check.js";
 import { studioCommand } from "./commands/studio.js";
+import { searchCommand, voicesCommand } from "./commands/search.js";
 
 const program = new Command();
 
@@ -68,6 +69,20 @@ program
   .description("Launch Tutti Studio — local web UI for inspecting agent runs")
   .action(async (score?: string) => {
     await studioCommand(score);
+  });
+
+program
+  .command("search <query>")
+  .description("Search the voice registry for voices matching a query")
+  .action(async (query: string) => {
+    await searchCommand(query);
+  });
+
+program
+  .command("voices")
+  .description("List all available official voices and install status")
+  .action(async () => {
+    await voicesCommand();
   });
 
 program.parse();
