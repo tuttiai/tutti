@@ -15,7 +15,7 @@ process.on("uncaughtException", (err) => {
 });
 
 import { Command } from "commander";
-import { initCommand } from "./commands/init.js";
+import { initCommand, templatesCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { addCommand } from "./commands/add.js";
 import { checkCommand } from "./commands/check.js";
@@ -33,8 +33,16 @@ program
 program
   .command("init [project-name]")
   .description("Create a new Tutti project")
-  .action(async (projectName?: string) => {
-    await initCommand(projectName);
+  .option("-t, --template <id>", "Project template to use")
+  .action(async (projectName: string | undefined, opts: { template?: string }) => {
+    await initCommand(projectName, opts.template);
+  });
+
+program
+  .command("templates")
+  .description("List all available project templates")
+  .action(() => {
+    templatesCommand();
   });
 
 program

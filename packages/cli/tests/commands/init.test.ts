@@ -25,7 +25,7 @@ describe("initCommand", () => {
   it("creates all expected files in the project directory", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("my-project");
+    await initCommand("my-project", "minimal");
 
     const projectDir = join(testDir, "my-project");
     expect(existsSync(projectDir)).toBe(true);
@@ -47,7 +47,7 @@ describe("initCommand", () => {
   it("writes valid JSON in package.json", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("json-test");
+    await initCommand("json-test", "minimal");
 
     const pkgPath = join(testDir, "json-test", "package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
@@ -64,7 +64,7 @@ describe("initCommand", () => {
   it("writes valid JSON in tsconfig.json", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("tsconfig-test");
+    await initCommand("tsconfig-test", "minimal");
 
     const tscPath = join(testDir, "tsconfig-test", "tsconfig.json");
     const tsconfig = JSON.parse(readFileSync(tscPath, "utf-8"));
@@ -76,7 +76,7 @@ describe("initCommand", () => {
   it("writes a valid tutti.score.ts with defineScore import", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("score-test");
+    await initCommand("score-test", "minimal");
 
     const scorePath = join(testDir, "score-test", "tutti.score.ts");
     const content = readFileSync(scorePath, "utf-8");
@@ -89,7 +89,7 @@ describe("initCommand", () => {
   it("writes .env.example with ANTHROPIC_API_KEY placeholder", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("env-test");
+    await initCommand("env-test", "minimal");
 
     const envPath = join(testDir, "env-test", ".env.example");
     const content = readFileSync(envPath, "utf-8");
@@ -100,7 +100,7 @@ describe("initCommand", () => {
   it("writes .gitignore that excludes .env", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("git-test");
+    await initCommand("git-test", "minimal");
 
     const gitignorePath = join(testDir, "git-test", ".gitignore");
     const content = readFileSync(gitignorePath, "utf-8");
@@ -112,7 +112,7 @@ describe("initCommand", () => {
   it("writes README with the project name", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("readme-test");
+    await initCommand("readme-test", "minimal");
 
     const readmePath = join(testDir, "readme-test", "README.md");
     const content = readFileSync(readmePath, "utf-8");
@@ -132,7 +132,7 @@ describe("initCommand", () => {
       throw new Error("process.exit called");
     }) as never;
 
-    await expect(initCommand("existing-dir")).rejects.toThrow(
+    await expect(initCommand("existing-dir", "minimal")).rejects.toThrow(
       "process.exit called",
     );
     expect(exitCode).toBe(1);
@@ -141,7 +141,7 @@ describe("initCommand", () => {
   it("does not create files outside the project directory", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
-    await initCommand("sandboxed");
+    await initCommand("sandboxed", "minimal");
 
     expect(existsSync(join(testDir, "sandboxed"))).toBe(true);
     expect(existsSync(join(testDir, "package.json"))).toBe(false);
