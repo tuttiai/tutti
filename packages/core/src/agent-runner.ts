@@ -63,6 +63,14 @@ export class AgentRunner {
         session_id: session.id,
       });
 
+      // Initialize voices that have setup hooks (e.g., MCP voice discovers tools)
+      const voiceCtx = { session_id: session.id, agent_name: agent.name };
+      for (const voice of agent.voices) {
+        if (voice.setup) {
+          await voice.setup(voiceCtx);
+        }
+      }
+
       // Collect all tools from all voices
       const allTools = agent.voices.flatMap((v) => v.tools);
       const toolDefs = allTools.map(toolToDefinition);
