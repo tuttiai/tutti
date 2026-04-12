@@ -10,6 +10,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
+    "test:ci": "turbo run test -- --coverage --reporter=verbose",
     "lint": "eslint packages/*/src voices/*/src",
     "lint:fix": "eslint packages/*/src voices/*/src --fix",
     "typecheck": "turbo run typecheck",
