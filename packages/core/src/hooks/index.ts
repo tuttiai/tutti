@@ -11,20 +11,21 @@ import type pino from "pino";
  */
 export function createLoggingHook(log: pino.Logger): TuttiHooks {
   return {
-    async beforeLLMCall(ctx: HookContext, request: ChatRequest): Promise<ChatRequest> {
+    beforeLLMCall(ctx: HookContext, request: ChatRequest): Promise<ChatRequest> {
       log.info({ agent: ctx.agent_name, turn: ctx.turn, model: request.model }, "LLM call");
-      return request;
+      return Promise.resolve(request);
     },
-    async afterLLMCall(ctx: HookContext, response: ChatResponse): Promise<void> {
+    afterLLMCall(ctx: HookContext, response: ChatResponse): Promise<void> {
       log.info({ agent: ctx.agent_name, turn: ctx.turn, usage: response.usage }, "LLM response");
+      return Promise.resolve();
     },
-    async beforeToolCall(ctx: HookContext, tool: string, input: unknown): Promise<unknown> {
+    beforeToolCall(ctx: HookContext, tool: string, input: unknown): Promise<unknown> {
       log.info({ agent: ctx.agent_name, tool, input }, "Tool call");
-      return input;
+      return Promise.resolve(input);
     },
-    async afterToolCall(ctx: HookContext, tool: string, result: ToolResult): Promise<ToolResult> {
+    afterToolCall(ctx: HookContext, tool: string, result: ToolResult): Promise<ToolResult> {
       log.info({ agent: ctx.agent_name, tool, is_error: result.is_error }, "Tool result");
-      return result;
+      return Promise.resolve(result);
     },
   };
 }
@@ -40,16 +41,16 @@ export function createCacheHook(
     return tool + ":" + JSON.stringify(input);
   }
   return {
-    async beforeToolCall(_ctx: HookContext, tool: string, input: unknown): Promise<boolean | unknown> {
+    beforeToolCall(_ctx: HookContext, tool: string, input: unknown): Promise<unknown> {
       const cached = store.get(cacheKey(tool, input));
-      if (cached) return cached;
-      return input;
+      if (cached) return Promise.resolve(cached);
+      return Promise.resolve(input);
     },
-    async afterToolCall(_ctx: HookContext, tool: string, result: ToolResult): Promise<ToolResult> {
+    afterToolCall(_ctx: HookContext, tool: string, result: ToolResult): Promise<ToolResult> {
       if (!result.is_error) {
         store.set(cacheKey(tool, result.content), result.content);
       }
-      return result;
+      return Promise.resolve(result);
     },
   };
 }
@@ -60,8 +61,8 @@ export function createCacheHook(
 export function createBlocklistHook(blockedTools: string[]): TuttiHooks {
   const blocked = new Set(blockedTools);
   return {
-    async beforeToolCall(_ctx: HookContext, tool: string): Promise<boolean> {
-      return !blocked.has(tool);
+    beforeToolCall(_ctx: HookContext, tool: string): Promise<unknown> {
+      return Promise.resolve(!blocked.has(tool));
     },
   };
 }
@@ -77,19 +78,20 @@ export function createMaxCostHook(maxUsd: number): TuttiHooks {
   const OUTPUT_PER_M = 15;
 
   return {
-    async afterLLMCall(_ctx: HookContext, response: ChatResponse): Promise<void> {
+    afterLLMCall(_ctx: HookContext, response: ChatResponse): Promise<void> {
       totalCost +=
         (response.usage.input_tokens / 1_000_000) * INPUT_PER_M +
         (response.usage.output_tokens / 1_000_000) * OUTPUT_PER_M;
+      return Promise.resolve();
     },
-    async beforeLLMCall(ctx: HookContext, request: ChatRequest): Promise<ChatRequest> {
+    beforeLLMCall(ctx: HookContext, request: ChatRequest): Promise<ChatRequest> {
       if (totalCost >= maxUsd) {
-        throw new Error(
+        return Promise.reject(new Error(
           "Max cost hook: $" + totalCost.toFixed(4) + " exceeds limit $" + maxUsd.toFixed(2) +
           " for agent " + ctx.agent_name,
-        );
+        ));
       }
-      return request;
+      return Promise.resolve(request);
     },
   };
 }

@@ -25,8 +25,8 @@ export interface TuttiHooks {
   beforeLLMCall?: (ctx: HookContext, request: ChatRequest) => Promise<ChatRequest>;
   /** Called after each LLM response. */
   afterLLMCall?: (ctx: HookContext, response: ChatResponse) => Promise<void>;
-  /** Called before each tool execution. Return false to block the call, or modified input. */
-  beforeToolCall?: (ctx: HookContext, tool: string, input: unknown) => Promise<boolean | unknown>;
+  /** Called before each tool execution. Return false to block the call. Return anything else to proceed. */
+  beforeToolCall?: (ctx: HookContext, tool: string, input: unknown) => Promise<unknown>;
   /** Called after each tool execution. Return a modified result. */
   afterToolCall?: (ctx: HookContext, tool: string, result: ToolResult) => Promise<ToolResult>;
   /** Called when an agent run starts (before the first turn). */

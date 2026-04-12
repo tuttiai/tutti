@@ -131,7 +131,7 @@ export async function runCommand(scorePath?: string): Promise<void> {
   });
 
   // Human-in-the-loop — agent pauses and asks the user a question
-  runtime.events.on("hitl:requested", async (e) => {
+  runtime.events.on("hitl:requested", (e) => {
     spinner.stop();
     if (streaming) {
       process.stdout.write("\n");
@@ -144,8 +144,9 @@ export async function runCommand(scorePath?: string): Promise<void> {
         console.log(chalk.yellow("    " + (i + 1) + ". " + opt));
       });
     }
-    const answer = await rl.question(chalk.yellow("  > "));
-    runtime.answer(e.session_id, answer.trim());
+    void rl.question(chalk.yellow("  > ")).then((answer) => {
+      runtime.answer(e.session_id, answer.trim());
+    });
   });
 
   // REPL

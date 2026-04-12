@@ -100,7 +100,7 @@ export class OpenAIProvider implements LLMProvider {
         function: {
           name: tool.name,
           description: tool.description,
-          parameters: tool.input_schema as Record<string, unknown>,
+          parameters: tool.input_schema,
         },
       }),
     );
@@ -210,7 +210,7 @@ export class OpenAIProvider implements LLMProvider {
 
     const tools: OpenAI.ChatCompletionTool[] | undefined = request.tools?.map((tool) => ({
       type: "function" as const,
-      function: { name: tool.name, description: tool.description, parameters: tool.input_schema as Record<string, unknown> },
+      function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
     }));
 
     let raw;

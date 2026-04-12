@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.15.0] - 2026-04-12
+
+### Added
+- Human-in-the-loop: `request_human_input` built-in tool
+- `allow_human_input` field on `AgentConfig` (default: false)
+- HITL events: `hitl:requested`, `hitl:answered`, `hitl:timeout`
+- `TuttiRuntime.answer(sessionId, answer)` API for non-CLI integrations
+- CLI REPL shows yellow HITL prompt with numbered options
+- `TuttiHooks` lifecycle interface with 6 hook points
+- `HookContext` with agent_name, session_id, turn, metadata
+- Global hooks on `ScoreConfig.hooks`, per-agent hooks on `AgentConfig.hooks`
+- Hook errors caught and logged — never crash the agent
+- Built-in factory: `createLoggingHook(logger)` — log all LLM/tool calls
+- Built-in factory: `createCacheHook(store)` — cache tool results by hash
+- Built-in factory: `createBlocklistHook(tools)` — block specific tools
+- Built-in factory: `createMaxCostHook(usd)` — enforce cost limit
+- ESLint setup with typescript-eslint + security plugin (0 errors)
+- Test coverage thresholds enforced in CI via vitest v8 provider
+- Typed error hierarchy: 13 error classes extending `TuttiError`
+- Retry logic for `ProviderError` (exponential backoff, max 3 attempts)
+- `RateLimitError` respects `retryAfter` header
+
+### Published
+- `@tuttiai/types@0.6.0`
+- `@tuttiai/core@0.8.0`
+- `tutti-ai@0.9.0`
+
 ## [0.14.0] - 2026-04-12
 
 ### Added
