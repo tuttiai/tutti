@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import express from "express";
 import chalk from "chalk";
 import {
@@ -11,7 +11,8 @@ import {
 import type { Response as ExpressResponse } from "express";
 
 const logger = createLogger("tutti-studio");
-const PORT = 4747;
+const envPort = Number.parseInt(process.env.PORT ?? "", 10);
+const PORT = Number.isInteger(envPort) && envPort > 0 && envPort <= 65535 ? envPort : 4747;
 
 function safeStringify(obj: unknown): string {
   return JSON.stringify(obj, (_key, value) => {
@@ -22,11 +23,12 @@ function safeStringify(obj: unknown): string {
 }
 
 function openBrowser(url: string): void {
-  const cmd =
-    process.platform === "darwin" ? "open" :
-    process.platform === "win32" ? "start" :
-    "xdg-open";
-  exec(cmd + " " + url);
+  if (process.platform === "win32") {
+    execFile("cmd.exe", ["/c", "start", "", url]);
+    return;
+  }
+  const cmd = process.platform === "darwin" ? "open" : "xdg-open";
+  execFile(cmd, [url]);
 }
 
 export async function studioCommand(scorePath?: string): Promise<void> {
@@ -121,15 +123,36 @@ export async function studioCommand(scorePath?: string): Promise<void> {
 
   app.get("/api/sessions/:id", (req, res) => {
     const session = runtime.getSession(req.params.id);
-    if (!session) { res.status(404).json({ error: "Session not found" }); return; }
+    if (!session) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
     res.json(session);
   });
 
   app.post("/api/run", async (req, res) => {
-    const { agent, input, session_id } = req.body as { agent: string; input: string; session_id?: string };
-    if (!agent || !input) { res.status(400).json({ error: "agent and input are required" }); return; }
+    const body = req.body;
+    if (typeof body !== "object" || body === null) {
+      res.status(400).json({ error: "Invalid request body" });
+      return;
+    }
+    const agent = (body as Record<string, unknown>).agent;
+    const input = (body as Record<string, unknown>).input;
+    const session_id = (body as Record<string, unknown>).session_id;
+    if (typeof agent !== "string" || agent.trim().length === 0) {
+      res.status(400).json({ error: "agent must be a non-empty string" });
+      return;
+    }
+    if (typeof input !== "string" || input.trim().length === 0) {
+      res.status(400).json({ error: "input must be a non-empty string" });
+      return;
+    }
+    if (session_id !== undefined && (typeof session_id !== "string" || session_id.trim().length === 0)) {
+      res.status(400).json({ error: "session_id must be a non-empty string when provided" });
+      return;
+    }
     try {
-      const result = await runtime.run(agent, input, session_id);
+      const result = await runtime.run(agent, input, session_id as string | undefined);
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -384,8 +407,11 @@ function connectSSE(){\
   es.onerror=function(){document.getElementById("sse-dot").className="dot off";document.getElementById("sse-label").textContent="disconnected"};\
 }\
 \
+/* Pricing: USD per 1M tokens (Sonnet-class default) */\
+var INPUT_PRICE_PER_MILLION=3;\
+var OUTPUT_PRICE_PER_MILLION=15;\
 function estimateCost(inp,out){\
-  var c=(inp/1e6)*3+(out/1e6)*15;\
+  var c=(inp/1e6)*INPUT_PRICE_PER_MILLION+(out/1e6)*OUTPUT_PRICE_PER_MILLION;\
   return c.toFixed(4);\
 }\
 \
