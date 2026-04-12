@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.13.0] - 2026-04-12
+
+### Added
+- `stream()` method on the `LLMProvider` interface (`AsyncIterable<StreamChunk>`)
+- `StreamChunk` type — `text`, `tool_use`, and `usage` chunk types
+- Token-by-token streaming in `AnthropicProvider` (message stream events)
+- Token-by-token streaming in `OpenAIProvider` (delta chunks with usage)
+- Token-by-token streaming in `GeminiProvider` (content stream)
+- `token:stream` event on `EventBus` for real-time token delivery
+- `streaming` field on `AgentConfig` (default `false`)
+- `AgentRunner.streamToResponse()` — consumes stream, emits events, builds `ChatResponse`
+- Streaming REPL in `tutti-ai run` — spinner until first token, then live output
+- Tool call display during streaming: `[using: name]` / `[done: name]`
+- Graceful Ctrl+C during mid-stream responses
+
+### Changed
+- `tutti-ai run` enables `streaming: true` on all agents automatically
+- Non-streaming fallback if no `token:stream` events received
+
+### Published
+- `@tuttiai/types@0.5.0`
+- `@tuttiai/core@0.7.0`
+- `@tuttiai/cli@0.6.0`
+- `tutti-ai@0.7.0`
+
 ## [0.12.0] - 2026-04-12
 
 ### Added
