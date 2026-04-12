@@ -7,6 +7,7 @@ import { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
 import { PermissionGuard } from "./permission-guard.js";
 import { logger } from "./logger.js";
+import { AgentNotFoundError, ScoreValidationError } from "./errors.js";
 import { initTelemetry } from "./telemetry-setup.js";
 
 export class TuttiRuntime {
@@ -55,16 +56,18 @@ export class TuttiRuntime {
     if (memory.provider === "postgres") {
       const url = memory.url ?? process.env.DATABASE_URL;
       if (!url) {
-        throw new Error(
+        throw new ScoreValidationError(
           "PostgreSQL session store requires a connection URL.\n" +
           "Set memory.url in your score, or DATABASE_URL in your .env file.",
+          { field: "memory.url" },
         );
       }
       return new PostgresSessionStore(url);
     }
-    throw new Error(
+    throw new ScoreValidationError(
       `Unsupported memory provider: "${memory.provider}".\n` +
       `Supported: "in-memory", "postgres"`,
+      { field: "memory.provider", value: memory.provider },
     );
   }
 
@@ -84,12 +87,7 @@ export class TuttiRuntime {
   ): Promise<AgentResult> {
     const agent = this._score.agents[agent_name];
     if (!agent) {
-      const available = Object.keys(this._score.agents).join(", ");
-      throw new Error(
-        `Agent "${agent_name}" not found in your score.\n` +
-        `Available agents: ${available}\n` +
-        `Check your tutti.score.ts — the agent ID must match the key in the agents object.`,
-      );
+      throw new AgentNotFoundError(agent_name, Object.keys(this._score.agents));
     }
 
     // Enforce voice permissions

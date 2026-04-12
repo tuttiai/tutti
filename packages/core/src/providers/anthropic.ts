@@ -8,6 +8,7 @@ import type {
 } from "@tuttiai/types";
 import { SecretsManager } from "../secrets.js";
 import { logger } from "../logger.js";
+import { ProviderError, AuthenticationError } from "../errors.js";
 
 export interface AnthropicProviderOptions {
   api_key?: string;
@@ -24,9 +25,10 @@ export class AnthropicProvider implements LLMProvider {
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
     if (!request.model) {
-      throw new Error(
+      throw new ProviderError(
         "AnthropicProvider requires a model on ChatRequest.\n" +
         "Set model on the agent or default_model on the score.",
+        { provider: "anthropic" },
       );
     }
 
@@ -51,10 +53,10 @@ export class AnthropicProvider implements LLMProvider {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "anthropic" }, "Provider request failed");
-      throw new Error(
-        `Anthropic API error: ${msg}\n` +
-        `Check that ANTHROPIC_API_KEY is set correctly in your .env file.`,
-      );
+      if (msg.includes("authentication") || msg.includes("apiKey") || msg.includes("authToken")) {
+        throw new AuthenticationError("anthropic");
+      }
+      throw new ProviderError(`Anthropic API error: ${msg}`, { provider: "anthropic" });
     }
 
     const content: ContentBlock[] = response.content.map((block) => {
@@ -85,9 +87,10 @@ export class AnthropicProvider implements LLMProvider {
 
   async *stream(request: ChatRequest): AsyncGenerator<StreamChunk> {
     if (!request.model) {
-      throw new Error(
+      throw new ProviderError(
         "AnthropicProvider requires a model on ChatRequest.\n" +
         "Set model on the agent or default_model on the score.",
+        { provider: "anthropic" },
       );
     }
 
@@ -113,10 +116,10 @@ export class AnthropicProvider implements LLMProvider {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "anthropic" }, "Provider stream failed");
-      throw new Error(
-        `Anthropic API error: ${msg}\n` +
-        `Check that ANTHROPIC_API_KEY is set correctly in your .env file.`,
-      );
+      if (msg.includes("authentication") || msg.includes("apiKey") || msg.includes("authToken")) {
+        throw new AuthenticationError("anthropic");
+      }
+      throw new ProviderError(`Anthropic API error: ${msg}`, { provider: "anthropic" });
     }
 
     // Track tool_use blocks being streamed (input arrives as partial JSON)

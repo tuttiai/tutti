@@ -1,14 +1,20 @@
 import { resolve } from "node:path";
 
+export class PathTraversalError extends Error {
+  public readonly code = "PATH_TRAVERSAL";
+  constructor(public readonly path: string, message?: string) {
+    super(message ?? `Path traversal detected: "${path}" is not allowed.`);
+    this.name = "PathTraversalError";
+  }
+}
+
 export class PathSanitizer {
   static sanitize(inputPath: string, baseDir?: string): string {
     const resolved = resolve(inputPath);
     if (baseDir) {
       const resolvedBase = resolve(baseDir);
       if (!resolved.startsWith(resolvedBase)) {
-        throw new Error(
-          "Path traversal detected: must stay within " + resolvedBase,
-        );
+        throw new PathTraversalError(inputPath, "Path traversal detected: must stay within " + resolvedBase);
       }
     }
     return resolved;
@@ -28,7 +34,7 @@ export class PathSanitizer {
     const resolved = resolve(filePath);
     for (const d of dangerous) {
       if (resolved.startsWith(resolve(d))) {
-        throw new Error("Access to system path not allowed: " + d);
+        throw new PathTraversalError(filePath, "Access to system path not allowed: " + d);
       }
     }
   }

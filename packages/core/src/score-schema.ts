@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ScoreValidationError } from "./errors.js";
 
 /**
  * Runtime Zod schema for validating a loaded ScoreConfig object.
@@ -83,7 +84,7 @@ export function validateScore(config: unknown): void {
       const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
       return `  - ${path}: ${issue.message}`;
     });
-    throw new Error(
+    throw new ScoreValidationError(
       "Invalid score file:\n" + issues.join("\n"),
     );
   }
@@ -96,8 +97,9 @@ export function validateScore(config: unknown): void {
     if (agent.delegates) {
       for (const delegateId of agent.delegates) {
         if (!agentKeys.includes(delegateId)) {
-          throw new Error(
+          throw new ScoreValidationError(
             `Invalid score file:\n  - agents.${key}.delegates: references unknown agent "${delegateId}". Available: ${agentKeys.join(", ")}`,
+            { field: `agents.${key}.delegates`, value: delegateId },
           );
         }
       }
@@ -106,8 +108,9 @@ export function validateScore(config: unknown): void {
 
   // Cross-field: entry must reference an existing agent
   if (data.entry && !agentKeys.includes(data.entry)) {
-    throw new Error(
+    throw new ScoreValidationError(
       `Invalid score file:\n  - entry: references unknown agent "${data.entry}". Available: ${agentKeys.join(", ")}`,
+      { field: "entry", value: data.entry },
     );
   }
 }

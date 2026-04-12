@@ -35,14 +35,14 @@ describe("PermissionGuard", () => {
     it("throws when a required permission is missing", () => {
       const voice = makeVoice(["filesystem"]);
       expect(() => PermissionGuard.check(voice, [])).toThrow(
-        "Voice test-voice requires permissions not granted: filesystem",
+        /requires permissions not granted: filesystem/,
       );
     });
 
     it("throws listing all missing permissions", () => {
       const voice = makeVoice(["filesystem", "shell"]);
       expect(() => PermissionGuard.check(voice, ["network"])).toThrow(
-        "Voice test-voice requires permissions not granted: filesystem, shell",
+        /requires permissions not granted: filesystem, shell/,
       );
     });
 

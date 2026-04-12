@@ -1,3 +1,20 @@
+// Errors
+export {
+  TuttiError,
+  ScoreValidationError,
+  AgentNotFoundError,
+  PermissionError,
+  BudgetExceededError,
+  ToolTimeoutError,
+  ProviderError,
+  AuthenticationError,
+  RateLimitError,
+  ContextWindowError,
+  VoiceError,
+  PathTraversalError,
+  UrlValidationError,
+} from "./errors.js";
+
 // Logger
 export { createLogger, logger } from "./logger.js";
 

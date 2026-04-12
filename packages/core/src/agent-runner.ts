@@ -23,10 +23,32 @@ import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
 import { logger } from "./logger.js";
 import { TuttiTracer } from "./telemetry.js";
+import { ToolTimeoutError, ProviderError, RateLimitError } from "./errors.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
+const MAX_PROVIDER_RETRIES = 3;
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= MAX_PROVIDER_RETRIES || !(err instanceof ProviderError)) {
+        throw err;
+      }
+      if (err instanceof RateLimitError && err.retryAfter) {
+        logger.warn({ attempt, retryAfter: err.retryAfter }, "Rate limited, waiting before retry");
+        await new Promise((r) => setTimeout(r, err.retryAfter! * 1000));
+      } else {
+        const delayMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
+        logger.warn({ attempt, delayMs }, "Provider error, retrying with backoff");
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+}
 
 export class AgentRunner {
   constructor(
@@ -143,9 +165,11 @@ export class AgentRunner {
 
         const response = await TuttiTracer.llmCall(
           agent.model ?? "unknown",
-          () => agent.streaming
-            ? this.streamToResponse(agent.name, request)
-            : this.provider.chat(request),
+          () => withRetry(() =>
+            agent.streaming
+              ? this.streamToResponse(agent.name, request)
+              : this.provider.chat(request),
+          ),
         );
 
         logger.debug(
@@ -301,13 +325,7 @@ export class AgentRunner {
       fn(),
       new Promise<never>((_, reject) =>
         setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Tool "${toolName}" timed out after ${timeoutMs}ms.\n` +
-                `Increase tool_timeout_ms in your agent config, or check if the tool is hanging.`,
-              ),
-            ),
+          () => reject(new ToolTimeoutError(toolName, timeoutMs)),
           timeoutMs,
         ),
       ),

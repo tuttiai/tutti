@@ -9,6 +9,7 @@ import type {
 } from "@tuttiai/types";
 import { SecretsManager } from "../secrets.js";
 import { logger } from "../logger.js";
+import { ProviderError, AuthenticationError } from "../errors.js";
 
 export interface OpenAIProviderOptions {
   /** OpenAI API key. Defaults to OPENAI_API_KEY env var. */
@@ -29,9 +30,10 @@ export class OpenAIProvider implements LLMProvider {
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
     if (!request.model) {
-      throw new Error(
+      throw new ProviderError(
         "OpenAIProvider requires a model on ChatRequest.\n" +
         "Set model on the agent or default_model on the score.",
+        { provider: "openai" },
       );
     }
 
@@ -116,10 +118,10 @@ export class OpenAIProvider implements LLMProvider {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "openai" }, "Provider request failed");
-      throw new Error(
-        `OpenAI API error: ${msg}\n` +
-        `Check that OPENAI_API_KEY is set correctly in your .env file.`,
-      );
+      if (msg.includes("Incorrect API key") || msg.includes("authentication")) {
+        throw new AuthenticationError("openai");
+      }
+      throw new ProviderError(`OpenAI API error: ${msg}`, { provider: "openai" });
     }
 
     const choice = response.choices[0];
@@ -169,9 +171,10 @@ export class OpenAIProvider implements LLMProvider {
 
   async *stream(request: ChatRequest): AsyncGenerator<StreamChunk> {
     if (!request.model) {
-      throw new Error(
+      throw new ProviderError(
         "OpenAIProvider requires a model on ChatRequest.\n" +
         "Set model on the agent or default_model on the score.",
+        { provider: "openai" },
       );
     }
 

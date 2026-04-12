@@ -1,5 +1,6 @@
 import type { Permission, Voice } from "@tuttiai/types";
 import { logger } from "./logger.js";
+import { PermissionError } from "./errors.js";
 
 export class PermissionGuard {
   static check(voice: Voice, granted: Permission[]): void {
@@ -7,17 +8,7 @@ export class PermissionGuard {
       (p) => !granted.includes(p),
     );
     if (missing.length > 0) {
-      throw new Error(
-        "Voice " +
-          voice.name +
-          " requires permissions not granted: " +
-          missing.join(", ") +
-          "\n\n" +
-          "Grant them in your score file:\n" +
-          "  permissions: [" +
-          missing.map((p) => "'" + p + "'").join(", ") +
-          "]",
-      );
+      throw new PermissionError(voice.name, voice.required_permissions, granted);
     }
   }
 

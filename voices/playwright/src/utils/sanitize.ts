@@ -1,3 +1,11 @@
+export class UrlValidationError extends Error {
+  public readonly code = "URL_BLOCKED";
+  constructor(public readonly url: string, message?: string) {
+    super(message ?? `URL blocked: "${url}".`);
+    this.name = "UrlValidationError";
+  }
+}
+
 export class UrlSanitizer {
   private static blocked = [
     /^file:/i,
@@ -11,11 +19,11 @@ export class UrlSanitizer {
   static validate(url: string): string {
     for (const pattern of this.blocked) {
       if (pattern.test(url)) {
-        throw new Error("URL not allowed: " + url);
+        throw new UrlValidationError(url, "URL not allowed: " + url);
       }
     }
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      throw new Error("URL must use http:// or https:// protocol");
+      throw new UrlValidationError(url, "URL must use http:// or https:// protocol");
     }
     return url;
   }

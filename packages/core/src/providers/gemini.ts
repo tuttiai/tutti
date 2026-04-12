@@ -14,6 +14,7 @@ import type {
 } from "@tuttiai/types";
 import { SecretsManager } from "../secrets.js";
 import { logger } from "../logger.js";
+import { ProviderError, AuthenticationError } from "../errors.js";
 
 export interface GeminiProviderOptions {
   /** Gemini API key. Defaults to GEMINI_API_KEY env var. */
@@ -26,11 +27,7 @@ export class GeminiProvider implements LLMProvider {
   constructor(options: GeminiProviderOptions = {}) {
     const apiKey = options.api_key ?? SecretsManager.optional("GEMINI_API_KEY");
     if (!apiKey) {
-      throw new Error(
-        "GeminiProvider requires an API key.\n" +
-        "Set GEMINI_API_KEY in your .env file, or pass api_key to the constructor:\n" +
-        "  new GeminiProvider({ api_key: 'your-key' })",
-      );
+      throw new AuthenticationError("gemini");
     }
     this.client = new GoogleGenerativeAI(apiKey);
   }
@@ -117,10 +114,7 @@ export class GeminiProvider implements LLMProvider {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "gemini" }, "Provider request failed");
-      throw new Error(
-        `Gemini API error: ${msg}\n` +
-        `Check that GEMINI_API_KEY is set correctly in your .env file.`,
-      );
+      throw new ProviderError(`Gemini API error: ${msg}`, { provider: "gemini" });
     }
 
     const response = result.response;
