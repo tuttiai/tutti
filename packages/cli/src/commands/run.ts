@@ -52,10 +52,17 @@ export async function runCommand(scorePath?: string): Promise<void> {
     }
   }
 
+  // Enable streaming on all agents
+  for (const agent of Object.values(score.agents)) {
+    agent.streaming = true;
+  }
+
   const runtime = new TuttiRuntime(score);
   const spinner = ora({ color: "cyan" });
 
-  // Event-based execution trace
+  // Streaming state — reset per run
+  let streaming = false;
+
   runtime.events.on("agent:start", (e) => {
     logger.info({ agent: e.agent_name }, "Running agent");
   });
@@ -64,19 +71,44 @@ export async function runCommand(scorePath?: string): Promise<void> {
     spinner.start("Thinking...");
   });
 
-  runtime.events.on("llm:response", () => {
-    spinner.stop();
+  // Token-by-token streaming
+  runtime.events.on("token:stream", (e) => {
+    if (!streaming) {
+      // First token — kill spinner, switch to streaming mode
+      spinner.stop();
+      streaming = true;
+    }
+    process.stdout.write(e.text);
   });
 
+  runtime.events.on("llm:response", () => {
+    if (streaming) {
+      // End of a streamed turn — newline after the streamed text
+      process.stdout.write("\n");
+    } else {
+      // Non-streaming fallback — just stop spinner
+      spinner.stop();
+    }
+  });
+
+  // Tool calls during streaming
   runtime.events.on("tool:start", (e) => {
-    logger.info({ tool: e.tool_name }, "Using tool");
+    if (streaming) {
+      process.stdout.write(chalk.dim("\n  [using: " + e.tool_name + "]"));
+    } else {
+      spinner.stop();
+      console.log(chalk.dim("  [using: " + e.tool_name + "]"));
+    }
   });
 
   runtime.events.on("tool:end", (e) => {
-    logger.debug({ tool: e.tool_name }, "Tool done");
+    if (streaming) {
+      process.stdout.write(chalk.dim("  [done: " + e.tool_name + "]\n"));
+    }
   });
 
   runtime.events.on("tool:error", (e) => {
+    spinner.stop();
     logger.error({ tool: e.tool_name }, "Tool error");
   });
 
@@ -102,9 +134,11 @@ export async function runCommand(scorePath?: string): Promise<void> {
 
   let sessionId: string | undefined;
 
-  // Handle Ctrl+C
+  // Handle Ctrl+C cleanly
   process.on("SIGINT", () => {
-    console.log(chalk.dim("\nGoodbye!"));
+    if (streaming) process.stdout.write("\n");
+    spinner.stop();
+    console.log(chalk.dim("Goodbye!"));
     rl.close();
     process.exit(0);
   });
@@ -117,11 +151,22 @@ export async function runCommand(scorePath?: string): Promise<void> {
       if (!trimmed) continue;
       if (trimmed === "exit" || trimmed === "quit") break;
 
+      // Reset streaming state for this run
+      streaming = false;
+
       try {
         const result = await runtime.run("assistant", trimmed, sessionId);
         sessionId = result.session_id;
-        console.log(`\n${result.output}\n`);
+
+        if (!streaming) {
+          // Non-streaming fallback — print the full response
+          console.log("\n" + result.output + "\n");
+        } else {
+          // Streaming already printed tokens; just add a blank line
+          console.log();
+        }
       } catch (err) {
+        if (streaming) process.stdout.write("\n");
         spinner.stop();
         logger.error(
           { error: err instanceof Error ? err.message : String(err) },
