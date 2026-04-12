@@ -22,6 +22,7 @@ import { checkCommand } from "./commands/check.js";
 import { studioCommand } from "./commands/studio.js";
 import { searchCommand, voicesCommand } from "./commands/search.js";
 import { publishCommand } from "./commands/publish.js";
+import { evalCommand } from "./commands/eval.js";
 
 const program = new Command();
 
@@ -100,6 +101,15 @@ program
   .option("--dry-run", "Run all checks without publishing")
   .action(async (opts: { dryRun?: boolean }) => {
     await publishCommand(opts);
+  });
+
+program
+  .command("eval <suite-file>")
+  .description("Run an evaluation suite against a score")
+  .option("--ci", "Exit with code 1 if any case fails")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (suitePath: string, opts: { ci?: boolean; score?: string }) => {
+    await evalCommand(suitePath, opts);
   });
 
 program.parse();

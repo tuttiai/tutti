@@ -1,0 +1,37 @@
+{
+  "name": "Basic Agent Tests",
+  "cases": [
+    {
+      "id": "capital",
+      "name": "Knows capitals",
+      "agent_id": "assistant",
+      "input": "What is the capital of France? Answer in one sentence.",
+      "assertions": [
+        { "type": "contains", "value": "Paris", "description": "Output mentions Paris" },
+        { "type": "not_contains", "value": "London", "description": "Does not confuse with London" },
+        { "type": "turns_lte", "value": 1, "description": "Answers in one turn" },
+        { "type": "cost_lte", "value": 0.01, "description": "Costs less than $0.01" }
+      ]
+    },
+    {
+      "id": "greeting",
+      "name": "Friendly greeting",
+      "agent_id": "assistant",
+      "input": "Hello! Who are you?",
+      "assertions": [
+        { "type": "matches_regex", "value": "assist|help|hello", "description": "Responds with a greeting" },
+        { "type": "turns_lte", "value": 1 }
+      ]
+    },
+    {
+      "id": "math",
+      "name": "Basic arithmetic",
+      "agent_id": "assistant",
+      "input": "What is 7 * 8?",
+      "assertions": [
+        { "type": "contains", "value": "56", "description": "Gets the right answer" },
+        { "type": "cost_lte", "value": 0.005 }
+      ]
+    }
+  ]
+}

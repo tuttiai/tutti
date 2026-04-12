@@ -23,6 +23,22 @@ export {
   createMaxCostHook,
 } from "./hooks/index.js";
 
+// Eval
+export {
+  EvalRunner,
+  printTable as printEvalTable,
+  toJSON as evalToJSON,
+  toMarkdown as evalToMarkdown,
+} from "./eval/index.js";
+export type {
+  EvalAssertion,
+  EvalCase,
+  EvalSuite,
+  EvalResult,
+  EvalReport,
+  EvalSummary,
+} from "./eval/index.js";
+
 // Logger
 export { createLogger, logger } from "./logger.js";
 
