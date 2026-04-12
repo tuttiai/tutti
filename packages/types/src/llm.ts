@@ -59,8 +59,8 @@ export interface TokenUsage {
 export interface StreamChunk {
   type: "text" | "tool_use" | "usage";
   text?: string;
-  tool?: { id: string; name: string; input: unknown };
-  usage?: { input_tokens: number; output_tokens: number };
+  tool?: Omit<ToolUseBlock, "type">;
+  usage?: TokenUsage;
   stop_reason?: StopReason;
 }
 
