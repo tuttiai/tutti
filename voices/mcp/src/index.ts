@@ -73,7 +73,10 @@ export class McpVoice implements Voice {
     const { tools: mcpTools } = await this.client.listTools();
 
     return mcpTools.map((mcpTool) => {
-      const schema = jsonSchemaToZod(mcpTool.inputSchema as Record<string, unknown>);
+      const raw = mcpTool.inputSchema;
+      const schema = jsonSchemaToZod(
+        typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {},
+      );
 
       return {
         name: mcpTool.name,
@@ -96,9 +99,9 @@ export class McpVoice implements Voice {
 
     const result = await this.client.callTool({ name, arguments: args });
 
-    // MCP result.content is an array of { type: "text", text: string } blocks
-    const text = (result.content as { type: string; text?: string }[])
-      .filter((c) => c.type === "text" && c.text)
+    const blocks = Array.isArray(result.content) ? result.content : [];
+    const text = blocks
+      .filter((c): c is { type: string; text: string } => c.type === "text" && typeof c.text === "string")
       .map((c) => c.text)
       .join("\n");
 
