@@ -3,6 +3,7 @@
 import type { ChatMessage, TokenUsage } from "./llm.js";
 import type { Permission } from "./voice.js";
 import type { Voice } from "./voice.js";
+import type { TuttiHooks } from "./hooks.js";
 
 export interface BudgetConfig {
   max_tokens?: number;
@@ -41,6 +42,8 @@ export interface AgentConfig {
   delegates?: string[];
   /** Role in the orchestration — orchestrator receives input first. */
   role?: "orchestrator" | "specialist";
+  /** Agent-level lifecycle hooks — merged with global hooks from ScoreConfig. */
+  hooks?: TuttiHooks;
 }
 
 export interface AgentResult {

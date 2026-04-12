@@ -46,3 +46,8 @@ export type {
   TuttiEventType,
   TuttiEventHandler,
 } from "./events.js";
+
+export type {
+  HookContext,
+  TuttiHooks,
+} from "./hooks.js";

@@ -7,6 +7,7 @@ import type {
   ChatRequest,
   ChatResponse,
   ContentBlock,
+  HookContext,
   LLMProvider,
   SessionStore,
   StopReason,
@@ -16,6 +17,7 @@ import type {
   ToolResultBlock,
   ToolUseBlock,
   TokenUsage,
+  TuttiHooks,
 } from "@tuttiai/types";
 import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
@@ -66,7 +68,18 @@ export class AgentRunner {
     private events: EventBus,
     private sessions: SessionStore,
     private semanticMemory?: SemanticMemoryStore,
+    private globalHooks?: TuttiHooks,
   ) {}
+
+  private async safeHook<T>(fn: (() => Promise<T> | T | undefined) | undefined): Promise<T | undefined> {
+    if (!fn) return undefined;
+    try {
+      return await fn() ?? undefined;
+    } catch (err) {
+      logger.warn({ error: err instanceof Error ? err.message : String(err) }, "Hook error (non-fatal)");
+      return undefined;
+    }
+  }
 
   /** Resolve a pending human-in-the-loop request for a session. */
   answer(sessionId: string, answer: string): void {
@@ -96,6 +109,18 @@ export class AgentRunner {
     }
 
     return TuttiTracer.agentRun(agent.name, session.id, async () => {
+      const agentHooks = agent.hooks;
+      const hookCtx: HookContext = {
+        agent_name: agent.name,
+        session_id: session.id,
+        turn: 0,
+        metadata: {},
+      };
+
+      // beforeAgentRun hooks
+      await this.safeHook(() => this.globalHooks?.beforeAgentRun?.(hookCtx));
+      await this.safeHook(() => agentHooks?.beforeAgentRun?.(hookCtx));
+
       logger.info({ agent: agent.name, session: session.id }, "Agent started");
 
       this.events.emit({
@@ -173,12 +198,19 @@ export class AgentRunner {
           }
         }
 
-        const request = {
+        let request: ChatRequest = {
           model: agent.model,
           system: systemPrompt,
           messages,
           tools: toolDefs.length > 0 ? toolDefs : undefined,
         };
+
+        // beforeLLMCall hooks — may modify the request
+        hookCtx.turn = turns;
+        const globalReq = await this.safeHook(() => this.globalHooks?.beforeLLMCall?.(hookCtx, request));
+        if (globalReq) request = globalReq;
+        const agentReq = await this.safeHook(() => agentHooks?.beforeLLMCall?.(hookCtx, request));
+        if (agentReq) request = agentReq;
 
         logger.debug({ agent: agent.name, model: agent.model }, "LLM request");
 
@@ -207,6 +239,10 @@ export class AgentRunner {
           agent_name: agent.name,
           response,
         });
+
+        // afterLLMCall hooks
+        await this.safeHook(() => this.globalHooks?.afterLLMCall?.(hookCtx, response));
+        await this.safeHook(() => agentHooks?.afterLLMCall?.(hookCtx, response));
 
         totalUsage.input_tokens += response.usage.input_tokens;
         totalUsage.output_tokens += response.usage.output_tokens;
@@ -302,7 +338,7 @@ export class AgentRunner {
 
         const toolResults: ToolResultBlock[] = await Promise.all(
           toolUseBlocks.map((block) =>
-            this.executeTool(allTools, block, toolContext, toolTimeoutMs),
+            this.executeTool(allTools, block, toolContext, toolTimeoutMs, hookCtx, agentHooks),
           ),
         );
 
@@ -331,13 +367,19 @@ export class AgentRunner {
         session_id: session.id,
       });
 
-      return {
+      const agentResult: AgentResult = {
         session_id: session.id,
         output,
         messages,
         turns,
         usage: totalUsage,
       };
+
+      // afterAgentRun hooks
+      await this.safeHook(() => this.globalHooks?.afterAgentRun?.(hookCtx, agentResult));
+      await this.safeHook(() => agentHooks?.afterAgentRun?.(hookCtx, agentResult));
+
+      return agentResult;
     });
   }
 
@@ -445,6 +487,8 @@ export class AgentRunner {
     block: ToolUseBlock,
     context: ToolContext,
     timeoutMs: number,
+    hookCtx?: HookContext,
+    agentHooks?: TuttiHooks,
   ): Promise<ToolResultBlock> {
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
@@ -458,6 +502,18 @@ export class AgentRunner {
     }
 
     return TuttiTracer.toolCall(block.name, async () => {
+      // beforeToolCall hooks — return false to block, or modified input
+      if (hookCtx) {
+        const globalResult = await this.safeHook(() => this.globalHooks?.beforeToolCall?.(hookCtx, block.name, block.input));
+        if (globalResult === false) {
+          return { type: "tool_result" as const, tool_use_id: block.id, content: "Tool call blocked by hook", is_error: true };
+        }
+        const agentResult = await this.safeHook(() => agentHooks?.beforeToolCall?.(hookCtx, block.name, block.input));
+        if (agentResult === false) {
+          return { type: "tool_result" as const, tool_use_id: block.id, content: "Tool call blocked by hook", is_error: true };
+        }
+      }
+
       logger.debug({ tool: block.name, input: block.input }, "Tool called");
 
       this.events.emit({
@@ -470,11 +526,19 @@ export class AgentRunner {
       try {
         // Validate input with Zod
         const parsed = tool.parameters.parse(block.input);
-        const result = await this.executeWithTimeout(
+        let result = await this.executeWithTimeout(
           () => tool.execute(parsed, context),
           timeoutMs,
           block.name,
         );
+
+        // afterToolCall hooks — may modify result
+        if (hookCtx) {
+          const globalMod = await this.safeHook(() => this.globalHooks?.afterToolCall?.(hookCtx, block.name, result));
+          if (globalMod) result = globalMod;
+          const agentMod = await this.safeHook(() => agentHooks?.afterToolCall?.(hookCtx, block.name, result));
+          if (agentMod) result = agentMod;
+        }
 
         logger.debug({ tool: block.name, result: result.content }, "Tool completed");
 

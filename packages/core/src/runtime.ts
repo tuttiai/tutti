@@ -27,6 +27,7 @@ export class TuttiRuntime {
       this.events,
       this._sessions,
       this.semanticMemory,
+      score.hooks,
     );
 
     if (score.telemetry) {

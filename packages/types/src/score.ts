@@ -2,6 +2,7 @@
 
 import type { AgentConfig } from "./agent.js";
 import type { LLMProvider } from "./llm.js";
+import type { TuttiHooks } from "./hooks.js";
 
 export interface MemoryConfig {
   provider: "in-memory" | "postgres" | "redis";
@@ -29,4 +30,6 @@ export interface ScoreConfig {
   memory?: MemoryConfig;
   /** OpenTelemetry tracing configuration. */
   telemetry?: TelemetryConfig;
+  /** Global lifecycle hooks — apply to all agents. */
+  hooks?: TuttiHooks;
 }

@@ -15,6 +15,14 @@ export {
   UrlValidationError,
 } from "./errors.js";
 
+// Hooks
+export {
+  createLoggingHook,
+  createCacheHook,
+  createBlocklistHook,
+  createMaxCostHook,
+} from "./hooks/index.js";
+
 // Logger
 export { createLogger, logger } from "./logger.js";
 
@@ -86,4 +94,7 @@ export type {
   TuttiEvent,
   TuttiEventType,
   TuttiEventHandler,
+  // Hooks
+  HookContext,
+  TuttiHooks,
 } from "@tuttiai/types";
