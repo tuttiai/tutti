@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.12.0] - 2026-04-12
+
+### Added
+- Structured logging with pino (`debug` / `info` / `warn` / `error` levels)
+- `createLogger(name)` factory and default `logger` export
+- `TUTTI_LOG_LEVEL` env var support (default: `info`)
+- pino-pretty for colorized dev output, raw JSON in production
+- OpenTelemetry tracing — `TuttiTracer` with `agentRun`, `llmCall`, `toolCall` spans
+- `TelemetryConfig` on `ScoreConfig` (`enabled`, `endpoint?`, `headers?`)
+- `initTelemetry()` / `shutdownTelemetry()` for OTel SDK lifecycle
+- OTLP HTTP exporter with configurable endpoint (default `localhost:4318`)
+- **Tutti Studio** — local web UI at `localhost:4747`
+- `tutti-ai studio [score]` command with auto browser-open
+- Studio: SVG agent graph (purple orchestrators, teal specialists, delegate arrows)
+- Studio: live SSE event stream, color-coded by event type
+- Studio: session browser with message history viewer
+- Studio: token usage bar (input / output / estimated cost)
+- Studio: REST API (`/api/score`, `/api/sessions`, `/api/run`)
+
+### Changed
+- All `console.log/warn/error` in core replaced with structured pino logging
+- CLI error handlers and event traces migrated to structured logger
+- Agent runner, providers, and runtime emit structured log context
+- `.env.example` template now includes `TUTTI_LOG_LEVEL` and OTEL vars
+
+### Published
+- `@tuttiai/types@0.4.0`
+- `@tuttiai/core@0.6.0`
+- `@tuttiai/cli@0.5.0`
+- `tutti-ai@0.6.0`
+
 ## [0.11.0] - 2026-04-11
 
 ### Added
