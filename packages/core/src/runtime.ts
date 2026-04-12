@@ -6,6 +6,7 @@ import { PostgresSessionStore } from "./memory/postgres.js";
 import { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
 import { PermissionGuard } from "./permission-guard.js";
+import { logger } from "./logger.js";
 
 export class TuttiRuntime {
   readonly events: EventBus;
@@ -25,6 +26,8 @@ export class TuttiRuntime {
       this._sessions,
       this.semanticMemory,
     );
+
+    logger.info({ score: score.name, agents: Object.keys(score.agents) }, "Runtime initialized");
   }
 
   /**

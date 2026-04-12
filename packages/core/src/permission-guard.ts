@@ -1,4 +1,5 @@
 import type { Permission, Voice } from "@tuttiai/types";
+import { logger } from "./logger.js";
 
 export class PermissionGuard {
   static check(voice: Voice, granted: Permission[]): void {
@@ -25,11 +26,9 @@ export class PermissionGuard {
       (p) => p === "shell" || p === "filesystem",
     );
     if (dangerous.length > 0) {
-      console.warn(
-        "[tutti] Warning: voice " +
-          voice.name +
-          " has elevated permissions: " +
-          dangerous.join(", "),
+      logger.warn(
+        { voice: voice.name, permissions: dangerous },
+        "Voice has elevated permissions",
       );
     }
   }

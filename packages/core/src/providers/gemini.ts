@@ -12,6 +12,7 @@ import type {
   ContentBlock,
 } from "@tuttiai/types";
 import { SecretsManager } from "../secrets.js";
+import { logger } from "../logger.js";
 
 export interface GeminiProviderOptions {
   /** Gemini API key. Defaults to GEMINI_API_KEY env var. */
@@ -114,6 +115,7 @@ export class GeminiProvider implements LLMProvider {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+      logger.error({ error: msg, provider: "gemini" }, "Provider request failed");
       throw new Error(
         `Gemini API error: ${msg}\n` +
         `Check that GEMINI_API_KEY is set correctly in your .env file.`,

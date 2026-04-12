@@ -2,6 +2,9 @@ import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import Enquirer from "enquirer";
+import { createLogger } from "@tuttiai/core";
+
+const logger = createLogger("tutti-cli");
 
 const { prompt } = Enquirer;
 
@@ -16,14 +19,14 @@ export async function initCommand(projectName?: string): Promise<void> {
   }
 
   if (!projectName) {
-    console.error(chalk.red("Project name is required."));
+    logger.error("Project name is required");
     process.exit(1);
   }
 
   const dir = join(process.cwd(), projectName);
 
   if (existsSync(dir)) {
-    console.error(chalk.red(`Directory already exists: ${projectName}/`));
+    logger.error({ dir: `${projectName}/` }, "Directory already exists");
     process.exit(1);
   }
 
@@ -52,7 +55,10 @@ export async function initCommand(projectName?: string): Promise<void> {
       2,
     ),
 
-    ".env.example": "ANTHROPIC_API_KEY=your_key_here\n",
+    ".env.example":
+      "ANTHROPIC_API_KEY=your_key_here\n\n" +
+      "# Log level: debug | info | warn | error (default: info)\n" +
+      "TUTTI_LOG_LEVEL=info\n",
 
     ".gitignore": "node_modules\ndist\n.env\n",
 

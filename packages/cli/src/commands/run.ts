@@ -10,16 +10,17 @@ import {
   OpenAIProvider,
   GeminiProvider,
   SecretsManager,
+  createLogger,
 } from "@tuttiai/core";
+
+const logger = createLogger("tutti-cli");
 
 export async function runCommand(scorePath?: string): Promise<void> {
   const file = resolve(scorePath ?? "./tutti.score.ts");
 
   if (!existsSync(file)) {
-    console.error(chalk.red(`Score file not found: ${file}`));
-    console.error(
-      chalk.dim('Run "tutti-ai init" to create a new project.'),
-    );
+    logger.error({ file }, "Score file not found");
+    console.error(chalk.dim('Run "tutti-ai init" to create a new project.'));
     process.exit(1);
   }
 
@@ -27,10 +28,9 @@ export async function runCommand(scorePath?: string): Promise<void> {
   try {
     score = await ScoreLoader.load(file);
   } catch (err) {
-    console.error(
-      chalk.red(
-        `Failed to load score: ${err instanceof Error ? err.message : err}`,
-      ),
+    logger.error(
+      { error: err instanceof Error ? err.message : String(err) },
+      "Failed to load score",
     );
     process.exit(1);
   }
@@ -46,12 +46,7 @@ export async function runCommand(scorePath?: string): Promise<void> {
     if (score.provider instanceof (ProviderClass as new (...args: unknown[]) => unknown)) {
       const key = SecretsManager.optional(envVar);
       if (!key) {
-        console.error(
-          chalk.red(
-            `Missing API key: ${envVar}\n` +
-              `Add it to your .env file: ${envVar}=your_value_here`,
-          ),
-        );
+        logger.error({ envVar }, "Missing API key");
         process.exit(1);
       }
     }
@@ -62,7 +57,7 @@ export async function runCommand(scorePath?: string): Promise<void> {
 
   // Event-based execution trace
   runtime.events.on("agent:start", (e) => {
-    console.log(chalk.cyan(`Running agent: ${e.agent_name}`));
+    logger.info({ agent: e.agent_name }, "Running agent");
   });
 
   runtime.events.on("llm:request", () => {
@@ -74,31 +69,27 @@ export async function runCommand(scorePath?: string): Promise<void> {
   });
 
   runtime.events.on("tool:start", (e) => {
-    console.log(chalk.dim(`  Using tool: ${e.tool_name}`));
+    logger.info({ tool: e.tool_name }, "Using tool");
   });
 
   runtime.events.on("tool:end", (e) => {
-    console.log(chalk.dim(`  Done: ${e.tool_name}`));
+    logger.debug({ tool: e.tool_name }, "Tool done");
   });
 
   runtime.events.on("tool:error", (e) => {
-    console.log(chalk.red(`  Error in tool: ${e.tool_name}`));
+    logger.error({ tool: e.tool_name }, "Tool error");
   });
 
   runtime.events.on("security:injection_detected", (e) => {
-    console.log(
-      chalk.yellow(
-        `  [security] Potential prompt injection detected in: ${e.tool_name}`,
-      ),
-    );
+    logger.warn({ tool: e.tool_name }, "Potential prompt injection detected");
   });
 
   runtime.events.on("budget:warning", () => {
-    console.log(chalk.yellow("  Approaching token budget (80%)"));
+    logger.warn("Approaching token budget (80%)");
   });
 
   runtime.events.on("budget:exceeded", () => {
-    console.log(chalk.red("  Token budget exceeded. Stopping."));
+    logger.error("Token budget exceeded — stopping");
   });
 
   // REPL
@@ -132,15 +123,9 @@ export async function runCommand(scorePath?: string): Promise<void> {
         console.log(`\n${result.output}\n`);
       } catch (err) {
         spinner.stop();
-        console.error(
-          chalk.red(
-            `[tutti] Something went wrong: ${err instanceof Error ? err.message : err}`,
-          ),
-        );
-        console.error(
-          chalk.dim(
-            'Run "tutti-ai check" to validate your score file.',
-          ),
+        logger.error(
+          { error: err instanceof Error ? err.message : String(err) },
+          "Something went wrong",
         );
       }
     }

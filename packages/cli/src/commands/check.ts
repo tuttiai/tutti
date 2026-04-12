@@ -7,7 +7,10 @@ import {
   OpenAIProvider,
   GeminiProvider,
   SecretsManager,
+  createLogger,
 } from "@tuttiai/core";
+
+const logger = createLogger("tutti-cli");
 
 const ok = (msg: string) => console.log(chalk.green("  \u2714 " + msg));
 const fail = (msg: string) => console.log(chalk.red("  \u2718 " + msg));
@@ -29,10 +32,9 @@ export async function checkCommand(scorePath?: string): Promise<void> {
     ok("Score file is valid");
   } catch (err) {
     fail("Score validation failed");
-    console.error(
-      chalk.red(
-        "  " + (err instanceof Error ? err.message : String(err)),
-      ),
+    logger.error(
+      { error: err instanceof Error ? err.message : String(err) },
+      "Score validation failed",
     );
     process.exit(1);
   }

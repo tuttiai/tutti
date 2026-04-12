@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { PermissionGuard } from "../src/permission-guard.js";
+import { logger } from "../src/logger.js";
 import type { Voice, Permission } from "@tuttiai/types";
 
 function makeVoice(permissions: Permission[]): Voice {
@@ -55,33 +56,35 @@ describe("PermissionGuard", () => {
 
   describe("warn()", () => {
     it("logs a warning for shell permission", () => {
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const spy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const voice = makeVoice(["shell"]);
 
       PermissionGuard.warn(voice);
 
       expect(spy).toHaveBeenCalledOnce();
       expect(spy).toHaveBeenCalledWith(
-        expect.stringContaining("elevated permissions: shell"),
+        expect.objectContaining({ voice: "test-voice", permissions: ["shell"] }),
+        "Voice has elevated permissions",
       );
       spy.mockRestore();
     });
 
     it("logs a warning for filesystem permission", () => {
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const spy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const voice = makeVoice(["filesystem"]);
 
       PermissionGuard.warn(voice);
 
       expect(spy).toHaveBeenCalledOnce();
       expect(spy).toHaveBeenCalledWith(
-        expect.stringContaining("elevated permissions: filesystem"),
+        expect.objectContaining({ voice: "test-voice", permissions: ["filesystem"] }),
+        "Voice has elevated permissions",
       );
       spy.mockRestore();
     });
 
     it("does not warn for network or browser permissions", () => {
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const spy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const voice = makeVoice(["network", "browser"]);
 
       PermissionGuard.warn(voice);

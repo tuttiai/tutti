@@ -1,6 +1,7 @@
 import pg from "pg";
 import { randomUUID } from "node:crypto";
 import type { Session, SessionStore, ChatMessage } from "@tuttiai/types";
+import { logger } from "../logger.js";
 
 const { Pool } = pg;
 
@@ -51,8 +52,9 @@ export class PostgresSessionStore implements SessionStore {
         ],
       )
       .catch((err) => {
-        console.error(
-          `[tutti] Failed to persist session ${session.id} to Postgres: ${err instanceof Error ? err.message : err}`,
+        logger.error(
+          { error: err instanceof Error ? err.message : String(err), session: session.id },
+          "Failed to persist session to Postgres",
         );
       });
 
@@ -99,8 +101,9 @@ export class PostgresSessionStore implements SessionStore {
         [JSON.stringify(messages), id],
       )
       .catch((err) => {
-        console.error(
-          `[tutti] Failed to update session ${id} in Postgres: ${err instanceof Error ? err.message : err}`,
+        logger.error(
+          { error: err instanceof Error ? err.message : String(err), session: id },
+          "Failed to update session in Postgres",
         );
       });
   }

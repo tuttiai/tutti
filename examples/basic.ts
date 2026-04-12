@@ -1,4 +1,6 @@
-import { TuttiRuntime, AnthropicProvider, defineScore } from "@tuttiai/core";
+import { TuttiRuntime, AnthropicProvider, defineScore, createLogger } from "@tuttiai/core";
+
+const logger = createLogger("example");
 
 const score = defineScore({
   name: "basic-example",
@@ -19,7 +21,7 @@ const tutti = new TuttiRuntime(score);
 // Subscribe to all events for full execution trace
 tutti.events.onAny((event) => {
   const { type, ...data } = event;
-  console.log(`\n[event] ${type}`, JSON.stringify(data, null, 2));
+  logger.debug({ event: type, ...data }, "Event emitted");
 });
 
 const result = await tutti.run(
@@ -27,11 +29,9 @@ const result = await tutti.run(
   "What is the capital of France? Answer in one sentence.",
 );
 
-console.log("\n--- Result ---");
-console.log("Output:", result.output);
-console.log("Turns:", result.turns);
-console.log(
-  "Usage:",
-  `${result.usage.input_tokens} input / ${result.usage.output_tokens} output tokens`,
+logger.info({ output: result.output, turns: result.turns }, "Result");
+logger.info(
+  { input_tokens: result.usage.input_tokens, output_tokens: result.usage.output_tokens },
+  "Token usage",
 );
-console.log("Session:", result.session_id);
+logger.info({ session: result.session_id }, "Session");

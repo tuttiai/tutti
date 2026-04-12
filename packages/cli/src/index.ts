@@ -1,14 +1,16 @@
 import { config } from "dotenv";
 config();
 
+import { createLogger } from "@tuttiai/core";
+const logger = createLogger("tutti-cli");
+
 process.on("unhandledRejection", (reason) => {
-  console.error("[tutti] Unhandled error:", reason);
-  console.error("Report at github.com/tuttiai/tutti/issues");
+  logger.error({ error: reason instanceof Error ? reason.message : String(reason) }, "Unhandled rejection");
   process.exit(1);
 });
 
 process.on("uncaughtException", (err) => {
-  console.error("[tutti] Fatal error:", err.message);
+  logger.error({ error: err.message }, "Fatal error");
   process.exit(1);
 });
 

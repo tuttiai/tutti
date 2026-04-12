@@ -6,6 +6,7 @@ import type {
   ContentBlock,
 } from "@tuttiai/types";
 import { SecretsManager } from "../secrets.js";
+import { logger } from "../logger.js";
 
 export interface AnthropicProviderOptions {
   api_key?: string;
@@ -48,6 +49,7 @@ export class AnthropicProvider implements LLMProvider {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+      logger.error({ error: msg, provider: "anthropic" }, "Provider request failed");
       throw new Error(
         `Anthropic API error: ${msg}\n` +
         `Check that ANTHROPIC_API_KEY is set correctly in your .env file.`,

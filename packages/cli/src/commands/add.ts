@@ -3,6 +3,9 @@ import { resolve } from "node:path";
 import { execSync } from "node:child_process";
 import chalk from "chalk";
 import ora from "ora";
+import { createLogger } from "@tuttiai/core";
+
+const logger = createLogger("tutti-cli");
 
 const OFFICIAL_VOICES: Record<string, { package: string; setup: string }> = {
   filesystem: {
@@ -77,12 +80,8 @@ export async function addCommand(voiceName: string): Promise<void> {
   // Check if package.json exists in cwd
   const pkgPath = resolve(process.cwd(), "package.json");
   if (!existsSync(pkgPath)) {
-    console.error(
-      chalk.red("No package.json found in the current directory."),
-    );
-    console.error(
-      chalk.dim('Run "tutti-ai init" to create a new project first.'),
-    );
+    logger.error("No package.json found in the current directory");
+    console.error(chalk.dim('Run "tutti-ai init" to create a new project first.'));
     process.exit(1);
   }
 
@@ -103,9 +102,8 @@ export async function addCommand(voiceName: string): Promise<void> {
     spinner.succeed(`Installed ${packageName}`);
   } catch (error) {
     spinner.fail(`Failed to install ${packageName}`);
-    const message =
-      error instanceof Error ? error.message : String(error);
-    console.error(chalk.red(message));
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error({ error: message, package: packageName }, "Installation failed");
     process.exit(1);
   }
 

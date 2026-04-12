@@ -18,6 +18,7 @@ import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
+import { logger } from "./logger.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
@@ -49,6 +50,8 @@ export class AgentRunner {
       );
     }
 
+    logger.info({ agent: agent.name, session: session.id }, "Agent started");
+
     this.events.emit({
       type: "agent:start",
       agent_name: agent.name,
@@ -77,6 +80,8 @@ export class AgentRunner {
     // Agentic loop
     while (turns < maxTurns) {
       turns++;
+
+      logger.info({ agent: agent.name, session: session.id, turn: turns }, "Turn started");
 
       this.events.emit({
         type: "turn:start",
@@ -115,6 +120,8 @@ export class AgentRunner {
         tools: toolDefs.length > 0 ? toolDefs : undefined,
       };
 
+      logger.debug({ agent: agent.name, model: agent.model }, "LLM request");
+
       this.events.emit({
         type: "llm:request",
         agent_name: agent.name,
@@ -122,6 +129,11 @@ export class AgentRunner {
       });
 
       const response = await this.provider.chat(request);
+
+      logger.debug(
+        { agent: agent.name, stopReason: response.stop_reason, usage: response.usage },
+        "LLM response",
+      );
 
       this.events.emit({
         type: "llm:response",
@@ -137,6 +149,10 @@ export class AgentRunner {
         budget.add(response.usage.input_tokens, response.usage.output_tokens);
         const status = budget.check();
         if (status === "warning") {
+          logger.warn(
+            { agent: agent.name, tokens: budget.total_tokens, cost_usd: budget.estimated_cost_usd },
+            "Approaching token budget limit",
+          );
           this.events.emit({
             type: "budget:warning",
             agent_name: agent.name,
@@ -144,6 +160,10 @@ export class AgentRunner {
             cost_usd: budget.estimated_cost_usd,
           });
         } else if (status === "exceeded") {
+          logger.warn(
+            { agent: agent.name, tokens: budget.total_tokens, cost_usd: budget.estimated_cost_usd },
+            "Token budget exceeded",
+          );
           this.events.emit({
             type: "budget:exceeded",
             agent_name: agent.name,
@@ -233,6 +253,11 @@ export class AgentRunner {
 
     const output = extractText(lastAssistant?.content);
 
+    logger.info(
+      { agent: agent.name, session: session.id, turns, usage: totalUsage },
+      "Agent finished",
+    );
+
     this.events.emit({
       type: "agent:end",
       agent_name: agent.name,
@@ -287,6 +312,8 @@ export class AgentRunner {
       };
     }
 
+    logger.debug({ tool: block.name, input: block.input }, "Tool called");
+
     this.events.emit({
       type: "tool:start",
       agent_name: context.agent_name,
@@ -303,6 +330,8 @@ export class AgentRunner {
         block.name,
       );
 
+      logger.debug({ tool: block.name, result: result.content }, "Tool completed");
+
       this.events.emit({
         type: "tool:end",
         agent_name: context.agent_name,
@@ -313,6 +342,10 @@ export class AgentRunner {
       // Scan for prompt injection and wrap content
       const scan = PromptGuard.scan(result.content);
       if (!scan.safe) {
+        logger.warn(
+          { tool: block.name, patterns: scan.found },
+          "Potential prompt injection detected in tool output",
+        );
         this.events.emit({
           type: "security:injection_detected",
           agent_name: context.agent_name,
@@ -329,6 +362,8 @@ export class AgentRunner {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+
+      logger.error({ error: message, tool: block.name }, "Tool failed");
 
       this.events.emit({
         type: "tool:error",

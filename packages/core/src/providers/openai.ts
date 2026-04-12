@@ -6,6 +6,7 @@ import type {
   ContentBlock,
 } from "@tuttiai/types";
 import { SecretsManager } from "../secrets.js";
+import { logger } from "../logger.js";
 
 export interface OpenAIProviderOptions {
   /** OpenAI API key. Defaults to OPENAI_API_KEY env var. */
@@ -112,6 +113,7 @@ export class OpenAIProvider implements LLMProvider {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+      logger.error({ error: msg, provider: "openai" }, "Provider request failed");
       throw new Error(
         `OpenAI API error: ${msg}\n` +
         `Check that OPENAI_API_KEY is set correctly in your .env file.`,
