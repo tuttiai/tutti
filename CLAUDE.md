@@ -9,7 +9,7 @@ Before every change, verify:
 - [ ] No API keys in logs, events, or error messages
 - [ ] All tool results wrapped with `PromptGuard.wrap()`
 - [ ] Dependency direction: types <- core <- cli, types <- voices, core <- voices
-- [ ] New public method has at least one test
+- [ ] New public methods have at least one unit test
 - [ ] Conventional Commit message with package scope
 - [ ] `npm audit --audit-level=high` passes
 - [ ] CHANGELOG.md updated before tagging
@@ -190,7 +190,7 @@ Every rule in this section is enforced on every PR. Non-compliance blocks merge.
 ### Dependencies
 
 - 🔒 `npm audit --audit-level=high` must pass before publish.
-- 🔒 Production dependencies pinned to exact versions — no `^` or `~`.
+- 🔒 Security-sensitive and LLM SDK dependencies (provider SDKs, `pg`, `express`, `@modelcontextprotocol/sdk`) pinned to exact versions — no `^` or `~`. Utility packages (`zod`, `chalk`, `pino`) may use `^` ranges. Rationale: provider SDK breaking changes have caused silent behavior regressions; pinning ensures reproducible builds for critical paths while allowing patch updates for low-risk utilities.
 - 🔒 **Never** use `eval()` or `new Function()` with user-provided strings.
 
 ### Security checklist (verify before every PR)
@@ -253,7 +253,7 @@ describe("AgentRunner", () => {
 - ⚠ **Never** use real API keys in tests. Always use `MockLLMProvider`.
 - ⚠ **Never** make real network calls in tests.
 - ⚠ **Never** write to the real filesystem in tests. Use temp directories cleaned up in `afterEach`.
-- Every new public method needs at least one test.
+- Every new public method must include at least one unit test.
 - Every bug fix needs a regression test that fails before the fix and passes after.
 - Every security control needs a proof-it-works test (e.g., "redacts API key from error message").
 
@@ -342,11 +342,11 @@ Every voice must have a README.md with these sections:
 
 ## 8. Performance Rules
 
-- Tool results truncated at 8,000 characters with a `[truncated]` notice appended.
+- Tool results truncated at 8,000 characters (configurable via `AgentConfig.max_tool_result_chars`, default chosen to stay well within Claude's 200k context while leaving room for multi-turn conversation history) with a `[truncated]` notice appended.
 - Session messages pruned when approaching the model's context window.
 - `voice.setup()` called once per runtime — not per run. Guard with an `initialized` flag.
 - Provider clients (Anthropic, OpenAI, Gemini) instantiated once in the constructor — not per request.
-- `InMemorySessionStore` capped at 1,000 sessions with LRU eviction.
+- `InMemorySessionStore` capped at 1,000 sessions (configurable via constructor `maxSessions` parameter) with LRU eviction. Default chosen to bound memory at ~50MB assuming ~50KB average session size. Use `PostgresSessionStore` for production workloads that need more.
 - `EventBus.on()` returns an unsubscribe function. Always clean up listeners to prevent leaks.
 - No circular references in event payloads — they must be JSON-serializable.
 
