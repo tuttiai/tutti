@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.16.0] - 2026-04-12
+
+### Added
+- 5 project templates: `minimal`, `coding-agent`, `research-agent`, `qa-pipeline`, `dev-team`
+- `tutti-ai init --template <id>` flag for direct template selection
+- Interactive template picker when no `--template` flag provided
+- `tutti-ai templates` command listing all templates with descriptions
+- Evaluation framework: `EvalCase`, `EvalAssertion`, `EvalResult`, `EvalReport` types
+- 7 assertion types: `contains`, `not_contains`, `matches_regex`, `tool_called`, `tool_not_called`, `turns_lte`, `cost_lte`
+- `EvalRunner` — runs suites against a score, checks all assertions, tracks cost
+- Report formatters: `printTable` (stdout), `toJSON` (CI), `toMarkdown` (PR comments)
+- `tutti-ai eval <suite.json>` command with `--ci` flag (exits 1 on failure)
+
+### Published
+- `@tuttiai/core@0.9.0`
+- `@tuttiai/cli@0.8.0`
+- `tutti-ai@0.10.0`
+
 ## [0.15.0] - 2026-04-12
 
 ### Added

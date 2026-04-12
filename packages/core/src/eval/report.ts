@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- printTable is designed to output directly to stdout */
 /** Evaluation report formatting — table, JSON, Markdown. */
 
 import type { EvalReport } from "./types.js";

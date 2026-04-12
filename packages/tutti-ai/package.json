@@ -1,6 +1,6 @@
 {
   "name": "tutti-ai",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Tutti — multi-agent orchestration. All agents. All together.",
   "type": "module",
   "bin": {
