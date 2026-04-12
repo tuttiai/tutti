@@ -3,9 +3,12 @@ import type {
   AgentConfig,
   AgentResult,
   ChatMessage,
+  ChatRequest,
+  ChatResponse,
   ContentBlock,
   LLMProvider,
   SessionStore,
+  StopReason,
   Tool,
   ToolContext,
   ToolDefinition,
@@ -132,7 +135,9 @@ export class AgentRunner {
 
         const response = await TuttiTracer.llmCall(
           agent.model ?? "unknown",
-          () => this.provider.chat(request),
+          () => agent.streaming
+            ? this.streamToResponse(agent.name, request)
+            : this.provider.chat(request),
         );
 
         logger.debug(
@@ -299,6 +304,45 @@ export class AgentRunner {
         ),
       ),
     ]);
+  }
+
+  private async streamToResponse(
+    agentName: string,
+    request: ChatRequest,
+  ): Promise<ChatResponse> {
+    const content: ContentBlock[] = [];
+    let textBuffer = "";
+    let usage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
+    let stopReason: StopReason = "end_turn";
+
+    for await (const chunk of this.provider.stream(request)) {
+      if (chunk.type === "text" && chunk.text) {
+        textBuffer += chunk.text;
+        this.events.emit({
+          type: "token:stream",
+          agent_name: agentName,
+          text: chunk.text,
+        });
+      }
+      if (chunk.type === "tool_use" && chunk.tool) {
+        content.push({
+          type: "tool_use",
+          id: chunk.tool.id,
+          name: chunk.tool.name,
+          input: chunk.tool.input,
+        });
+      }
+      if (chunk.type === "usage") {
+        if (chunk.usage) usage = chunk.usage;
+        if (chunk.stop_reason) stopReason = chunk.stop_reason;
+      }
+    }
+
+    if (textBuffer) {
+      content.unshift({ type: "text", text: textBuffer });
+    }
+
+    return { id: "", content, stop_reason: stopReason, usage };
   }
 
   private async executeTool(

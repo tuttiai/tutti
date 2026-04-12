@@ -33,6 +33,8 @@ export interface AgentConfig {
   budget?: BudgetConfig;
   /** Semantic (long-term) memory configuration. */
   semantic_memory?: AgentMemoryConfig;
+  /** Enable token-by-token streaming (default: false). */
+  streaming?: boolean;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];
   /** Role in the orchestration — orchestrator receives input first. */

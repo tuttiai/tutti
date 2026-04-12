@@ -56,6 +56,15 @@ export interface TokenUsage {
   output_tokens: number;
 }
 
+export interface StreamChunk {
+  type: "text" | "tool_use" | "usage";
+  text?: string;
+  tool?: { id: string; name: string; input: unknown };
+  usage?: { input_tokens: number; output_tokens: number };
+  stop_reason?: StopReason;
+}
+
 export interface LLMProvider {
   chat(request: ChatRequest): Promise<ChatResponse>;
+  stream(request: ChatRequest): AsyncIterable<StreamChunk>;
 }

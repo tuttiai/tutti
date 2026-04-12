@@ -12,16 +12,16 @@ const score = defineScore({
       system_prompt:
         "You are a friendly and concise assistant. Answer clearly in plain language.",
       voices: [],
+      streaming: true,
     },
   },
 });
 
 const tutti = new TuttiRuntime(score);
 
-// Subscribe to all events for full execution trace
-tutti.events.onAny((event) => {
-  const { type, ...data } = event;
-  logger.debug({ event: type, ...data }, "Event emitted");
+// Stream tokens to stdout in real-time
+tutti.events.on("token:stream", (e) => {
+  process.stdout.write(e.text);
 });
 
 const result = await tutti.run(
@@ -29,7 +29,10 @@ const result = await tutti.run(
   "What is the capital of France? Answer in one sentence.",
 );
 
-logger.info({ output: result.output, turns: result.turns }, "Result");
+// Newline after streamed output
+console.log();
+
+logger.info({ turns: result.turns }, "Done");
 logger.info(
   { input_tokens: result.usage.input_tokens, output_tokens: result.usage.output_tokens },
   "Token usage",

@@ -17,7 +17,8 @@ export type TuttiEvent =
   | { type: "delegate:end"; from: string; to: string; output: string }
   | { type: "security:injection_detected"; agent_name: string; tool_name: string; patterns: string[] }
   | { type: "budget:warning"; agent_name: string; tokens: number; cost_usd: number }
-  | { type: "budget:exceeded"; agent_name: string; tokens: number; cost_usd: number };
+  | { type: "budget:exceeded"; agent_name: string; tokens: number; cost_usd: number }
+  | { type: "token:stream"; agent_name: string; text: string };
 
 export type TuttiEventType = TuttiEvent["type"];
 

@@ -10,6 +10,7 @@ import type {
   ChatRequest,
   ChatResponse,
   ContentBlock,
+  StreamChunk,
 } from "@tuttiai/types";
 import { SecretsManager } from "../secrets.js";
 import { logger } from "../logger.js";
@@ -164,6 +165,101 @@ export class GeminiProvider implements LLMProvider {
         input_tokens: usage?.promptTokenCount ?? 0,
         output_tokens: usage?.candidatesTokenCount ?? 0,
       },
+    };
+  }
+
+  async *stream(request: ChatRequest): AsyncGenerator<StreamChunk> {
+    const model = request.model ?? "gemini-2.0-flash";
+
+    const tools: { functionDeclarations: FunctionDeclaration[] }[] = [];
+    if (request.tools && request.tools.length > 0) {
+      tools.push({
+        functionDeclarations: request.tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: convertJsonSchemaToGemini(tool.input_schema),
+        })),
+      });
+    }
+
+    const generativeModel = this.client.getGenerativeModel({
+      model,
+      systemInstruction: request.system,
+      tools: tools.length > 0 ? tools : undefined,
+    });
+
+    const contents: Content[] = [];
+    for (const msg of request.messages) {
+      if (msg.role === "user") {
+        if (typeof msg.content === "string") {
+          contents.push({ role: "user", parts: [{ text: msg.content }] });
+        } else {
+          const parts: Part[] = [];
+          for (const block of msg.content) {
+            if (block.type === "tool_result") {
+              parts.push({ functionResponse: { name: block.tool_use_id, response: { content: block.content } } });
+            }
+          }
+          if (parts.length > 0) contents.push({ role: "user", parts });
+        }
+      } else if (msg.role === "assistant") {
+        if (typeof msg.content === "string") {
+          contents.push({ role: "model", parts: [{ text: msg.content }] });
+        } else {
+          const parts: Part[] = [];
+          for (const block of msg.content) {
+            if (block.type === "text") parts.push({ text: block.text });
+            else if (block.type === "tool_use") parts.push({ functionCall: { name: block.name, args: block.input as Record<string, unknown> } });
+          }
+          if (parts.length > 0) contents.push({ role: "model", parts });
+        }
+      }
+    }
+
+    let result;
+    try {
+      result = await generativeModel.generateContentStream({
+        contents,
+        generationConfig: {
+          maxOutputTokens: request.max_tokens,
+          temperature: request.temperature,
+          stopSequences: request.stop_sequences,
+        },
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error({ error: msg, provider: "gemini" }, "Provider stream failed");
+      throw new Error(
+        `Gemini API error: ${msg}\n` +
+        `Check that GEMINI_API_KEY is set correctly in your .env file.`,
+      );
+    }
+
+    let hasToolCalls = false;
+
+    for await (const chunk of result.stream) {
+      const candidate = chunk.candidates?.[0];
+      if (!candidate) continue;
+      for (const part of candidate.content.parts) {
+        if ("text" in part && part.text) {
+          yield { type: "text", text: part.text };
+        }
+        if ("functionCall" in part && part.functionCall) {
+          hasToolCalls = true;
+          yield {
+            type: "tool_use",
+            tool: { id: part.functionCall.name, name: part.functionCall.name, input: part.functionCall.args ?? {} },
+          };
+        }
+      }
+    }
+
+    const response = await result.response;
+    const usage = response.usageMetadata;
+    yield {
+      type: "usage",
+      usage: { input_tokens: usage?.promptTokenCount ?? 0, output_tokens: usage?.candidatesTokenCount ?? 0 },
+      stop_reason: hasToolCalls ? "tool_use" : "end_turn",
     };
   }
 }

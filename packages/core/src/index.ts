@@ -43,6 +43,7 @@ export type {
   ChatRequest,
   ChatResponse,
   TokenUsage,
+  StreamChunk,
   LLMProvider,
   // Voice
   Permission,

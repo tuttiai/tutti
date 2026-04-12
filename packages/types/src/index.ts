@@ -9,6 +9,7 @@ export type {
   ChatRequest,
   ChatResponse,
   TokenUsage,
+  StreamChunk,
   LLMProvider,
 } from "./llm.js";
 

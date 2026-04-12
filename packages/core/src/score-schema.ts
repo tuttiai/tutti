@@ -37,6 +37,7 @@ const AgentSchema = z
     max_tool_calls: z.number().int().positive("max_tool_calls must be a positive number").optional(),
     tool_timeout_ms: z.number().int().positive("tool_timeout_ms must be a positive number").optional(),
     budget: BudgetSchema.optional(),
+    streaming: z.boolean().optional(),
     delegates: z.array(z.string()).optional(),
     role: z.enum(["orchestrator", "specialist"]).optional(),
   })
