@@ -1,6 +1,10 @@
 // Logger
 export { createLogger, logger } from "./logger.js";
 
+// Telemetry
+export { TuttiTracer } from "./telemetry.js";
+export { initTelemetry, shutdownTelemetry } from "./telemetry-setup.js";
+
 // Runtime
 export { TuttiRuntime } from "./runtime.js";
 export { AgentRunner } from "./agent-runner.js";
@@ -55,6 +59,7 @@ export type {
   AgentResult,
   // Score
   MemoryConfig,
+  TelemetryConfig,
   ScoreConfig,
   // Session
   Session,

@@ -26,6 +26,10 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.39.0",
     "@google/generative-ai": "0.21.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.72.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
+    "@opentelemetry/sdk-node": "^0.214.0",
     "@tuttiai/types": "*",
     "openai": "4.104.0",
     "pg": "8.20.0",

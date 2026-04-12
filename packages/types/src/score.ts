@@ -9,6 +9,14 @@ export interface MemoryConfig {
   url?: string;
 }
 
+export interface TelemetryConfig {
+  enabled: boolean;
+  /** OTLP HTTP endpoint (default: http://localhost:4318). */
+  endpoint?: string;
+  /** Extra headers sent with OTLP requests (e.g. auth tokens). */
+  headers?: Record<string, string>;
+}
+
 export interface ScoreConfig {
   name?: string;
   description?: string;
@@ -19,4 +27,6 @@ export interface ScoreConfig {
   entry?: string;
   /** Session storage configuration (default: in-memory). */
   memory?: MemoryConfig;
+  /** OpenTelemetry tracing configuration. */
+  telemetry?: TelemetryConfig;
 }

@@ -58,7 +58,10 @@ export async function initCommand(projectName?: string): Promise<void> {
     ".env.example":
       "ANTHROPIC_API_KEY=your_key_here\n\n" +
       "# Log level: debug | info | warn | error (default: info)\n" +
-      "TUTTI_LOG_LEVEL=info\n",
+      "TUTTI_LOG_LEVEL=info\n\n" +
+      "# OpenTelemetry (optional)\n" +
+      "# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318\n" +
+      "# OTEL_SERVICE_NAME=tutti\n",
 
     ".gitignore": "node_modules\ndist\n.env\n",
 

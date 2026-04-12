@@ -7,6 +7,7 @@ import { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
 import { PermissionGuard } from "./permission-guard.js";
 import { logger } from "./logger.js";
+import { initTelemetry } from "./telemetry-setup.js";
 
 export class TuttiRuntime {
   readonly events: EventBus;
@@ -26,6 +27,10 @@ export class TuttiRuntime {
       this._sessions,
       this.semanticMemory,
     );
+
+    if (score.telemetry) {
+      initTelemetry(score.telemetry);
+    }
 
     logger.info({ score: score.name, agents: Object.keys(score.agents) }, "Runtime initialized");
   }

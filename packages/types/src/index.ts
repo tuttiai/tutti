@@ -31,6 +31,7 @@ export type {
 
 export type {
   MemoryConfig,
+  TelemetryConfig,
   ScoreConfig,
 } from "./score.js";
 

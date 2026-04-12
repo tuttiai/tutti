@@ -42,6 +42,14 @@ const AgentSchema = z
   })
   .passthrough();
 
+const TelemetrySchema = z
+  .object({
+    enabled: z.boolean(),
+    endpoint: z.string().url("telemetry.endpoint must be a valid URL").optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+  })
+  .strict();
+
 const ScoreSchema = z
   .object({
     provider: z
@@ -58,6 +66,7 @@ const ScoreSchema = z
     description: z.string().optional(),
     default_model: z.string().optional(),
     entry: z.string().optional(),
+    telemetry: TelemetrySchema.optional(),
   })
   .passthrough();
 
