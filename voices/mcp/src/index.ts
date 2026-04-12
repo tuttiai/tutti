@@ -21,6 +21,18 @@ export interface McpVoiceOptions {
   name?: string;
 }
 
+interface McpTextBlock {
+  type: "text";
+  text: string;
+}
+
+/** Split a command string into [command, ...args]. Does not handle quoted arguments. */
+function parseCommand(server: string): [string, string[]] {
+  const parts = server.split(/\s+/).filter(Boolean);
+  const command = parts[0] ?? "echo";
+  return [command, parts.slice(1)];
+}
+
 export class McpVoice implements Voice {
   name: string;
   description = "MCP server bridge";
@@ -39,7 +51,7 @@ export class McpVoice implements Voice {
   async setup(_context: VoiceContext): Promise<void> {
     if (this.initialized) return;
 
-    const [command, ...cmdArgs] = this.options.server.split(/\s+/);
+    const [command, cmdArgs] = parseCommand(this.options.server);
 
     this.transport = new StdioClientTransport({
       command,
@@ -101,7 +113,7 @@ export class McpVoice implements Voice {
 
     const blocks = Array.isArray(result.content) ? result.content : [];
     const text = blocks
-      .filter((c): c is { type: string; text: string } => c.type === "text" && typeof c.text === "string")
+      .filter((c): c is McpTextBlock => c.type === "text" && typeof c.text === "string")
       .map((c) => c.text)
       .join("\n");
 
@@ -116,24 +128,26 @@ export class McpVoice implements Voice {
 // JSON Schema → Zod converter (covers common MCP tool schemas)
 // ---------------------------------------------------------------------------
 
-function jsonSchemaToZod(schema: Record<string, unknown>): z.ZodType {
+function jsonSchemaToZod(schema: Record<string, unknown>): z.ZodTypeAny {
   const properties = schema.properties as
     | Record<string, Record<string, unknown>>
     | undefined;
-  const required = (schema.required as string[]) ?? [];
+  const required = Array.isArray(schema.required)
+    ? schema.required.filter((v): v is string => typeof v === "string")
+    : [];
 
   if (!properties) {
     return z.record(z.unknown());
   }
 
-  const shape: Record<string, z.ZodType> = {};
+  const shape: Record<string, z.ZodTypeAny> = {};
   for (const [key, prop] of Object.entries(properties)) {
-    let field = convertType(prop);
-    if (prop.description) {
-      field = field.describe(prop.description as string);
+    let field: z.ZodTypeAny = convertType(prop);
+    if (typeof prop.description === "string") {
+      field = field.describe(prop.description);
     }
     if (!required.includes(key)) {
-      field = field.optional() as unknown as z.ZodType;
+      field = field.optional();
     }
     shape[key] = field;
   }
@@ -141,11 +155,11 @@ function jsonSchemaToZod(schema: Record<string, unknown>): z.ZodType {
   return z.object(shape).passthrough();
 }
 
-function convertType(prop: Record<string, unknown>): z.ZodType {
-  if (prop.enum) {
-    const values = prop.enum as string[];
-    if (values.length > 0) {
-      return z.enum(values as [string, ...string[]]);
+function convertType(prop: Record<string, unknown>): z.ZodTypeAny {
+  if (Array.isArray(prop.enum)) {
+    const strings = prop.enum.filter((v): v is string => typeof v === "string");
+    if (strings.length > 0) {
+      return z.enum(strings as [string, ...string[]]);
     }
   }
 
