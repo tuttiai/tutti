@@ -14,6 +14,7 @@ A **voice** is a pluggable package that gives agents tools and capabilities. Eac
 | [Filesystem](/voices/filesystem) | `@tuttiai/filesystem` | `filesystem` | 7 | Read, write, search, and manage local files |
 | [GitHub](/voices/github) | `@tuttiai/github` | `network` | 10 | Issues, PRs, repos, code search |
 | [Playwright](/voices/playwright) | `@tuttiai/playwright` | `network`, `browser` | 12 | Browser automation, screenshots, page interaction |
+| MCP Bridge | `@tuttiai/mcp` | `network` | dynamic | Wrap any MCP server as a Tutti voice |
 
 ## Installing a voice
 
@@ -21,6 +22,14 @@ A **voice** is a pluggable package that gives agents tools and capabilities. Eac
 npx tutti-ai add filesystem
 npx tutti-ai add github
 npx tutti-ai add playwright
+npx tutti-ai add mcp
+```
+
+## Discovering voices
+
+```bash
+npx tutti-ai voices           # list all official voices + install status
+npx tutti-ai search browser   # search by name, description, or tags
 ```
 
 ## Using a voice
@@ -56,6 +65,21 @@ interface Voice {
 }
 ```
 
+## MCP Bridge
+
+The `@tuttiai/mcp` voice wraps any [MCP server](https://modelcontextprotocol.io/) as a Tutti voice. Tools are discovered dynamically at runtime — no manual tool definitions needed:
+
+```ts
+import { McpVoice } from "@tuttiai/mcp";
+
+const mcp = new McpVoice({ server: "npx @playwright/mcp" });
+// Agent gets ALL tools from the MCP server automatically
+```
+
+See the [API reference](/api/overview) for full `McpVoice` options.
+
 ## Community voices
 
 Anyone can build and publish a voice. See [Building a Voice](/guides/building-a-voice) for a step-by-step guide.
+
+Publish your voice with `tutti-ai publish` — it handles npm publishing and opens a PR to the voice registry automatically.

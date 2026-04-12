@@ -70,7 +70,9 @@ Goodbye!
 - Validates the API key for the detected provider
 - Maintains a session across REPL turns
 - Shows tool usage, errors, security warnings, and budget events
-- Ctrl+C to exit gracefully
+- **Streaming output** — tokens print to the terminal as they arrive (spinner until first token)
+- Tool calls shown inline: `[using: tool_name]` / `[done: tool_name]`
+- Ctrl+C to exit gracefully (even mid-stream)
 
 ---
 
@@ -164,6 +166,58 @@ Alias for `check`. Validates a score file without running it.
 tutti-ai doctor
 tutti-ai doctor ./path/to/score.ts
 ```
+
+---
+
+## `tutti-ai studio [score]`
+
+Launch Tutti Studio — a local web UI for inspecting agent runs at `localhost:4747`.
+
+```bash
+tutti-ai studio                    # uses ./tutti.score.ts
+tutti-ai studio ./path/to/score.ts # custom path
+PORT=8080 tutti-ai studio          # custom port
+```
+
+Opens the browser automatically. Four panels: SVG agent graph, live SSE event stream, session browser, and token usage bar. Includes a REST API for programmatic access (`/api/score`, `/api/sessions`, `/api/run`).
+
+---
+
+## `tutti-ai search <query>`
+
+Search the voice registry for voices matching a query.
+
+```bash
+tutti-ai search browser
+tutti-ai search database
+```
+
+Searches name, description, and tags (case-insensitive). Fetches the live registry from `github.com/tuttiai/voices`, falls back to a built-in list when offline.
+
+---
+
+## `tutti-ai voices`
+
+List all available official voices with install status.
+
+```bash
+tutti-ai voices
+```
+
+Shows each voice with `[official]` badge and whether it's installed in the current project.
+
+---
+
+## `tutti-ai publish`
+
+Publish the current voice to npm and the voice registry. Run from inside a voice directory.
+
+```bash
+tutti-ai publish            # full publish flow
+tutti-ai publish --dry-run  # validate without publishing
+```
+
+Five-step flow: pre-flight checks (structure, naming, build, tests, audit), pack dry-run, npm publish with confirmation, registry PR via GitHub API, success summary.
 
 ---
 

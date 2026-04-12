@@ -25,6 +25,9 @@ The runtime package. Main exports:
 | `PermissionGuard` | Voice permission enforcement |
 | `PromptGuard` | Prompt injection detection and wrapping |
 | `TokenBudget` | Token/cost tracking and budget enforcement |
+| `PostgresSessionStore` | PostgreSQL session persistence |
+| `InMemorySemanticStore` | In-memory semantic (long-term) memory |
+| `TuttiTracer` | OpenTelemetry tracing for agent runs, LLM calls, tool calls |
 
 ### Functions
 
@@ -32,6 +35,9 @@ The runtime package. Main exports:
 | ------ | ----------- |
 | `defineScore(config)` | Typed identity function for score definitions |
 | `validateScore(config)` | Zod-validate a score config object |
+| `createLogger(name)` | Create a named pino logger instance |
+| `initTelemetry(config)` | Initialize OpenTelemetry SDK |
+| `shutdownTelemetry()` | Shut down OpenTelemetry SDK |
 
 ### Providers
 
@@ -51,6 +57,8 @@ Type definitions. All types are re-exported from `@tuttiai/core` for convenience
 import type {
   // Score
   ScoreConfig,
+  TelemetryConfig,
+  MemoryConfig,
 
   // Agent
   AgentConfig,
@@ -72,6 +80,7 @@ import type {
   ChatMessage,
   ContentBlock,
   TokenUsage,
+  StreamChunk,
 
   // Session
   Session,
@@ -125,9 +134,37 @@ The interface all providers implement:
 ```ts
 interface LLMProvider {
   chat(request: ChatRequest): Promise<ChatResponse>;
+  stream(request: ChatRequest): AsyncIterable<StreamChunk>;
 }
 ```
 
-:::caution[Coming soon]
-Auto-generated TypeDoc API reference is planned. For now, the source code in `packages/core/src/` and `packages/types/src/` is the definitive reference.
-:::
+### StreamChunk
+
+Yielded by `provider.stream()`:
+
+```ts
+interface StreamChunk {
+  type: "text" | "tool_use" | "usage";
+  text?: string;                       // present when type === "text"
+  tool?: Omit<ToolUseBlock, "type">;   // present when type === "tool_use"
+  usage?: TokenUsage;                  // present when type === "usage"
+  stop_reason?: StopReason;            // present when type === "usage"
+}
+```
+
+## @tuttiai/mcp
+
+MCP bridge voice — wraps any MCP server as a Tutti voice.
+
+```ts
+import { McpVoice } from "@tuttiai/mcp";
+
+const voice = new McpVoice({
+  server: "npx @playwright/mcp",   // command to start the MCP server
+  args: [],                         // additional CLI args
+  env: {},                          // env vars for server process
+  name: "my-mcp",                   // override voice name
+});
+```
+
+Tools are discovered dynamically via `client.listTools()` during `voice.setup()`.

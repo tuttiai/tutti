@@ -41,6 +41,7 @@ An **agent** is an LLM-powered worker. Each agent has:
 | `tool_timeout_ms` | No | Per-tool timeout in ms (default: 30000) |
 | `budget` | No | Token/cost budget for this agent |
 | `semantic_memory` | No | Long-term memory config (`{ enabled, max_memories }`) |
+| `streaming` | No | Enable token-by-token streaming (default: false) |
 | `delegates` | No | Agent IDs this orchestrator can delegate to |
 | `role` | No | `"orchestrator"` or `"specialist"` |
 
@@ -125,7 +126,7 @@ tutti.events.onAny((e) => {
 });
 ```
 
-Available events: `agent:start`, `agent:end`, `llm:request`, `llm:response`, `tool:start`, `tool:end`, `tool:error`, `turn:start`, `turn:end`, `delegate:start`, `delegate:end`, `security:injection_detected`, `budget:warning`, `budget:exceeded`.
+Available events: `agent:start`, `agent:end`, `llm:request`, `llm:response`, `tool:start`, `tool:end`, `tool:error`, `turn:start`, `turn:end`, `delegate:start`, `delegate:end`, `security:injection_detected`, `budget:warning`, `budget:exceeded`, `token:stream`.
 
 ## Sessions
 
@@ -179,3 +180,100 @@ Voices declare what they need. Agents declare what they grant. If there's a mism
 ```
 
 The four permission types: `filesystem`, `network`, `shell`, `browser`.
+
+## Streaming
+
+Enable token-by-token streaming on any agent:
+
+```ts
+{
+  assistant: {
+    name: "Assistant",
+    system_prompt: "You are helpful.",
+    voices: [],
+    streaming: true,
+  },
+}
+```
+
+When `streaming: true`, the runtime uses `provider.stream()` instead of `provider.chat()`. Each text token emits a `token:stream` event:
+
+```ts
+tutti.events.on("token:stream", (e) => {
+  process.stdout.write(e.text);
+});
+```
+
+The `tutti-ai run` command enables streaming automatically — tokens print to the terminal as they arrive.
+
+All three providers support streaming: Anthropic (message stream events), OpenAI (delta chunks), and Gemini (content stream).
+
+## Logging
+
+Tutti uses structured logging via [pino](https://getpino.io/). All runtime events, provider calls, and errors are logged with structured context.
+
+```ts
+import { createLogger, logger } from "@tuttiai/core";
+
+// Default logger
+logger.info({ agent: "assistant" }, "Agent started");
+
+// Custom named logger
+const myLogger = createLogger("my-app");
+```
+
+Control the log level with the `TUTTI_LOG_LEVEL` environment variable:
+
+```bash
+TUTTI_LOG_LEVEL=debug npx tsx app.ts  # debug, info, warn, error
+```
+
+In development, logs are colorized via pino-pretty. In production (`NODE_ENV=production`), logs output as raw JSON for log aggregation.
+
+## Telemetry
+
+Tutti supports [OpenTelemetry](https://opentelemetry.io/) for distributed tracing. Enable it in your score:
+
+```ts
+export default defineScore({
+  provider: new AnthropicProvider(),
+  telemetry: {
+    enabled: true,
+    endpoint: "http://localhost:4318",  // OTLP HTTP endpoint
+    headers: { Authorization: "Bearer ..." },  // optional
+  },
+  agents: { /* ... */ },
+});
+```
+
+When enabled, the runtime wraps agent runs, LLM calls, and tool executions in OpenTelemetry spans:
+
+```
+agent.run (agent.name=assistant, session.id=abc-123)
+  ├── llm.call (llm.model=claude-sonnet-4-20250514)
+  ├── tool.call (tool.name=read_file)
+  ├── llm.call (llm.model=claude-sonnet-4-20250514)
+  └── ...
+```
+
+## MCP Bridge
+
+The `@tuttiai/mcp` voice wraps any [MCP server](https://modelcontextprotocol.io/) as a Tutti voice. Tools are discovered dynamically at runtime:
+
+```ts
+import { McpVoice } from "@tuttiai/mcp";
+
+const mcp = new McpVoice({ server: "npx @playwright/mcp" });
+
+// The agent gets ALL tools from the MCP server
+{
+  browser: {
+    name: "Browser",
+    system_prompt: "You control a browser.",
+    voices: [mcp],
+    permissions: ["network"],
+  },
+}
+```
+
+The voice starts the MCP server as a child process, connects via stdio transport, calls `listTools()` to discover available tools, and proxies `execute()` calls through `callTool()`.

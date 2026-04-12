@@ -1,15 +1,15 @@
 import { Octokit } from "@octokit/rest";
+import { SecretsManager } from "@tuttiai/core";
+import { logger } from "./logger.js";
 
 let warned = false;
 
 export function createOctokit(token?: string): Octokit {
-  const auth = token ?? process.env.GITHUB_TOKEN;
+  const auth = token ?? SecretsManager.optional("GITHUB_TOKEN");
 
   if (!auth && !warned) {
     warned = true;
-    console.warn(
-      "[github voice] No GITHUB_TOKEN set — requests will be unauthenticated (60 req/hr rate limit).",
-    );
+    logger.warn("No GITHUB_TOKEN set — requests will be unauthenticated (60 req/hr rate limit)");
   }
 
   return new Octokit({ auth: auth || undefined });

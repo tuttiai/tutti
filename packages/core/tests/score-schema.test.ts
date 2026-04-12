@@ -242,4 +242,79 @@ describe("validateScore", () => {
       }),
     ).not.toThrow();
   });
+
+  // ── Streaming field ──
+
+  it("accepts streaming: true on an agent", () => {
+    expect(() =>
+      validateScore({
+        provider: { chat: async () => ({}) },
+        agents: {
+          a: { name: "a", system_prompt: "p", voices: [], streaming: true },
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts streaming: false on an agent", () => {
+    expect(() =>
+      validateScore({
+        provider: { chat: async () => ({}) },
+        agents: {
+          a: { name: "a", system_prompt: "p", voices: [], streaming: false },
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  // ── Telemetry config ──
+
+  it("accepts a valid telemetry config", () => {
+    expect(() =>
+      validateScore({
+        ...validScore(),
+        telemetry: { enabled: true, endpoint: "http://localhost:4318" },
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts telemetry with headers", () => {
+    expect(() =>
+      validateScore({
+        ...validScore(),
+        telemetry: {
+          enabled: true,
+          endpoint: "https://otel.example.com",
+          headers: { Authorization: "Bearer token" },
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts telemetry: { enabled: false }", () => {
+    expect(() =>
+      validateScore({
+        ...validScore(),
+        telemetry: { enabled: false },
+      }),
+    ).not.toThrow();
+  });
+
+  it("throws if telemetry.endpoint is not a valid URL", () => {
+    expect(() =>
+      validateScore({
+        ...validScore(),
+        telemetry: { enabled: true, endpoint: "not-a-url" },
+      }),
+    ).toThrow("telemetry.endpoint must be a valid URL");
+  });
+
+  it("throws if telemetry has unknown fields (strict)", () => {
+    expect(() =>
+      validateScore({
+        ...validScore(),
+        telemetry: { enabled: true, foo: "bar" },
+      }),
+    ).toThrow("Invalid score file");
+  });
 });

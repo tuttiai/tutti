@@ -10,6 +10,7 @@ import type {
   AgentConfig,
   ChatResponse,
   LLMProvider,
+  StreamChunk,
 } from "@tuttiai/types";
 
 /**
@@ -18,15 +19,28 @@ import type {
  */
 export function createMockProvider(
   responses: ChatResponse[],
-): LLMProvider & { chat: ReturnType<typeof vi.fn> } {
+): LLMProvider & { chat: ReturnType<typeof vi.fn>; stream: ReturnType<typeof vi.fn> } {
   let callIndex = 0;
+  const getNext = () => {
+    const response = responses[callIndex];
+    if (!response) throw new Error("No more mock responses");
+    callIndex++;
+    return response;
+  };
   return {
-    chat: vi.fn(async () => {
-      const response = responses[callIndex];
-      if (!response) throw new Error("No more mock responses");
-      callIndex++;
-      return response;
-    }),
+    chat: vi.fn(async () => getNext()),
+    async *stream() {
+      const response = getNext();
+      for (const block of response.content) {
+        if (block.type === "text") {
+          yield { type: "text", text: block.text } as StreamChunk;
+        }
+        if (block.type === "tool_use") {
+          yield { type: "tool_use", tool: { id: block.id, name: block.name, input: block.input } } as StreamChunk;
+        }
+      }
+      yield { type: "usage", usage: response.usage, stop_reason: response.stop_reason } as StreamChunk;
+    },
   };
 }
 
