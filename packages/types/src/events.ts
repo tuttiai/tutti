@@ -18,7 +18,10 @@ export type TuttiEvent =
   | { type: "security:injection_detected"; agent_name: string; tool_name: string; patterns: string[] }
   | { type: "budget:warning"; agent_name: string; tokens: number; cost_usd: number }
   | { type: "budget:exceeded"; agent_name: string; tokens: number; cost_usd: number }
-  | { type: "token:stream"; agent_name: string; text: string };
+  | { type: "token:stream"; agent_name: string; text: string }
+  | { type: "hitl:requested"; agent_name: string; session_id: string; question: string; options?: string[] }
+  | { type: "hitl:answered"; agent_name: string; session_id: string; answer: string }
+  | { type: "hitl:timeout"; agent_name: string; session_id: string };
 
 export type TuttiEventType = TuttiEvent["type"];
 

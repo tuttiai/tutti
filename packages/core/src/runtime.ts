@@ -105,6 +105,14 @@ export class TuttiRuntime {
     return this._runner.run(resolvedAgent, input, session_id);
   }
 
+  /**
+   * Provide an answer to a pending human-in-the-loop request.
+   * Call this when a `hitl:requested` event fires to resume the agent.
+   */
+  answer(sessionId: string, answer: string): void {
+    this._runner.answer(sessionId, answer);
+  }
+
   /** Retrieve an existing session. */
   getSession(id: string): Session | undefined {
     return this._sessions.get(id);

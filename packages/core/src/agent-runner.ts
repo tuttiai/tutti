@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type {
   AgentConfig,
@@ -28,7 +29,14 @@ import { ToolTimeoutError, ProviderError, RateLimitError } from "./errors.js";
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
+const DEFAULT_HITL_TIMEOUT_S = 300;
 const MAX_PROVIDER_RETRIES = 3;
+
+const hitlRequestSchema = z.object({
+  question: z.string().describe("The question to ask the human"),
+  options: z.array(z.string()).optional().describe("If provided, the human picks one of these"),
+  timeout_seconds: z.number().optional().describe("How long to wait before timing out (default 300)"),
+});
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt++) {
@@ -51,12 +59,23 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export class AgentRunner {
+  private pendingHitl = new Map<string, (answer: string) => void>();
+
   constructor(
     private provider: LLMProvider,
     private events: EventBus,
     private sessions: SessionStore,
     private semanticMemory?: SemanticMemoryStore,
   ) {}
+
+  /** Resolve a pending human-in-the-loop request for a session. */
+  answer(sessionId: string, answer: string): void {
+    const resolve = this.pendingHitl.get(sessionId);
+    if (resolve) {
+      this.pendingHitl.delete(sessionId);
+      resolve(answer);
+    }
+  }
 
   async run(
     agent: AgentConfig,
@@ -94,7 +113,13 @@ export class AgentRunner {
       }
 
       // Collect all tools from all voices
-      const allTools = agent.voices.flatMap((v) => v.tools);
+      const allTools: Tool[] = [...agent.voices.flatMap((v) => v.tools)];
+
+      // Inject HITL tool if enabled
+      if (agent.allow_human_input) {
+        allTools.push(this.createHitlTool(agent.name, session.id));
+      }
+
       const toolDefs = allTools.map(toolToDefinition);
 
       // Add user message
@@ -369,6 +394,50 @@ export class AgentRunner {
     }
 
     return { id: "", content, stop_reason: stopReason, usage };
+  }
+
+  private createHitlTool(agentName: string, sessionId: string): Tool {
+    return {
+      name: "request_human_input",
+      description: "Pause and ask the human for guidance or approval before proceeding.",
+      parameters: hitlRequestSchema,
+      execute: async (input: z.infer<typeof hitlRequestSchema>): Promise<{ content: string; is_error?: boolean }> => {
+        const timeout = (input.timeout_seconds ?? DEFAULT_HITL_TIMEOUT_S) * 1000;
+
+        logger.info({ agent: agentName, question: input.question }, "Waiting for human input");
+
+        // Set up pending resolver BEFORE emitting so synchronous handlers can call answer()
+        const answer = await new Promise<string>((resolve) => {
+          this.pendingHitl.set(sessionId, resolve);
+
+          // Emit after pendingHitl is set — handlers can now call runner.answer()
+          this.events.emit({
+            type: "hitl:requested",
+            agent_name: agentName,
+            session_id: sessionId,
+            question: input.question,
+            options: input.options,
+          });
+
+          setTimeout(() => {
+            if (this.pendingHitl.has(sessionId)) {
+              this.pendingHitl.delete(sessionId);
+              this.events.emit({ type: "hitl:timeout", agent_name: agentName, session_id: sessionId });
+              resolve("[timeout: human did not respond within " + (timeout / 1000) + "s]");
+            }
+          }, timeout);
+        });
+
+        this.events.emit({
+          type: "hitl:answered",
+          agent_name: agentName,
+          session_id: sessionId,
+          answer,
+        });
+
+        return { content: "Human responded: " + answer };
+      },
+    };
   }
 
   private async executeTool(

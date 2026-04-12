@@ -124,12 +124,31 @@ export async function runCommand(scorePath?: string): Promise<void> {
     logger.error("Token budget exceeded — stopping");
   });
 
-  // REPL
+  // REPL readline — created early so HITL handler can use it
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
   });
 
+  // Human-in-the-loop — agent pauses and asks the user a question
+  runtime.events.on("hitl:requested", async (e) => {
+    spinner.stop();
+    if (streaming) {
+      process.stdout.write("\n");
+      streaming = false;
+    }
+    console.log();
+    console.log(chalk.yellow("  " + chalk.bold("[Agent needs input]") + " " + e.question));
+    if (e.options) {
+      e.options.forEach((opt, i) => {
+        console.log(chalk.yellow("    " + (i + 1) + ". " + opt));
+      });
+    }
+    const answer = await rl.question(chalk.yellow("  > "));
+    runtime.answer(e.session_id, answer.trim());
+  });
+
+  // REPL
   console.log(chalk.dim('Tutti REPL — type "exit" to quit\n'));
 
   let sessionId: string | undefined;

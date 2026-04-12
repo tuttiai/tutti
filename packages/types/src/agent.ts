@@ -35,6 +35,8 @@ export interface AgentConfig {
   semantic_memory?: AgentMemoryConfig;
   /** Enable token-by-token streaming (default: false). */
   streaming?: boolean;
+  /** Allow the agent to pause and ask the human for input (default: false). */
+  allow_human_input?: boolean;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];
   /** Role in the orchestration — orchestrator receives input first. */

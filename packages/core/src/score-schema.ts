@@ -39,6 +39,7 @@ const AgentSchema = z
     tool_timeout_ms: z.number().int().positive("tool_timeout_ms must be a positive number").optional(),
     budget: BudgetSchema.optional(),
     streaming: z.boolean().optional(),
+    allow_human_input: z.boolean().optional(),
     delegates: z.array(z.string()).optional(),
     role: z.enum(["orchestrator", "specialist"]).optional(),
   })
