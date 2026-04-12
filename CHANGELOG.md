@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.14.0] - 2026-04-12
+
+### Added
+- `tutti-ai search <query>` — search the voice registry by name, description, or tags
+- `tutti-ai voices` — list all official voices with install status
+- `tutti-ai publish` — automated voice publishing (pre-flight checks, npm publish, registry PR)
+- `tutti-ai publish --dry-run` — validate without publishing
+- `tuttiai-mcp` voice — MCP bridge wraps any MCP server as a Tutti voice
+- `McpVoice` with stdio transport, dynamic tool discovery, and JSON Schema to Zod conversion
+- `AgentRunner` now calls `voice.setup()` before collecting tools (enables runtime tool discovery)
+- Voice registry integration with `tuttiai/voices` on GitHub
+
+### Published
+- `@tuttiai/cli@0.7.0`
+- `tutti-ai@0.8.0`
+- `tuttiai-mcp@0.1.0`
+
 ## [0.13.0] - 2026-04-12
 
 ### Added
