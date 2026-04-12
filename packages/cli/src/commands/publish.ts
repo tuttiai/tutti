@@ -224,11 +224,15 @@ async function openRegistryPR(
   );
   if (!fileRes.ok) throw new Error("Failed to fetch voices.json: " + fileRes.status);
   const fileData = (await fileRes.json()) as { content: string; sha: string };
-  const registry = JSON.parse(Buffer.from(fileData.content, "base64").toString("utf-8"));
+
+  interface RegistryVoice { name: string; package: string; description: string; version: string; author: string; tags: string[]; repo?: string }
+  interface Registry { official: RegistryVoice[]; community: RegistryVoice[] }
+
+  const registry = JSON.parse(Buffer.from(fileData.content, "base64").toString("utf-8")) as Registry;
 
   // 2. Add the new voice entry
-  const section = isOfficial ? "official" : "community";
-  const entry = {
+  const section: keyof Registry = isOfficial ? "official" : "community";
+  const entry: RegistryVoice = {
     name: shortName,
     package: packageName,
     description,
@@ -239,10 +243,9 @@ async function openRegistryPR(
   };
 
   if (!registry[section]) registry[section] = [];
-  const exists = registry[section].some((v: { package: string }) => v.package === packageName);
+  const exists = registry[section].some((v) => v.package === packageName);
   if (exists) {
-    // Update version
-    const idx = registry[section].findIndex((v: { package: string }) => v.package === packageName);
+    const idx = registry[section].findIndex((v) => v.package === packageName);
     registry[section][idx] = { ...registry[section][idx], ...entry };
   } else {
     registry[section].push(entry);

@@ -47,8 +47,8 @@ program
 program
   .command("add <voice>")
   .description("Add a voice to your project")
-  .action(async (voice: string) => {
-    await addCommand(voice);
+  .action((voice: string) => {
+    addCommand(voice);
   });
 
 program

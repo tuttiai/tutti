@@ -99,8 +99,8 @@ function isInstalled(packageName: string): boolean {
   const pkgPath = resolve(process.cwd(), "package.json");
   if (!existsSync(pkgPath)) return false;
   try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const deps: Record<string, string> = { ...pkg.dependencies, ...pkg.devDependencies };
     return packageName in deps;
   } catch {
     return false;

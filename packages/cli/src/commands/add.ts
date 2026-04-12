@@ -66,15 +66,15 @@ function isAlreadyInstalled(packageName: string): boolean {
   if (!existsSync(pkgPath)) return false;
 
   try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    const deps: Record<string, string> = { ...pkg.dependencies, ...pkg.devDependencies };
     return packageName in deps;
   } catch {
     return false;
   }
 }
 
-export async function addCommand(voiceName: string): Promise<void> {
+export function addCommand(voiceName: string): void {
   const packageName = resolvePackageName(voiceName);
 
   // Check if package.json exists in cwd

@@ -10,16 +10,20 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "eslint packages/*/src voices/*/src",
+    "lint:fix": "eslint packages/*/src voices/*/src --fix",
     "typecheck": "turbo run typecheck",
     "test:coverage": "turbo run test -- --coverage"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "3.2.4",
+    "eslint": "^10.2.0",
+    "eslint-plugin-security": "^4.0.0",
     "tsup": "8.5.1",
     "tsx": "4.21.0",
     "turbo": "2.9.5",
     "typescript": "5.9.3",
+    "typescript-eslint": "^8.58.1",
     "vitest": "3.2.4"
   },
   "license": "MIT",

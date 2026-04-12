@@ -39,7 +39,7 @@ export default tseslint.config(
       "no-debugger": "error",
       "no-var": "error",
       "prefer-const": "error",
-      eqeqeq: ["error", "always"],
+      eqeqeq: ["error", "always", { null: "ignore" }],
       "no-throw-literal": "off", // Superseded by @typescript-eslint/only-throw-error
 
       // TypeScript

@@ -18,7 +18,7 @@ export class SecretsManager {
   static redactObject(obj: unknown): unknown {
     const str = JSON.stringify(obj);
     const redacted = this.redact(str);
-    return JSON.parse(redacted);
+    return JSON.parse(redacted) as unknown;
   }
 
   static require(key: string): string {

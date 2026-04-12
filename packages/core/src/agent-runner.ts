@@ -461,6 +461,7 @@ export class AgentRunner {
 }
 
 function toolToDefinition(tool: Tool): ToolDefinition {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Zod generic variance: Tool<unknown> vs zodToJsonSchema's expected ZodType<any>
   const jsonSchema = zodToJsonSchema(tool.parameters, { target: "openApi3" });
   return {
     name: tool.name,

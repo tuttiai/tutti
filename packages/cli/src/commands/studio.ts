@@ -15,7 +15,7 @@ const envPort = Number.parseInt(process.env.PORT ?? "", 10);
 const PORT = Number.isInteger(envPort) && envPort > 0 && envPort <= 65535 ? envPort : 4747;
 
 function safeStringify(obj: unknown): string {
-  return JSON.stringify(obj, (_key, value) => {
+  return JSON.stringify(obj, (_key, value: unknown) => {
     if (value instanceof Error) return { message: value.message, name: value.name };
     if (typeof value === "function") return undefined;
     return value;
@@ -131,7 +131,7 @@ export async function studioCommand(scorePath?: string): Promise<void> {
   });
 
   app.post("/api/run", async (req, res) => {
-    const body = req.body;
+    const body: unknown = req.body;
     if (typeof body !== "object" || body === null) {
       res.status(400).json({ error: "Invalid request body" });
       return;
@@ -152,7 +152,7 @@ export async function studioCommand(scorePath?: string): Promise<void> {
       return;
     }
     try {
-      const result = await runtime.run(agent, input, session_id as string | undefined);
+      const result = await runtime.run(agent, input, session_id);
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
