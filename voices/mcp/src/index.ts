@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { z } from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -9,6 +10,9 @@ import type {
   Voice,
   VoiceContext,
 } from "@tuttiai/types";
+
+const require = createRequire(import.meta.url);
+const PKG_VERSION: string = (require("../package.json") as { version: string }).version;
 
 export interface McpVoiceOptions {
   /** MCP server command, e.g. 'npx @playwright/mcp' */
@@ -61,10 +65,18 @@ export class McpVoice implements Voice {
     });
 
     this.client = new Client(
-      { name: "tutti", version: "1.0.0" },
+      { name: "tutti", version: PKG_VERSION },
     );
 
     await this.client.connect(this.transport);
+
+    // Drain stderr so the child process doesn't stall from backpressure.
+    // Errors are non-fatal — the server may log diagnostics we don't need.
+    const stderr = this.transport.stderr;
+    if (stderr) {
+      stderr.on("data", () => { /* discard */ });
+    }
+
     this.tools = await this.discoverTools();
     this.initialized = true;
   }
@@ -94,8 +106,16 @@ export class McpVoice implements Voice {
         name: mcpTool.name,
         description: mcpTool.description ?? "",
         parameters: schema,
-        execute: (input: unknown, _context: ToolContext): Promise<ToolResult> => {
-          return this.callMcpTool(mcpTool.name, input as Record<string, unknown>);
+        execute: async (input: unknown, _context: ToolContext): Promise<ToolResult> => {
+          try {
+            // Safe: input has been parsed by the Zod schema derived from the MCP tool's inputSchema.
+            return await this.callMcpTool(mcpTool.name, input as Record<string, unknown>);
+          } catch (err) {
+            return {
+              content: err instanceof Error ? err.message : String(err),
+              is_error: true,
+            };
+          }
         },
       };
     });
