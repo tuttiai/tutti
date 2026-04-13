@@ -68,8 +68,16 @@ export type {
   Checkpoint,
   SessionState,
   CheckpointStore,
+  RedisCheckpointStoreOptions,
+  PostgresCheckpointStoreOptions,
 } from "./checkpoint/index.js";
-export { MemoryCheckpointStore } from "./checkpoint/index.js";
+export {
+  MemoryCheckpointStore,
+  RedisCheckpointStore,
+  PostgresCheckpointStore,
+  createCheckpointStore,
+  DEFAULT_CHECKPOINT_TTL_SECONDS,
+} from "./checkpoint/index.js";
 
 // Tool result cache
 export type { ToolCache } from "./cache/tool-cache.js";
