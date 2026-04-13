@@ -63,6 +63,14 @@ export { PromptGuard } from "./prompt-guard.js";
 export { TokenBudget } from "./token-budget.js";
 export { validateScore } from "./score-schema.js";
 
+// Checkpoint persistence
+export type {
+  Checkpoint,
+  SessionState,
+  CheckpointStore,
+} from "./checkpoint/index.js";
+export { MemoryCheckpointStore } from "./checkpoint/index.js";
+
 // Tool result cache
 export type { ToolCache } from "./cache/tool-cache.js";
 export {

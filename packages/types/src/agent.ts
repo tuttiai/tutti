@@ -22,6 +22,21 @@ export interface AgentMemoryConfig {
 }
 
 /**
+ * Per-agent durable-checkpoint configuration.
+ *
+ * When enabled, the runtime persists a {@link Checkpoint} at every turn
+ * boundary so a crashed or restarted process can resume the conversation
+ * exactly where it left off. `true` accepts the defaults; an object lets
+ * the caller pick the backing store and override the retention window.
+ */
+export interface AgentDurableConfig {
+  /** Which checkpoint store to write to. */
+  store: "redis" | "postgres" | "memory";
+  /** Checkpoint TTL in seconds. Defaults to 604800 (7 days). */
+  ttl?: number;
+}
+
+/**
  * Per-agent tool result cache configuration.
  *
  * When `enabled`, repeated tool calls with the same input within `ttl_ms`
@@ -65,6 +80,13 @@ export interface AgentConfig {
   hooks?: TuttiHooks;
   /** Tool result cache — serves repeated identical tool calls from memory. */
   cache?: AgentCacheConfig;
+  /**
+   * Persist a checkpoint at every turn boundary so crashed or restarted
+   * processes can resume without losing progress. `true` accepts defaults
+   * (memory store, 7-day TTL); pass an object to pick the backing store
+   * or override the retention window.
+   */
+  durable?: boolean | AgentDurableConfig;
 }
 
 export interface AgentResult {
