@@ -16,6 +16,18 @@ export type {
 } from "./types.js";
 export { ChunkStrategy } from "./types.js";
 export { ingestDocument, loadSource } from "./ingest.js";
+export {
+  createEmbeddingProvider,
+  OpenAIEmbeddingProvider,
+  AnthropicEmbeddingProvider,
+  LocalEmbeddingProvider,
+  EmbeddingRequestError,
+  type EmbeddingProvider,
+  type EmbeddingConfig,
+  type OpenAIEmbeddingConfig,
+  type AnthropicEmbeddingConfig,
+  type LocalEmbeddingConfig,
+} from "./embeddings/index.js";
 
 export {
   createIngestDocumentTool,
