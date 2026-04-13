@@ -23,9 +23,31 @@ export function isGitHubUrl(url: string): boolean {
  *
  * Bare repo URLs (no file path) throw — full-repo ingestion is not yet
  * supported to avoid pulling in a tar/zip extractor.
+ *
+ * Host matching uses parsed `URL.hostname` rather than a substring check —
+ * `url.includes("raw.githubusercontent.com")` would be bypassable via
+ * `https://evil.com/raw.githubusercontent.com/...`,
+ * `https://raw.githubusercontent.com.evil.com/...`, or any URL carrying
+ * that substring anywhere in its path or query.
  */
 export function toRawUrl(url: string): string {
-  if (url.includes("raw.githubusercontent.com")) return url;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Unrecognized GitHub URL: " + url);
+  }
+  const host = parsed.hostname.toLowerCase();
+
+  // Already a raw URL — pass through unchanged.
+  if (host === "raw.githubusercontent.com") return url;
+
+  // Everything below expects a github.com URL. Anything else — including
+  // subdomains like `foo.github.com` or lookalikes like `github.com.evil.com`
+  // — is rejected up-front.
+  if (host !== "github.com") {
+    throw new Error("Unrecognized GitHub URL: " + url);
+  }
 
   const blob = BLOB_RE.exec(url);
   if (blob) {

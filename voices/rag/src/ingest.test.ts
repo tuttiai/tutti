@@ -333,4 +333,19 @@ describe("GitHub URL handling", () => {
       /not supported/,
     );
   });
+
+  // Regression: earlier versions used `url.includes("raw.githubusercontent.com")`
+  // which could be spoofed by putting the substring anywhere in the URL
+  // (path, query, or a lookalike host). CodeQL flagged this as
+  // js/incomplete-url-substring-sanitization. toRawUrl now parses the host.
+  it.each([
+    "https://evil.com/raw.githubusercontent.com/a/b/main/x.md",
+    "https://raw.githubusercontent.com.evil.com/a/b/main/x.md",
+    "https://example.com/path?redirect=raw.githubusercontent.com",
+    "https://foo.github.com/a/b/blob/main/x.md",
+    "not a url",
+    "",
+  ])("rejects spoofed / unrecognised host: %s", (url) => {
+    expect(() => toRawUrl(url)).toThrow(/Unrecognized GitHub URL/);
+  });
 });
