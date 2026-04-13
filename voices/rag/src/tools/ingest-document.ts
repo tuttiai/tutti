@@ -92,7 +92,20 @@ export function createIngestDocumentTool(
             : {}),
         };
 
-        const chunks = await ingestDocument(pipelineInput, chunkOptions);
+        // Narrow try/catch around the load/parse/chunk step so the caller
+        // gets a message that clearly points at the source file (format,
+        // encoding, network fetch failures), not a generic "tool failed".
+        // The outer try/catch below still runs as a last-resort safety net.
+        let chunks;
+        try {
+          chunks = await ingestDocument(pipelineInput, chunkOptions);
+        } catch (err) {
+          return {
+            content: `ingest_document: failed to load/parse ${input.source} (source_id: ${id}): ${err instanceof Error ? err.message : String(err)}`,
+            is_error: true,
+          };
+        }
+
         if (chunks.length === 0) {
           return {
             content: `ingest_document produced no chunks from ${input.source} — check that the document is non-empty and a supported format`,
@@ -103,7 +116,11 @@ export function createIngestDocumentTool(
         const vectors = await ctx.embeddings.embed(chunks.map((c) => c.text));
         if (vectors.length !== chunks.length) {
           return {
-            content: `ingest_document: embedding provider returned ${vectors.length} vectors for ${chunks.length} chunks`,
+            content:
+              `ingest_document: embedding provider returned an unexpected number of vectors ` +
+              `(expected ${chunks.length}, got ${vectors.length}). ` +
+              `This usually signals a provider/model configuration issue or a partial embedding failure. ` +
+              `Verify the embedding provider settings, check the provider's response payload / logs, and retry.`,
             is_error: true,
           };
         }
@@ -116,7 +133,7 @@ export function createIngestDocumentTool(
           embedded.push({
             ...c,
             vector,
-            chunk_id: id + ":" + c.chunk_index,
+            chunk_id: `${id}:${c.chunk_index}`,
             metadata: {
               ...(c.metadata ?? {}),
               chunk_index: c.chunk_index,
