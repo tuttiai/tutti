@@ -20,7 +20,7 @@ function createRunner(responses: Parameters<typeof createMockProvider>[0]) {
 
 describe("Human-in-the-loop", () => {
   it("injects request_human_input tool when allow_human_input is true", async () => {
-    const { runner, events, provider } = createRunner([
+    const { runner, events } = createRunner([
       toolUseResponse("request_human_input", { question: "Continue?" }),
       textResponse("Done after approval"),
     ]);

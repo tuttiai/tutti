@@ -18,11 +18,10 @@ import { AgentRunner } from "../../src/agent-runner.js";
 import { EventBus } from "../../src/event-bus.js";
 import { InMemorySessionStore } from "../../src/session-store.js";
 import {
-  createMockProvider,
   textResponse,
   simpleAgent,
 } from "../helpers/mock-provider.js";
-import type { ChatResponse, LLMProvider, StreamChunk } from "@tuttiai/types";
+import type { LLMProvider, StreamChunk } from "@tuttiai/types";
 
 // ── Error properties ───────────────────────────────────────────
 
