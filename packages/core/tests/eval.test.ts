@@ -113,7 +113,8 @@ describe("EvalRunner", () => {
         agent_id: "assistant",
         input: "hi",
         assertions: [
-          { type: "matches_regex", value: "hello.*assistant" },
+          // Pattern matches output capitalization directly (no implicit case-insensitivity)
+          { type: "matches_regex", value: "Hello.*assistant" },
         ],
       }],
     };
@@ -122,9 +123,14 @@ describe("EvalRunner", () => {
     expect(report.results[0].passed).toBe(true);
   });
 
-  it("checks cost_lte assertion", async () => {
+  it("checks cost_lte assertion with exact cost calculation", async () => {
     const provider = fakeProvider("cheap response");
     const runner = new EvalRunner(makeScore(provider));
+
+    // Expected: 20 input tokens × $3/1M + 10 output tokens × $15/1M = 0.00006 + 0.00015 = 0.00021
+    const INPUT_PER_M = 3;
+    const OUTPUT_PER_M = 15;
+    const expectedCost = (20 / 1_000_000) * INPUT_PER_M + (10 / 1_000_000) * OUTPUT_PER_M;
 
     const suite: EvalSuite = {
       name: "cost-test",
@@ -134,14 +140,19 @@ describe("EvalRunner", () => {
         agent_id: "assistant",
         input: "test",
         assertions: [
-          { type: "cost_lte", value: 1.0 },
+          { type: "cost_lte", value: 0.001 },
+          // Budget below actual cost should fail
+          { type: "cost_lte", value: 0.0001 },
         ],
       }],
     };
 
     const report = await runner.run(suite);
-    expect(report.results[0].passed).toBe(true);
-    expect(report.results[0].cost_usd).toBeLessThan(1.0);
+    // First assertion passes (actual cost < 0.001), second fails (actual cost > 0.0001)
+    expect(report.results[0].assertions[0].passed).toBe(true);
+    expect(report.results[0].assertions[1].passed).toBe(false);
+    // Verify the cost matches the exact pricing formula
+    expect(report.results[0].cost_usd).toBeCloseTo(expectedCost, 6);
   });
 
   it("calculates summary correctly", async () => {
@@ -225,7 +236,36 @@ describe("EvalReport formatters", () => {
     expect(md).toContain("### Failures");
   });
 
-  it("printTable does not throw", () => {
-    expect(() => printTable(report)).not.toThrow();
+  it("printTable outputs suite name, case names, scores, and summary", () => {
+    const output: string[] = [];
+    const originalLog = console.log;
+    console.log = (msg?: unknown) => { output.push(typeof msg === "string" ? msg : String(msg)); };
+
+    try {
+      printTable(report);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const full = output.join("\n");
+    // Suite header
+    expect(full).toContain("Test Suite");
+    expect(full).toContain("2 cases");
+    // Case names
+    expect(full).toContain("Passes");
+    expect(full).toContain("Fails");
+    // Case IDs
+    expect(full).toContain("t1");
+    expect(full).toContain("t2");
+    // Scores formatted to 2 decimals
+    expect(full).toContain("1.00");
+    expect(full).toContain("0.00");
+    // Summary line
+    expect(full).toContain("1/2 passed (50%)");
+    expect(full).toContain("Avg: 0.50");
+    expect(full).toContain("Total: $0.015");
+    // Failed assertion detail
+    expect(full).toContain("FAIL");
+    expect(full).toContain("contains: London");
   });
 });
