@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.17.0] - 2026-04-13
 
 ### Added
 - Tool result caching: `ToolCache` interface + `InMemoryToolCache` (sha256 keys, 5-minute default TTL, 1000-entry LRU eviction); per-agent opt-in via `AgentConfig.cache` (`{ enabled, ttl_ms?, excluded_tools? }`); `TuttiRuntime` attaches an `InMemoryToolCache` by default, exposed as `runtime.toolCache`
@@ -12,9 +12,15 @@
 - `ParallelAgentResult` type in `@tuttiai/types`
 - New events: `parallel:start` (`{ agents }`) and `parallel:complete` (`{ results }`)
 - Example: `examples/parallel-test.ts` — two analysts running simultaneously
+- Docs: `docs/guides/tool-caching.mdx` + updated `docs/guides/multi-agent.mdx`
 
 ### Changed
 - `ScoreConfig.entry` type widened to `string | ParallelEntryConfig` (backwards compatible — string form behaves identically)
+
+### Published
+- `@tuttiai/types@0.7.0`
+- `@tuttiai/core@0.10.0`
+- `tutti-ai@0.11.0`
 
 ## [0.16.0] - 2026-04-12
 
