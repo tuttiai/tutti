@@ -15,7 +15,22 @@ import type { EmbeddingConfig } from "./types.js";
 
 interface MockCall {
   url: string;
-  init: RequestInit | undefined;
+  /** Always present in our suite — every provider passes a body. */
+  init: RequestInit;
+}
+
+/** Pull the JSON body off a recorded call, narrowing through the union. */
+function bodyOf(call: MockCall): string {
+  const body = call.init.body;
+  if (typeof body !== "string") {
+    throw new Error("mockFetch: expected string body, got " + typeof body);
+  }
+  return body;
+}
+
+/** Pull a header off a recorded call as a string map. */
+function headersOf(call: MockCall): Record<string, string> {
+  return call.init.headers as Record<string, string>;
 }
 
 /**
@@ -37,6 +52,9 @@ function mockFetch(
         : input instanceof URL
           ? input.href
           : input.url;
+    if (!init) {
+      return Promise.reject(new Error("mockFetch: tests must pass an init"));
+    }
     calls.push({ url, init });
     const next = responses[i++];
     if (!next) {
@@ -189,9 +207,9 @@ describe("OpenAIEmbeddingProvider", () => {
     expect(Math.hypot(...vectors[1])).toBeCloseTo(1, 10);
 
     expect(calls[0].url).toBe("https://api.openai.com/v1/embeddings");
-    const headers = calls[0].init!.headers as Record<string, string>;
+    const headers = headersOf(calls[0]);
     expect(headers.authorization).toBe("Bearer sk-test");
-    const body = JSON.parse(calls[0].init!.body as string) as {
+    const body = JSON.parse(bodyOf(calls[0])) as {
       model: string;
       input: string[];
     };
@@ -248,8 +266,8 @@ describe("OpenAIEmbeddingProvider", () => {
 
     expect(vectors).toHaveLength(2050);
     expect(calls).toHaveLength(2);
-    const b0 = JSON.parse(calls[0].init!.body as string) as { input: string[] };
-    const b1 = JSON.parse(calls[1].init!.body as string) as { input: string[] };
+    const b0 = JSON.parse(bodyOf(calls[0])) as { input: string[] };
+    const b1 = JSON.parse(bodyOf(calls[1])) as { input: string[] };
     expect(b0.input).toHaveLength(2048);
     expect(b1.input).toHaveLength(2);
   });
@@ -352,9 +370,7 @@ describe("AnthropicEmbeddingProvider", () => {
 
     expect(vectors).toHaveLength(1);
     expect(calls[0].url).toBe("https://api.voyageai.com/v1/embeddings");
-    const body = JSON.parse(calls[0].init!.body as string) as {
-      model: string;
-    };
+    const body = JSON.parse(bodyOf(calls[0])) as { model: string };
     expect(body.model).toBe("voyage-3-lite");
   });
 
@@ -430,7 +446,7 @@ describe("LocalEmbeddingProvider", () => {
 
     expect(calls).toHaveLength(2);
     expect(calls[0].url).toBe("https://ollama.example.com/api/embeddings");
-    const body = JSON.parse(calls[0].init!.body as string) as {
+    const body = JSON.parse(bodyOf(calls[0])) as {
       model: string;
       prompt: string;
     };

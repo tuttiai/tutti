@@ -117,21 +117,13 @@ export class KeywordIndex {
     if (this.dirty || !this.engine) this.rebuild();
 
     const fetchLimit = filter ? Math.max(limit * 4, 10) : limit;
-    const raw = this.engine!.search(query, fetchLimit);
+    const engine = this.engine;
+    if (!engine) return []; // unreachable after rebuild() above; satisfies the type-checker.
+    const raw = engine.search(query, fetchLimit);
 
     const filtered: KeywordHit[] = [];
     for (const [id, score] of raw) {
-      if (filter) {
-        const meta = this.docs.get(id)?.metadata ?? {};
-        let matches = true;
-        for (const [k, v] of Object.entries(filter)) {
-          if (meta[k] !== v) {
-            matches = false;
-            break;
-          }
-        }
-        if (!matches) continue;
-      }
+      if (filter && !matchesFilter(this.docs.get(id)?.metadata, filter)) continue;
       filtered.push({ chunk_id: id, score });
       if (filtered.length >= limit) break;
     }
@@ -149,4 +141,21 @@ export class KeywordIndex {
     this.engine = engine;
     this.dirty = false;
   }
+}
+
+/** AND-equality match. Iterates `filter` entries to avoid dynamic key access on `meta`. */
+function matchesFilter(
+  meta: Record<string, unknown> | undefined,
+  filter: Record<string, string>,
+): boolean {
+  const m = meta ?? {};
+  for (const [k, v] of Object.entries(filter)) {
+    // `k` originates from the trusted filter object the caller passed; we
+    // only ever compare it for equality, never write it back.
+    const value = Object.prototype.hasOwnProperty.call(m, k)
+      ? Reflect.get(m, k)
+      : undefined;
+    if (value !== v) return false;
+  }
+  return true;
 }

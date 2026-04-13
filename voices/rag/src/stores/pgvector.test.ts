@@ -132,9 +132,9 @@ suite("PgVectorStore (integration)", () => {
     ]);
     const sources = await store.list();
     const match = sources.find((s) => s.source_id === "listed-src");
-    expect(match).toBeDefined();
-    expect(match!.chunk_count).toBeGreaterThanOrEqual(2);
-    expect(match!.title).toBe("Listed");
+    if (!match) throw new Error("listed-src missing from list()");
+    expect(match.chunk_count).toBeGreaterThanOrEqual(2);
+    expect(match.title).toBe("Listed");
   });
 });
 

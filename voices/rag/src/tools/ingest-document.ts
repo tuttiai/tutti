@@ -103,16 +103,33 @@ export function createIngestDocumentTool(
         }
 
         const vectors = await ctx.embeddings.embed(chunks.map((c) => c.text));
+        if (vectors.length !== chunks.length) {
+          return {
+            content:
+              "ingest_document: embedding provider returned " +
+              vectors.length +
+              " vectors for " +
+              chunks.length +
+              " chunks",
+            is_error: true,
+          };
+        }
 
-        const embedded: EmbeddedChunk[] = chunks.map((c, i) => ({
-          ...c,
-          vector: vectors[i],
-          chunk_id: id + ":" + c.chunk_index,
-          metadata: {
-            ...(c.metadata ?? {}),
-            chunk_index: c.chunk_index,
-          },
-        }));
+        const embedded: EmbeddedChunk[] = [];
+        const iter = chunks.entries();
+        for (const [i, c] of iter) {
+          const vector = vectors.at(i);
+          if (!vector) continue; // unreachable after the length guard above.
+          embedded.push({
+            ...c,
+            vector,
+            chunk_id: id + ":" + c.chunk_index,
+            metadata: {
+              ...(c.metadata ?? {}),
+              chunk_index: c.chunk_index,
+            },
+          });
+        }
 
         await ctx.store.upsert(embedded);
         ctx.engine.index(embedded);

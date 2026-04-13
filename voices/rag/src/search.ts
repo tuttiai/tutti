@@ -195,14 +195,16 @@ export class SearchEngine {
     const byId = new Map<string, SearchResult>();
     const rrfScore = new Map<string, number>();
 
-    for (let i = 0; i < semantic.length; i++) {
-      const hit = semantic[i];
+    let rank = 0;
+    for (const hit of semantic) {
+      rank += 1;
       byId.set(hit.chunk_id, hit);
-      rrfScore.set(hit.chunk_id, (rrfScore.get(hit.chunk_id) ?? 0) + 1 / (k + (i + 1)));
+      rrfScore.set(hit.chunk_id, (rrfScore.get(hit.chunk_id) ?? 0) + 1 / (k + rank));
     }
-    for (let i = 0; i < keyword.length; i++) {
-      const hit = keyword[i];
-      rrfScore.set(hit.chunk_id, (rrfScore.get(hit.chunk_id) ?? 0) + 1 / (k + (i + 1)));
+    rank = 0;
+    for (const hit of keyword) {
+      rank += 1;
+      rrfScore.set(hit.chunk_id, (rrfScore.get(hit.chunk_id) ?? 0) + 1 / (k + rank));
     }
 
     // De-dup: every chunk_id gets a single entry with the accumulated

@@ -74,11 +74,9 @@ export class MemoryVectorStore implements VectorStore {
 
     // Process in SCAN_BATCH_SIZE windows, yielding to the event loop between
     // batches so a 100k-chunk scan can't block incoming HTTP / timer work.
-    for (let start = 0; start < entries.length; start += SCAN_BATCH_SIZE) {
-      const end = Math.min(start + SCAN_BATCH_SIZE, entries.length);
-      for (let i = start; i < end; i++) {
-        const chunk = entries[i];
-        if (filter && !matchesFilter(chunk, filter)) continue;
+    let scanned = 0;
+    for (const chunk of entries) {
+      if (!filter || matchesFilter(chunk, filter)) {
         scored.push({
           chunk_id: chunk.chunk_id,
           source_id: chunk.source_id,
@@ -87,7 +85,10 @@ export class MemoryVectorStore implements VectorStore {
           metadata: chunk.metadata,
         });
       }
-      if (end < entries.length) await yieldToEventLoop();
+      scanned += 1;
+      if (scanned % SCAN_BATCH_SIZE === 0 && scanned < entries.length) {
+        await yieldToEventLoop();
+      }
     }
 
     scored.sort((a, b) => b.score - a.score);
@@ -142,7 +143,15 @@ export class MemoryVectorStore implements VectorStore {
 function cosine(a: number[], b: number[]): number {
   let sum = 0;
   const n = Math.min(a.length, b.length);
-  for (let i = 0; i < n; i++) sum += a[i] * b[i];
+  for (let i = 0; i < n; i++) {
+    // `i` is a bounded counter, not user input; security/detect-object-injection
+    // is a false positive over numeric arrays.
+    /* eslint-disable security/detect-object-injection */
+    const av = a[i];
+    const bv = b[i];
+    /* eslint-enable security/detect-object-injection */
+    if (av !== undefined && bv !== undefined) sum += av * bv;
+  }
   return sum;
 }
 
@@ -159,7 +168,11 @@ function matchesFilter(
 ): boolean {
   const meta = chunk.metadata ?? {};
   for (const [key, expected] of Object.entries(filter)) {
-    if (meta[key] !== expected) return false;
+    // `key` originates from the trusted filter object; only compared, never assigned.
+    const value = Object.prototype.hasOwnProperty.call(meta, key)
+      ? Reflect.get(meta, key)
+      : undefined;
+    if (value !== expected) return false;
   }
   return true;
 }

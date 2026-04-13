@@ -53,7 +53,11 @@ describe("RagVoice end-to-end", () => {
     workDir = await mkdtemp(join(tmpdir(), "rag-e2e-"));
 
     fetchMock = vi.fn((_url: string | URL, init?: RequestInit) => {
-      const body = JSON.parse(init!.body as string) as OpenAIEmbeddingsRequestBody;
+      const rawBody = init?.body;
+      if (typeof rawBody !== "string") {
+        return Promise.reject(new Error("e2e fetch mock: missing string body"));
+      }
+      const body = JSON.parse(rawBody) as OpenAIEmbeddingsRequestBody;
       const data = body.input.map((text, index) => ({
         index,
         embedding: embedFor(text),
