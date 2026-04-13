@@ -1,9 +1,15 @@
 import type { Permission, Tool, Voice } from "@tuttiai/types";
+import { createEmbeddingProvider } from "./embeddings/index.js";
+import { SearchEngine, type LlmFn } from "./search.js";
+import { createVectorStore } from "./stores/index.js";
 import { createIngestDocumentTool } from "./tools/ingest-document.js";
 import { createSearchKnowledgeTool } from "./tools/search-knowledge.js";
 import { createListSourcesTool } from "./tools/list-sources.js";
 import { createDeleteSourceTool } from "./tools/delete-source.js";
+import type { RagContext } from "./tool-context.js";
 import type { RagConfig } from "./types.js";
+
+// --- public re-exports -----------------------------------------------------
 
 export type {
   RagConfig,
@@ -47,30 +53,58 @@ export {
 } from "./search.js";
 export { KeywordIndex } from "./keyword-index.js";
 
-export {
-  createIngestDocumentTool,
-  createSearchKnowledgeTool,
-  createListSourcesTool,
-  createDeleteSourceTool,
-};
+// --- voice factory ---------------------------------------------------------
 
 /**
- * Build a RAG voice for the given configuration.
+ * Extra construction options for {@link RagVoice} that don't belong on the
+ * serialisable {@link RagConfig}. An `llm` callback is required for HyDE
+ * query rewriting; without it, `config.hyde` is ignored.
+ */
+export interface RagVoiceOptions {
+  /**
+   * Callback used by the HyDE query-rewriter. Receives a prompt, returns
+   * the LLM's response. Callers typically wrap their Tutti LLMProvider here.
+   */
+  llm?: LlmFn;
+}
+
+/**
+ * Build the RAG voice. Constructs an {@link EmbeddingProvider}, a
+ * {@link VectorStore}, and a {@link SearchEngine} from `config`, wires them
+ * into the four tools, and returns the resulting {@link Voice}.
  *
- * The returned {@link Voice} can be passed to an `AgentConfig`'s `voices`
- * array. Tools are stubs — wire up an embedder and vector store backend
- * before relying on them at runtime.
+ * `required_permissions` is `["network"]` because every sensible embedding
+ * backend performs a network round-trip; local Ollama runs still pass the
+ * permission check.
  *
  * @example
- * const voice = RagVoice({ collection: "product-docs" });
- * const agent = { name: "support", voices: [voice], ... };
+ * const voice = RagVoice({
+ *   collection: "product-docs",
+ *   embeddings: { provider: "openai", api_key: process.env.OPENAI_API_KEY! },
+ *   storage: { provider: "memory" },
+ * });
  */
-export function RagVoice(config: RagConfig): Voice {
+export function RagVoice(config: RagConfig, options: RagVoiceOptions = {}): Voice {
+  const embeddings = createEmbeddingProvider(config);
+  const store = createVectorStore(config);
+
+  const engineDeps: {
+    embeddings: typeof embeddings;
+    store: typeof store;
+    llm?: LlmFn;
+    config?: { hyde?: boolean };
+  } = { embeddings, store };
+  if (options.llm !== undefined) engineDeps.llm = options.llm;
+  if (config.hyde !== undefined) engineDeps.config = { hyde: config.hyde };
+  const engine = new SearchEngine(engineDeps);
+
+  const ctx: RagContext = { config, embeddings, store, engine };
+
   const tools: Tool[] = [
-    createIngestDocumentTool(config),
-    createSearchKnowledgeTool(config),
-    createListSourcesTool(config),
-    createDeleteSourceTool(config),
+    createIngestDocumentTool(ctx),
+    createSearchKnowledgeTool(ctx),
+    createListSourcesTool(ctx),
+    createDeleteSourceTool(ctx),
   ];
 
   return {

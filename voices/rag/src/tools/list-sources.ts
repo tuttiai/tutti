@@ -1,37 +1,49 @@
 import { z } from "zod";
 import type { Tool } from "@tuttiai/types";
-import type { RagConfig } from "../types.js";
+import type { RagContext } from "../tool-context.js";
 
-const parameters = z.object({
-  limit: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe("Maximum number of sources to return"),
-  cursor: z
-    .string()
-    .optional()
-    .describe("Opaque pagination cursor returned by a previous call"),
-});
+const parameters = z.object({});
 
-/**
- * Build the `list_sources` tool.
- *
- * Stub — the body is intentionally not implemented.
- */
+type ListSourcesInput = z.infer<typeof parameters>;
+
+interface FormattedSource {
+  source_id: string;
+  filename: string;
+  chunks: number;
+  ingested_at: string;
+}
+
+/** Wire the `list_sources` tool — enumerate every source in the store. */
 export function createListSourcesTool(
-  _config: RagConfig,
-): Tool<z.infer<typeof parameters>> {
+  ctx: RagContext,
+): Tool<ListSourcesInput> {
   return {
     name: "list_sources",
-    description: "List ingested source documents in the knowledge base",
+    description: "List every ingested source document",
     parameters,
-    execute: async (_input) => {
-      return {
-        content: "list_sources is not implemented yet",
-        is_error: true,
-      };
+    execute: async (): Promise<{ content: string; is_error?: boolean }> => {
+      try {
+        const sources = await ctx.store.list();
+        const formatted: FormattedSource[] = sources.map((s) => {
+          const meta = s.metadata ?? {};
+          const metaFilename =
+            typeof meta.filename === "string" ? meta.filename : undefined;
+          return {
+            source_id: s.source_id,
+            filename: metaFilename ?? s.title ?? s.source_id,
+            chunks: s.chunk_count,
+            ingested_at: s.ingested_at,
+          };
+        });
+        return { content: JSON.stringify(formatted) };
+      } catch (err) {
+        return {
+          content:
+            "list_sources failed: " +
+            (err instanceof Error ? err.message : String(err)),
+          is_error: true,
+        };
+      }
     },
   };
 }

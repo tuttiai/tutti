@@ -94,6 +94,15 @@ export class SearchEngine {
   }
 
   /**
+   * Drop every BM25 entry whose `metadata.source_id` equals `source_id`.
+   * Called by `delete_source` to keep keyword search in sync with the
+   * vector store.
+   */
+  removeSource(source_id: string): number {
+    return this.keyword.removeBySource(source_id);
+  }
+
+  /**
    * Retrieve chunks ranked by relevance to `query`.
    *
    * @throws When `options.hyde` (or `config.hyde`) is true but no `llm`

@@ -85,6 +85,19 @@ export class KeywordIndex {
     this.dirty = true;
   }
 
+  /** Remove every chunk whose `source_id` metadata matches. */
+  removeBySource(source_id: string): number {
+    let removed = 0;
+    for (const [id, doc] of this.docs) {
+      if (doc.metadata?.source_id === source_id) {
+        this.docs.delete(id);
+        removed += 1;
+      }
+    }
+    if (removed > 0) this.dirty = true;
+    return removed;
+  }
+
   /**
    * Run BM25 over the indexed corpus and return up to `limit` hits.
    *

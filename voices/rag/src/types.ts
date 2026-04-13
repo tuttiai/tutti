@@ -88,6 +88,11 @@ export interface RagConfig {
   chunk_size?: number;
   /** Number of overlapping characters between adjacent chunks. */
   chunk_overlap?: number;
+  /**
+   * Enable HyDE query rewriting for the `search_knowledge` tool. Requires
+   * passing an `llm` callback to {@link RagVoice}; ignored otherwise.
+   */
+  hyde?: boolean;
 }
 
 /**
