@@ -95,9 +95,7 @@ export function createIngestDocumentTool(
         const chunks = await ingestDocument(pipelineInput, chunkOptions);
         if (chunks.length === 0) {
           return {
-            content:
-              "ingest_document produced no chunks from " + input.source +
-              " — check that the document is non-empty and a supported format",
+            content: `ingest_document produced no chunks from ${input.source} — check that the document is non-empty and a supported format`,
             is_error: true,
           };
         }
@@ -105,12 +103,7 @@ export function createIngestDocumentTool(
         const vectors = await ctx.embeddings.embed(chunks.map((c) => c.text));
         if (vectors.length !== chunks.length) {
           return {
-            content:
-              "ingest_document: embedding provider returned " +
-              vectors.length +
-              " vectors for " +
-              chunks.length +
-              " chunks",
+            content: `ingest_document: embedding provider returned ${vectors.length} vectors for ${chunks.length} chunks`,
             is_error: true,
           };
         }
@@ -143,9 +136,7 @@ export function createIngestDocumentTool(
         };
       } catch (err) {
         return {
-          content:
-            "ingest_document failed: " +
-            (err instanceof Error ? err.message : String(err)),
+          content: `ingest_document failed: ${err instanceof Error ? err.message : String(err)}`,
           is_error: true,
         };
       }
