@@ -22,6 +22,14 @@ export default defineConfig({
         "src/memory/semantic.ts",
         // OTel SDK setup requires a running collector
         "src/telemetry-setup.ts",
+        // Checkpoint backends — same reasoning as memory/postgres.ts:
+        // integration tests require a live Redis / Postgres and skip
+        // in CI when TUTTI_REDIS_URL / TUTTI_PG_URL are unset.
+        "src/checkpoint/redis.ts",
+        "src/checkpoint/postgres.ts",
+        // Checkpoint interface + types (no runtime code).
+        "src/checkpoint/store.ts",
+        "src/checkpoint/types.ts",
       ],
       thresholds: {
         lines: 85,
