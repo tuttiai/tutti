@@ -68,7 +68,23 @@ export class RedisCheckpointStore implements CheckpointStore {
     const pipeline = this.client.pipeline();
     pipeline.set(turnKey, JSON.stringify(checkpoint), "EX", this.ttl);
     pipeline.set(latestKey, String(checkpoint.turn), "EX", this.ttl);
-    await pipeline.exec();
+    const results = await pipeline.exec();
+
+    // pipeline.exec() returns [[err, result], ...] — per-command failures
+    // are NOT thrown. Without this check an OOM or auth drift on either
+    // SET would leave the caller thinking the checkpoint was durable.
+    if (results === null) {
+      throw new Error(
+        "RedisCheckpointStore: pipeline aborted before any command ran",
+      );
+    }
+    for (const [err] of results) {
+      if (err) {
+        throw new Error(
+          "RedisCheckpointStore: save failed — " + err.message,
+        );
+      }
+    }
   }
 
   async loadLatest(session_id: string): Promise<Checkpoint | null> {
@@ -76,7 +92,10 @@ export class RedisCheckpointStore implements CheckpointStore {
     const latest = await this.client.get(this.latestKey(session_id));
     if (latest === null) return null;
     const turn = Number(latest);
-    if (!Number.isInteger(turn)) {
+    // `isFinite` rejects NaN/Infinity (malformed pointer) while still
+    // accepting any value the Checkpoint contract admits — `turn: number`
+    // is not constrained to integers.
+    if (!Number.isFinite(turn)) {
       logger.warn(
         { session_id, value: latest },
         "RedisCheckpointStore: malformed latest pointer, ignoring",
@@ -130,7 +149,17 @@ export class RedisCheckpointStore implements CheckpointStore {
    * integration setups that want to fail fast on misconfiguration.
    */
   async connect(): Promise<void> {
-    if (this.client.status === "ready") return;
+    // ioredis throws "Redis is already connecting/connected" from any
+    // non-idle status, so the guard covers every in-flight and ready state.
+    const status = this.client.status;
+    if (
+      status === "ready" ||
+      status === "connect" ||
+      status === "connecting" ||
+      status === "reconnecting"
+    ) {
+      return;
+    }
     await this.client.connect();
   }
 
