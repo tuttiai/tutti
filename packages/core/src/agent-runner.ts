@@ -399,15 +399,21 @@ export class AgentRunner {
     timeoutMs: number,
     toolName: string,
   ): Promise<T> {
-    return Promise.race([
-      fn(),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new ToolTimeoutError(toolName, timeoutMs)),
-          timeoutMs,
-        ),
-      ),
-    ]);
+    // Track the timer so we can clear it on the happy path. Without this,
+    // a tool that finishes in 10ms still leaves a timeoutMs-long handle
+    // alive, keeping the event loop running and firing a dead rejection.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new ToolTimeoutError(toolName, timeoutMs)),
+        timeoutMs,
+      );
+    });
+    try {
+      return await Promise.race([fn(), timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   private async streamToResponse(
@@ -547,13 +553,19 @@ export class AgentRunner {
         !DEFAULT_WRITE_TOOLS.includes(block.name) &&
         !(cacheCfg.excluded_tools ?? []).includes(block.name);
 
+      // Security: scope cache keys by agent_name so a poisoned tool result
+      // cached by one agent can't be read back by another agent with a
+      // different trust model. Agents with the same name (same trust domain)
+      // still share the cache — that's the intended win.
+      const scopedTool = `${context.agent_name}::${block.name}`;
+
       try {
         // Validate input with Zod
         const parsed = tool.parameters.parse(block.input);
 
         // Cache lookup on the parsed input so semantically-equal inputs hit.
         if (cacheable && this.toolCache) {
-          const cached = await this.toolCache.get(block.name, parsed);
+          const cached = await this.toolCache.get(scopedTool, parsed);
           if (cached) {
             this.events.emit({
               type: "cache:hit",
@@ -590,7 +602,7 @@ export class AgentRunner {
         // so transient failures don't get pinned for minutes.
         if (cacheable && this.toolCache && !result.is_error) {
           await this.toolCache.set(
-            block.name,
+            scopedTool,
             parsed,
             result,
             cacheCfg?.ttl_ms,

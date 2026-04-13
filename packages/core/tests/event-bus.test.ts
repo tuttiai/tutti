@@ -159,4 +159,67 @@ describe("EventBus", () => {
 
     expect(() => bus.off("agent:start", handler)).not.toThrow();
   });
+
+  // ── Handler isolation (security) ──
+  describe("handler isolation", () => {
+    it("a throwing handler does not crash emit() or block siblings", () => {
+      const bus = new EventBus();
+      const bad = vi.fn(() => {
+        throw new Error("handler boom");
+      });
+      const good = vi.fn();
+
+      bus.on("agent:start", bad);
+      bus.on("agent:start", good);
+
+      expect(() =>
+        bus.emit({
+          type: "agent:start",
+          agent_name: "test",
+          session_id: "s1",
+        }),
+      ).not.toThrow();
+
+      expect(bad).toHaveBeenCalledOnce();
+      // Critical: the sibling handler still fires after the first one threw.
+      expect(good).toHaveBeenCalledOnce();
+    });
+
+    it("a throwing wildcard handler does not block specific handlers", () => {
+      const bus = new EventBus();
+      const bad = vi.fn(() => {
+        throw new Error("wildcard boom");
+      });
+      const good = vi.fn();
+
+      bus.onAny(bad);
+      bus.on("agent:start", good);
+
+      expect(() =>
+        bus.emit({
+          type: "agent:start",
+          agent_name: "test",
+          session_id: "s1",
+        }),
+      ).not.toThrow();
+
+      expect(good).toHaveBeenCalledOnce();
+    });
+
+    it("a rejecting async handler does not produce an unhandled rejection", async () => {
+      const bus = new EventBus();
+      bus.on("agent:start", () => Promise.reject(new Error("async boom")));
+
+      bus.emit({
+        type: "agent:start",
+        agent_name: "test",
+        session_id: "s1",
+      });
+
+      // Yield to let the microtask queue drain; if unhandled, Node would warn.
+      await new Promise((r) => setImmediate(r));
+      // Reaching here without an unhandled-rejection is the pass condition.
+      expect(true).toBe(true);
+    });
+  });
 });

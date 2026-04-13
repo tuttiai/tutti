@@ -39,6 +39,7 @@ export default defineConfig({
             { label: "Building a Voice", slug: "guides/building-a-voice" },
             { label: "Providers", slug: "guides/providers" },
             { label: "Memory & Sessions", slug: "guides/memory-sessions" },
+            { label: "Tool Result Caching", slug: "guides/tool-caching" },
             { label: "Security", slug: "guides/security" },
           ],
         },

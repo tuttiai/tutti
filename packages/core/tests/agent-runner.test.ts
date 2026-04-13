@@ -338,4 +338,44 @@ describe("AgentRunner", () => {
     });
     expect(session.messages[1].role).toBe("assistant");
   });
+
+  // Regression guard for the executeWithTimeout timer leak. If the happy-path
+  // branch fails to clear the setTimeout, vitest's fake-timers will show the
+  // handle is still queued after the tool returns — we assert it isn't.
+  it("clears the tool timeout handle when the tool finishes in time", async () => {
+    vi.useFakeTimers();
+    try {
+      const voice: Voice = {
+        name: "quick",
+        required_permissions: [],
+        tools: [
+          {
+            name: "instant",
+            description: "returns immediately",
+            parameters: z.object({}),
+            execute: () => Promise.resolve({ content: "done" }),
+          },
+        ],
+      };
+      const provider = createMockProvider([
+        toolUseResponse("instant", {}),
+        textResponse("ok"),
+      ]);
+      const events = new EventBus();
+      const sessions = new InMemorySessionStore();
+      const runner = new AgentRunner(provider, events, sessions);
+
+      await runner.run(
+        { ...simpleAgent, voices: [voice], tool_timeout_ms: 30_000 },
+        "go",
+      );
+
+      // After the run completes, there must be no outstanding timers — the
+      // happy-path branch of executeWithTimeout should have cleared the
+      // 30-second watchdog. If it hadn't, the timer count would be > 0.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

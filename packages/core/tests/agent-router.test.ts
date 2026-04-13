@@ -441,6 +441,92 @@ describe("AgentRouter", () => {
         /at least one input/,
       );
     });
+
+    it("handles a single input (trivial fan-out of 1)", async () => {
+      const provider = createDelayedProvider(
+        [{ match: "tag:solo", behavior: "ok" }],
+        { baseDelayMs: 5 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["solo"]),
+      );
+
+      const results = await router.runParallel([
+        { agent_id: "solo", input: "x" },
+      ]);
+
+      expect(results.size).toBe(1);
+      expect(results.get("solo")?.output).toBe("[tag:solo] ok");
+    });
+
+    it("returns a fully-populated map even when every agent fails", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:a", behavior: "fail" },
+          { match: "tag:b", behavior: "fail" },
+        ],
+        { baseDelayMs: 5 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["a", "b"]),
+      );
+
+      const results = await router.runParallel([
+        { agent_id: "a", input: "x" },
+        { agent_id: "b", input: "x" },
+      ]);
+
+      expect(results.size).toBe(2);
+      expect(results.get("a")?.output).toMatch(/\[error\]/);
+      expect(results.get("b")?.output).toMatch(/\[error\]/);
+    });
+
+    it("parallel:complete excludes agents that failed", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:ok", behavior: "ok" },
+          { match: "tag:bad", behavior: "fail" },
+        ],
+        { baseDelayMs: 5 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["ok", "bad"]),
+      );
+
+      let completeEvent:
+        | Extract<TuttiEvent, { type: "parallel:complete" }>
+        | undefined;
+      router.events.on("parallel:complete", (e) => {
+        completeEvent = e;
+      });
+
+      await router.runParallel([
+        { agent_id: "ok", input: "x" },
+        { agent_id: "bad", input: "x" },
+      ]);
+
+      // Only successful agents appear in parallel:complete.results
+      expect(completeEvent?.results).toEqual(["ok"]);
+    });
+
+    it("surfaces a non-Error rejection value as a string", async () => {
+      // Provider whose chat() rejects with a plain string — exercises the
+      // `String(outcome.error)` fallback in runParallelInternal's error path.
+      const provider: LLMProvider = {
+        chat: vi.fn(() => Promise.reject("string-rejection")),
+        async *stream(): AsyncIterable<StreamChunk> {
+          yield { type: "text", text: "stub" } as StreamChunk;
+        },
+      };
+      const router = new AgentRouter(createParallelScore(provider, ["a"]));
+
+      const results = await router.runParallel([
+        { agent_id: "a", input: "x" },
+      ]);
+
+      expect(results.get("a")?.output).toContain("[error]");
+      expect(results.get("a")?.output).toContain("string-rejection");
+    });
   });
 
   describe("parallel entry config", () => {
@@ -473,6 +559,21 @@ describe("AgentRouter", () => {
       // Merged usage is the sum of both agents
       expect(result.usage.input_tokens).toBe(20); // 10 + 10 from textResponse
       expect(result.usage.output_tokens).toBe(10); // 5 + 5
+    });
+
+    it("parallel entry rejects an empty agents[] at construction time", () => {
+      const provider = createDelayedProvider(
+        [{ match: "tag:a", behavior: "ok" }],
+        { baseDelayMs: 5 },
+      );
+      const score: ScoreConfig = {
+        provider,
+        agents: {
+          a: { name: "A", system_prompt: "tag:a", voices: [] },
+        },
+        entry: { type: "parallel", agents: [] },
+      };
+      expect(() => new AgentRouter(score)).toThrow(/at least one agent/);
     });
 
     it("parallel entry rejects unknown agents at construction time", () => {

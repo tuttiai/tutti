@@ -333,4 +333,78 @@ describe("AgentRunner + ToolCache", () => {
 
     expect(spy).toHaveBeenCalledTimes(2);
   });
+
+  // ── Security: cache is scoped by agent_name ──
+  it("does not share cached results across agents with different names", async () => {
+    const { voice, spy } = makeSpyVoice("read_thing");
+    // Both agents' first calls are tool_use → text (same inputs).
+    const provider = createMockProvider([
+      // Agent A turn 1: tool_use
+      toolUseResponse("read_thing", { path: "a.md" }, "tu-a1"),
+      textResponse("A done"),
+      // Agent B turn 1: tool_use (same input, different agent)
+      toolUseResponse("read_thing", { path: "a.md" }, "tu-b1"),
+      textResponse("B done"),
+    ]);
+    const events = new EventBus();
+    const sessions = new InMemorySessionStore();
+    const cache = new InMemoryToolCache();
+    const runner = new AgentRunner(
+      provider,
+      events,
+      sessions,
+      undefined,
+      undefined,
+      cache,
+    );
+
+    const agentA: AgentConfig = {
+      ...simpleAgent,
+      name: "agent-a",
+      voices: [voice],
+      cache: { enabled: true },
+    };
+    const agentB: AgentConfig = {
+      ...simpleAgent,
+      name: "agent-b",
+      voices: [voice],
+      cache: { enabled: true },
+    };
+
+    await runner.run(agentA, "run");
+    await runner.run(agentB, "run");
+
+    // Both agents executed the tool: B did NOT get A's cached result.
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("ttl_ms of 0 means never serve from cache", async () => {
+    const { voice, spy } = makeSpyVoice("read_thing");
+    const provider = createMockProvider(
+      twoCallsWithSameInput("read_thing", { path: "a.md" }),
+    );
+    const events = new EventBus();
+    const sessions = new InMemorySessionStore();
+    const cache = new InMemoryToolCache();
+    const runner = new AgentRunner(
+      provider,
+      events,
+      sessions,
+      undefined,
+      undefined,
+      cache,
+    );
+
+    const agent: AgentConfig = {
+      ...simpleAgent,
+      voices: [voice],
+      cache: { enabled: true, ttl_ms: 0 },
+    };
+
+    const r1 = await runner.run(agent, "first");
+    await runner.run(agent, "second", r1.session_id);
+
+    // TTL=0 → entry expires at set-time → every lookup misses.
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
 });

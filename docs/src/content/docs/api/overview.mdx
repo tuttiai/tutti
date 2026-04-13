@@ -17,9 +17,10 @@ The runtime package. Main exports:
 | ------ | ----------- |
 | `TuttiRuntime` | Main runtime — takes a score, runs agents |
 | `AgentRunner` | Low-level agentic loop (used internally by the runtime) |
-| `AgentRouter` | Multi-agent orchestration with delegation |
+| `AgentRouter` | Multi-agent orchestration with delegation or parallel fan-out |
 | `EventBus` | Typed event emitter |
 | `InMemorySessionStore` | Default session storage |
+| `InMemoryToolCache` | TTL + LRU tool result cache (`ToolCache` impl) |
 | `ScoreLoader` | Dynamic import + Zod validation for score files |
 | `SecretsManager` | API key redaction and env var access |
 | `PermissionGuard` | Voice permission enforcement |
@@ -59,11 +60,14 @@ import type {
   ScoreConfig,
   TelemetryConfig,
   MemoryConfig,
+  ParallelEntryConfig,   // { type: "parallel"; agents: string[] }
 
   // Agent
   AgentConfig,
   AgentResult,
   BudgetConfig,
+  AgentCacheConfig,      // per-agent cache opt-in
+  ParallelAgentResult,   // aggregate result from runParallelWithSummary
 
   // Voice
   Voice,
@@ -99,6 +103,7 @@ import type {
 class TuttiRuntime {
   constructor(score: ScoreConfig);
   readonly events: EventBus;
+  readonly toolCache: ToolCache;       // attached InMemoryToolCache by default
   get score(): ScoreConfig;
   run(agent_name: string, input: string, session_id?: string): Promise<AgentResult>;
   getSession(id: string): Session | undefined;
@@ -111,7 +116,24 @@ class TuttiRuntime {
 class AgentRouter {
   constructor(score: ScoreConfig);
   readonly events: EventBus;
+
+  /** Delegation mode: runs entry orchestrator. Parallel mode: fans input out
+   *  to every agent in the ParallelEntryConfig and returns a merged AgentResult. */
   run(input: string, session_id?: string): Promise<AgentResult>;
+
+  /** Run multiple agents simultaneously with independent sessions. One
+   *  failure never blocks the others; `timeout_ms` races each agent. */
+  runParallel(
+    inputs: { agent_id: string; input: string }[],
+    options?: { timeout_ms?: number },
+  ): Promise<Map<string, AgentResult>>;
+
+  /** Same as runParallel but returns the full aggregate with rollup metrics
+   *  (merged_output, total_usage, total_cost_usd, duration_ms). */
+  runParallelWithSummary(
+    inputs: { agent_id: string; input: string }[],
+    options?: { timeout_ms?: number },
+  ): Promise<ParallelAgentResult>;
 }
 ```
 
@@ -125,7 +147,33 @@ interface AgentResult {
   turns: number;
   usage: TokenUsage;
 }
+
+interface ParallelAgentResult {
+  results: Map<string, AgentResult>;
+  merged_output: string;      // "[agent_id] output\n\n[agent_id] output ..."
+  total_usage: TokenUsage;
+  total_cost_usd: number;
+  duration_ms: number;
+}
 ```
+
+### ToolCache
+
+```ts
+interface ToolCache {
+  get(tool: string, input: unknown): Promise<ToolResult | null>;
+  set(tool: string, input: unknown, result: ToolResult, ttl_ms?: number): Promise<void>;
+  invalidate(tool: string, input?: unknown): Promise<void>;
+  clear(): Promise<void>;
+}
+```
+
+The default `InMemoryToolCache` uses sha256 keys, a 5-minute TTL, and
+1000-entry LRU eviction. Write / side-effect tools listed in
+`DEFAULT_WRITE_TOOLS` (`write_file`, `delete_file`, `move_file`,
+`create_issue`, `comment_on_issue`) are never cached. Cache keys are
+internally scoped by `agent_name` so one agent's tool output cannot be
+consumed by another agent with a different trust model.
 
 ### LLMProvider
 

@@ -126,7 +126,9 @@ tutti.events.onAny((e) => {
 });
 ```
 
-Available events: `agent:start`, `agent:end`, `llm:request`, `llm:response`, `tool:start`, `tool:end`, `tool:error`, `turn:start`, `turn:end`, `delegate:start`, `delegate:end`, `security:injection_detected`, `budget:warning`, `budget:exceeded`, `token:stream`.
+Available events: `agent:start`, `agent:end`, `llm:request`, `llm:response`, `tool:start`, `tool:end`, `tool:error`, `turn:start`, `turn:end`, `delegate:start`, `delegate:end`, `parallel:start`, `parallel:complete`, `cache:hit`, `cache:miss`, `security:injection_detected`, `budget:warning`, `budget:exceeded`, `token:stream`, `hitl:requested`, `hitl:answered`, `hitl:timeout`.
+
+Event handlers are **isolated** — a throwing handler is logged and siblings keep firing, so a bad telemetry subscriber can't crash an agent run.
 
 ## Sessions
 
@@ -161,6 +163,39 @@ Tutti has two kinds of memory:
 ```
 
 Tools can explicitly store memories via `context.memory.remember()`. See the [Memory & Sessions guide](/guides/memory-sessions) for full details.
+
+## Tool result caching
+
+Repeated tool calls — same tool, same input — can be served from an in-memory cache instead of re-executing. Opt in per agent:
+
+```ts
+{
+  researcher: {
+    voices: [new FilesystemVoice()],
+    cache: {
+      enabled: true,
+      ttl_ms: 60_000,                  // optional: default 5 min
+      excluded_tools: ["run_migration"] // in addition to built-in write-tool exclusions
+    },
+  },
+}
+```
+
+Known write tools (`write_file`, `delete_file`, `move_file`, `create_issue`, `comment_on_issue`) and errored results are never cached. Cache keys are scoped per agent, so a poisoned result from one agent can't be served to another with a different trust model. Observe with the `cache:hit` / `cache:miss` events. See the [Tool Result Caching guide](/guides/tool-caching) for details, including custom cache backends.
+
+## Parallel execution
+
+Fan one input out to several agents simultaneously by setting `entry` to a parallel config:
+
+```ts
+defineScore({
+  provider: new AnthropicProvider(),
+  entry: { type: "parallel", agents: ["bull", "bear"] },
+  agents: { bull: { /* ... */ }, bear: { /* ... */ } },
+});
+```
+
+`router.run(input)` dispatches to every listed agent at once (each with its own session) and returns a merged `AgentResult`. For per-agent inputs, timeouts, or rollup metrics, call `router.runParallel()` / `router.runParallelWithSummary()` directly. A failed agent never blocks the others — it surfaces as a synthetic `[error]` entry in the result map. Observe with the `parallel:start` / `parallel:complete` events. See the [Multi-Agent guide](/guides/multi-agent#parallel-fan-out).
 
 ## Permissions
 
