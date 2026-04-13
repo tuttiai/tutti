@@ -17,6 +17,7 @@ process.on("uncaughtException", (err) => {
 import { Command } from "commander";
 import { initCommand, templatesCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
+import { resumeCommand, type ResumeOptions } from "./commands/resume.js";
 import { addCommand } from "./commands/add.js";
 import { checkCommand } from "./commands/check.js";
 import { studioCommand } from "./commands/studio.js";
@@ -52,6 +53,36 @@ program
   .action(async (score?: string) => {
     await runCommand(score);
   });
+
+program
+  .command("resume <session-id>")
+  .description("Resume a crashed or interrupted run from its last checkpoint")
+  .option(
+    "--store <backend>",
+    "Durable store the checkpoint was written to (redis | postgres)",
+    "redis",
+  )
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .option("-a, --agent <name>", "Agent key to resume (default: score.entry or the first agent)")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(
+    async (
+      sessionId: string,
+      opts: { store?: string; score?: string; agent?: string; yes?: boolean },
+    ) => {
+      if (opts.store !== "redis" && opts.store !== "postgres") {
+        console.error("--store must be 'redis' or 'postgres'");
+        process.exit(1);
+      }
+      const resolved: ResumeOptions = {
+        store: opts.store,
+        ...(opts.score !== undefined ? { score: opts.score } : {}),
+        ...(opts.agent !== undefined ? { agent: opts.agent } : {}),
+        ...(opts.yes !== undefined ? { yes: opts.yes } : {}),
+      };
+      await resumeCommand(sessionId, resolved);
+    },
+  );
 
 program
   .command("add <voice>")

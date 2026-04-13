@@ -28,4 +28,14 @@ export class InMemorySessionStore implements SessionStore {
     session.messages = messages;
     session.updated_at = new Date();
   }
+
+  /**
+   * Insert-or-replace a session with a caller-supplied id. Used by resume
+   * flows that need to rehydrate a session read from an external store
+   * (e.g. a checkpoint) under its original id. Not part of the
+   * `SessionStore` interface — callers must opt in explicitly.
+   */
+  save(session: Session): void {
+    this.sessions.set(session.id, session);
+  }
 }

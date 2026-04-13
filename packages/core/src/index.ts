@@ -47,7 +47,7 @@ export { TuttiTracer } from "./telemetry.js";
 export { initTelemetry, shutdownTelemetry } from "./telemetry-setup.js";
 
 // Runtime
-export { TuttiRuntime } from "./runtime.js";
+export { TuttiRuntime, type TuttiRuntimeOptions } from "./runtime.js";
 export { AgentRunner } from "./agent-runner.js";
 export { AgentRouter } from "./agent-router.js";
 export { EventBus } from "./event-bus.js";

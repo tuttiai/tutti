@@ -1,5 +1,6 @@
 import type { AgentResult, ScoreConfig, Session, SessionStore } from "@tuttiai/types";
 import { AgentRunner } from "./agent-runner.js";
+import type { CheckpointStore } from "./checkpoint/index.js";
 import { EventBus } from "./event-bus.js";
 import { InMemorySessionStore } from "./session-store.js";
 import { PostgresSessionStore } from "./memory/postgres.js";
@@ -12,6 +13,15 @@ import { logger } from "./logger.js";
 import { AgentNotFoundError, ScoreValidationError } from "./errors.js";
 import { initTelemetry } from "./telemetry-setup.js";
 
+/** Optional runtime overrides that don't belong in the score. */
+export interface TuttiRuntimeOptions {
+  /**
+   * Attach a durable checkpoint store so agents with `durable: true` can
+   * save turn boundaries and resume after a crash.
+   */
+  checkpointStore?: CheckpointStore;
+}
+
 export class TuttiRuntime {
   readonly events: EventBus;
   readonly semanticMemory: SemanticMemoryStore;
@@ -20,7 +30,7 @@ export class TuttiRuntime {
   private _runner: AgentRunner;
   private _score: ScoreConfig;
 
-  constructor(score: ScoreConfig) {
+  constructor(score: ScoreConfig, options: TuttiRuntimeOptions = {}) {
     this._score = score;
     this.events = new EventBus();
     this._sessions = TuttiRuntime.createStore(score);
@@ -33,6 +43,7 @@ export class TuttiRuntime {
       this.semanticMemory,
       score.hooks,
       this.toolCache,
+      options.checkpointStore,
     );
 
     if (score.telemetry) {
@@ -46,12 +57,21 @@ export class TuttiRuntime {
    * Create a runtime with async initialization (required for Postgres).
    * Prefer this over `new TuttiRuntime()` when using a database-backed store.
    */
-  static async create(score: ScoreConfig): Promise<TuttiRuntime> {
-    const runtime = new TuttiRuntime(score);
+  static async create(
+    score: ScoreConfig,
+    options: TuttiRuntimeOptions = {},
+  ): Promise<TuttiRuntime> {
+    const runtime = new TuttiRuntime(score, options);
     if (runtime._sessions instanceof PostgresSessionStore) {
       await runtime._sessions.initialize();
     }
     return runtime;
+  }
+
+  /** Underlying session store — exposed so CLI flows like `resume` can seed
+   *  a session by the id stored in a checkpoint before calling `run()`. */
+  get sessions(): SessionStore {
+    return this._sessions;
   }
 
   private static createStore(score: ScoreConfig): SessionStore {
