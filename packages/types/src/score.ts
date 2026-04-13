@@ -18,14 +18,29 @@ export interface TelemetryConfig {
   headers?: Record<string, string>;
 }
 
+/**
+ * Declarative parallel entry — when set as `ScoreConfig.entry`, calling
+ * `AgentRouter.run(input)` fans the input out to every listed agent
+ * simultaneously instead of routing through a single orchestrator.
+ */
+export interface ParallelEntryConfig {
+  type: "parallel";
+  /** Agent IDs to run simultaneously. Must all exist in `agents`. */
+  agents: string[];
+}
+
 export interface ScoreConfig {
   name?: string;
   description?: string;
   agents: Record<string, AgentConfig>;
   provider: LLMProvider;
   default_model?: string;
-  /** Which agent is the entry point (default: "orchestrator"). */
-  entry?: string;
+  /**
+   * Entry point for `AgentRouter.run()`. Either the ID of a single
+   * orchestrator agent (default: `"orchestrator"`), or a `ParallelEntryConfig`
+   * that fans the input out to several agents simultaneously.
+   */
+  entry?: string | ParallelEntryConfig;
   /** Session storage configuration (default: in-memory). */
   memory?: MemoryConfig;
   /** OpenTelemetry tracing configuration. */

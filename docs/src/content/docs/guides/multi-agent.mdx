@@ -109,3 +109,55 @@ Give each specialist a clear, focused system prompt. The orchestrator works best
 :::caution
 Each delegation is a separate agent run with its own token usage. Set `budget` on specialists to prevent runaway costs.
 :::
+
+## Parallel fan-out
+
+When you want multiple agents to look at the same input **simultaneously** (e.g. a bull analyst and a bear analyst, or several reviewers), use parallel execution instead of sequential delegation.
+
+### Declarative parallel entry
+
+Set `entry` to a `ParallelEntryConfig` and `router.run(input)` will fan the input out to every listed agent at once, returning a merged `AgentResult`:
+
+```ts title="tutti.score.ts"
+export default defineScore({
+  provider: new AnthropicProvider(),
+  entry: { type: "parallel", agents: ["bull", "bear"] },
+  agents: {
+    bull: { name: "Bull", system_prompt: "...", voices: [] },
+    bear: { name: "Bear", system_prompt: "...", voices: [] },
+  },
+});
+```
+
+### Programmatic `runParallel()`
+
+For per-agent inputs, timeouts, and rich rollup metrics, call `runParallel` directly:
+
+```ts
+const router = new AgentRouter(score);
+
+const results = await router.runParallel(
+  [
+    { agent_id: "bull", input: "AAPL at current valuation" },
+    { agent_id: "bear", input: "AAPL at current valuation" },
+  ],
+  { timeout_ms: 30_000 },
+);
+
+for (const [agentId, result] of results) {
+  console.log(`${agentId}: ${result.output}`);
+}
+```
+
+- All agents start at once via `Promise.all`; each gets its own session.
+- If one agent fails, the others still complete — the failure is surfaced as a synthetic `[error]` result in the returned map (so callers can see which agent broke).
+- `timeout_ms` caps wall-clock time for any single agent and cancels stragglers.
+
+For the full aggregate (merged output + total usage + total cost + duration) use `runParallelWithSummary`, which returns a `ParallelAgentResult`.
+
+### Parallel events
+
+| Event | Fields | When |
+| ----- | ------ | ---- |
+| `parallel:start` | `agents` | Before the batch dispatches |
+| `parallel:complete` | `results` (agent IDs that succeeded) | After every agent has settled |

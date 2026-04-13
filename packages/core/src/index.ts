@@ -99,10 +99,12 @@ export type {
   AgentMemoryConfig,
   AgentConfig,
   AgentResult,
+  ParallelAgentResult,
   // Score
   MemoryConfig,
   TelemetryConfig,
   ScoreConfig,
+  ParallelEntryConfig,
   // Session
   Session,
   SessionStore,

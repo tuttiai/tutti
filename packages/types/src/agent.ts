@@ -53,3 +53,21 @@ export interface AgentResult {
   turns: number;
   usage: TokenUsage;
 }
+
+/**
+ * Aggregate result returned when several agents are run simultaneously via
+ * `AgentRouter.runParallel()` (or when a score's `entry` is a parallel
+ * configuration). Contains each agent's individual result plus rollup metrics.
+ */
+export interface ParallelAgentResult {
+  /** Individual results, keyed by agent_id. */
+  results: Map<string, AgentResult>;
+  /** Concatenated outputs with `[agent_id]` labels for quick display. */
+  merged_output: string;
+  /** Sum of token usage across every agent that completed. */
+  total_usage: TokenUsage;
+  /** Estimated total cost in USD across every agent that completed. */
+  total_cost_usd: number;
+  /** Wall-clock duration of the parallel batch, in milliseconds. */
+  duration_ms: number;
+}

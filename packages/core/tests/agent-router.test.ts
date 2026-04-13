@@ -5,7 +5,13 @@ import {
   textResponse,
   toolUseResponse,
 } from "./helpers/mock-provider.js";
-import type { ScoreConfig, TuttiEvent } from "@tuttiai/types";
+import type {
+  ChatRequest,
+  LLMProvider,
+  ScoreConfig,
+  StreamChunk,
+  TuttiEvent,
+} from "@tuttiai/types";
 
 function createRoutingScore(
   responses: ReturnType<typeof textResponse>[],
@@ -219,6 +225,295 @@ describe("AgentRouter", () => {
 
     expect(events).toContain("agent:start");
     expect(events).toContain("agent:end");
+  });
+
+  // ==========================================================================
+  // Parallel execution
+  // ==========================================================================
+
+  /** Provider whose chat() delays, and can be steered per-agent via system prompt. */
+  function createDelayedProvider(
+    routes: { match: string; behavior: "ok" | "fail" | "slow" }[],
+    opts: { baseDelayMs?: number; slowDelayMs?: number } = {},
+  ): LLMProvider {
+    const baseDelay = opts.baseDelayMs ?? 60;
+    const slowDelay = opts.slowDelayMs ?? 400;
+    return {
+      chat: vi.fn(async (req: ChatRequest) => {
+        const route = routes.find((r) =>
+          (req.system ?? "").includes(r.match),
+        );
+        if (route?.behavior === "fail") {
+          await new Promise((r) => setTimeout(r, baseDelay));
+          throw new Error(`[${route.match}] LLM exploded`);
+        }
+        const delay = route?.behavior === "slow" ? slowDelay : baseDelay;
+        await new Promise((r) => setTimeout(r, delay));
+        return textResponse(`[${route?.match ?? "unknown"}] ok`);
+      }),
+      async *stream(): AsyncIterable<StreamChunk> {
+        yield { type: "text", text: "stub" } as StreamChunk;
+      },
+    };
+  }
+
+  function createParallelScore(
+    provider: LLMProvider,
+    agentIds: string[],
+  ): ScoreConfig {
+    const agents: ScoreConfig["agents"] = {};
+    for (const id of agentIds) {
+      agents[id] = {
+        name: id,
+        // system_prompt carries the route tag so the mock provider can identify callers.
+        system_prompt: `tag:${id}`,
+        voices: [],
+      };
+    }
+    return {
+      provider,
+      agents,
+      entry: { type: "parallel", agents: agentIds },
+    };
+  }
+
+  describe("runParallel", () => {
+    it("runs agents concurrently (verified via wall-clock timing)", async () => {
+      const DELAY = 80;
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:a", behavior: "ok" },
+          { match: "tag:b", behavior: "ok" },
+          { match: "tag:c", behavior: "ok" },
+        ],
+        { baseDelayMs: DELAY },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["a", "b", "c"]),
+      );
+
+      const start = Date.now();
+      const results = await router.runParallel([
+        { agent_id: "a", input: "x" },
+        { agent_id: "b", input: "x" },
+        { agent_id: "c", input: "x" },
+      ]);
+      const duration = Date.now() - start;
+
+      expect(results.size).toBe(3);
+      expect(results.get("a")?.output).toBe("[tag:a] ok");
+      expect(results.get("b")?.output).toBe("[tag:b] ok");
+      expect(results.get("c")?.output).toBe("[tag:c] ok");
+
+      // Sequential would take >= 3*DELAY = 240ms. Parallel should be < 2*DELAY.
+      // Leave generous slack for CI to avoid flakes.
+      expect(duration).toBeLessThan(DELAY * 2);
+    });
+
+    it("one failure does not block the other agents", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:good", behavior: "ok" },
+          { match: "tag:bad", behavior: "fail" },
+          { match: "tag:also_good", behavior: "ok" },
+        ],
+        { baseDelayMs: 30 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["good", "bad", "also_good"]),
+      );
+
+      const results = await router.runParallel([
+        { agent_id: "good", input: "x" },
+        { agent_id: "bad", input: "x" },
+        { agent_id: "also_good", input: "x" },
+      ]);
+
+      expect(results.size).toBe(3);
+      expect(results.get("good")?.output).toBe("[tag:good] ok");
+      expect(results.get("also_good")?.output).toBe("[tag:also_good] ok");
+      expect(results.get("bad")?.output).toContain("[error]");
+      expect(results.get("bad")?.output).toContain("LLM exploded");
+    });
+
+    it("timeout_ms kills any agent that takes too long", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:fast", behavior: "ok" },
+          { match: "tag:slow", behavior: "slow" },
+        ],
+        { baseDelayMs: 20, slowDelayMs: 500 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["fast", "slow"]),
+      );
+
+      const start = Date.now();
+      const results = await router.runParallel(
+        [
+          { agent_id: "fast", input: "x" },
+          { agent_id: "slow", input: "x" },
+        ],
+        { timeout_ms: 80 },
+      );
+      const duration = Date.now() - start;
+
+      expect(results.get("fast")?.output).toBe("[tag:fast] ok");
+      expect(results.get("slow")?.output).toContain("[error]");
+      expect(results.get("slow")?.output).toMatch(/timeout/i);
+      // We should NOT wait out the slow agent's full 500ms delay.
+      expect(duration).toBeLessThan(300);
+    });
+
+    it("emits parallel:start and parallel:complete events", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:a", behavior: "ok" },
+          { match: "tag:b", behavior: "ok" },
+        ],
+        { baseDelayMs: 10 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["a", "b"]),
+      );
+
+      const events: TuttiEvent[] = [];
+      router.events.on("parallel:start", (e) => events.push(e));
+      router.events.on("parallel:complete", (e) => events.push(e));
+
+      await router.runParallel([
+        { agent_id: "a", input: "x" },
+        { agent_id: "b", input: "x" },
+      ]);
+
+      expect(events).toHaveLength(2);
+      expect(events[0].type).toBe("parallel:start");
+      expect((events[0] as Extract<TuttiEvent, { type: "parallel:start" }>).agents)
+        .toEqual(["a", "b"]);
+      expect(events[1].type).toBe("parallel:complete");
+      expect((events[1] as Extract<TuttiEvent, { type: "parallel:complete" }>).results)
+        .toEqual(["a", "b"]);
+    });
+
+    it("gives each agent its own session (no shared session_id)", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:a", behavior: "ok" },
+          { match: "tag:b", behavior: "ok" },
+        ],
+        { baseDelayMs: 10 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["a", "b"]),
+      );
+
+      const results = await router.runParallel([
+        { agent_id: "a", input: "x" },
+        { agent_id: "b", input: "x" },
+      ]);
+
+      const sa = results.get("a")?.session_id;
+      const sb = results.get("b")?.session_id;
+      expect(sa).toBeTruthy();
+      expect(sb).toBeTruthy();
+      expect(sa).not.toBe(sb);
+    });
+
+    it("rejects when an input references an unknown agent", async () => {
+      const provider = createDelayedProvider(
+        [{ match: "tag:a", behavior: "ok" }],
+        { baseDelayMs: 5 },
+      );
+      const router = new AgentRouter(createParallelScore(provider, ["a"]));
+
+      await expect(
+        router.runParallel([{ agent_id: "ghost", input: "x" }]),
+      ).rejects.toThrow(/unknown agent "ghost"/);
+    });
+
+    it("rejects when inputs is empty", async () => {
+      const provider = createDelayedProvider(
+        [{ match: "tag:a", behavior: "ok" }],
+        { baseDelayMs: 5 },
+      );
+      const router = new AgentRouter(createParallelScore(provider, ["a"]));
+      await expect(router.runParallel([])).rejects.toThrow(
+        /at least one input/,
+      );
+    });
+  });
+
+  describe("parallel entry config", () => {
+    it("constructor accepts { type: 'parallel' } entry without delegates", () => {
+      const provider = createDelayedProvider(
+        [{ match: "tag:a", behavior: "ok" }],
+        { baseDelayMs: 5 },
+      );
+      expect(
+        () => new AgentRouter(createParallelScore(provider, ["a"])),
+      ).not.toThrow();
+    });
+
+    it("run() with parallel entry fans input out and returns merged AgentResult", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:a", behavior: "ok" },
+          { match: "tag:b", behavior: "ok" },
+        ],
+        { baseDelayMs: 20 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["a", "b"]),
+      );
+
+      const result = await router.run("question");
+
+      expect(result.output).toContain("[a]");
+      expect(result.output).toContain("[b]");
+      // Merged usage is the sum of both agents
+      expect(result.usage.input_tokens).toBe(20); // 10 + 10 from textResponse
+      expect(result.usage.output_tokens).toBe(10); // 5 + 5
+    });
+
+    it("parallel entry rejects unknown agents at construction time", () => {
+      const provider = createDelayedProvider(
+        [{ match: "tag:a", behavior: "ok" }],
+        { baseDelayMs: 5 },
+      );
+      const score: ScoreConfig = {
+        provider,
+        agents: {
+          a: { name: "A", system_prompt: "tag:a", voices: [] },
+        },
+        entry: { type: "parallel", agents: ["a", "ghost"] },
+      };
+      expect(() => new AgentRouter(score)).toThrow(/"ghost" not found/);
+    });
+
+    it("runParallelWithSummary returns rollup metrics", async () => {
+      const provider = createDelayedProvider(
+        [
+          { match: "tag:a", behavior: "ok" },
+          { match: "tag:b", behavior: "ok" },
+        ],
+        { baseDelayMs: 15 },
+      );
+      const router = new AgentRouter(
+        createParallelScore(provider, ["a", "b"]),
+      );
+
+      const summary = await router.runParallelWithSummary([
+        { agent_id: "a", input: "x" },
+        { agent_id: "b", input: "x" },
+      ]);
+
+      expect(summary.results.size).toBe(2);
+      expect(summary.merged_output).toContain("[a]");
+      expect(summary.merged_output).toContain("[b]");
+      expect(summary.total_usage.input_tokens).toBeGreaterThan(0);
+      expect(summary.total_cost_usd).toBeGreaterThan(0);
+      expect(summary.duration_ms).toBeGreaterThanOrEqual(0);
+    });
   });
 
   it("defaults entry to 'orchestrator' when not specified", async () => {

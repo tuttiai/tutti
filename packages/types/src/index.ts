@@ -28,12 +28,14 @@ export type {
   AgentMemoryConfig,
   AgentConfig,
   AgentResult,
+  ParallelAgentResult,
 } from "./agent.js";
 
 export type {
   MemoryConfig,
   TelemetryConfig,
   ScoreConfig,
+  ParallelEntryConfig,
 } from "./score.js";
 
 export type {

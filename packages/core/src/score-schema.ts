@@ -53,6 +53,17 @@ const TelemetrySchema = z
   })
   .strict();
 
+const ParallelEntrySchema = z
+  .object({
+    type: z.literal("parallel"),
+    agents: z
+      .array(z.string())
+      .min(1, "Parallel entry requires at least one agent"),
+  })
+  .strict();
+
+const EntrySchema = z.union([z.string(), ParallelEntrySchema]);
+
 const ScoreSchema = z
   .object({
     provider: z
@@ -68,7 +79,7 @@ const ScoreSchema = z
     name: z.string().optional(),
     description: z.string().optional(),
     default_model: z.string().optional(),
-    entry: z.string().optional(),
+    entry: EntrySchema.optional(),
     telemetry: TelemetrySchema.optional(),
   })
   .passthrough();
@@ -107,11 +118,25 @@ export function validateScore(config: unknown): void {
     }
   }
 
-  // Cross-field: entry must reference an existing agent
-  if (data.entry && !agentKeys.includes(data.entry)) {
-    throw new ScoreValidationError(
-      `Invalid score file:\n  - entry: references unknown agent "${data.entry}". Available: ${agentKeys.join(", ")}`,
-      { field: "entry", value: data.entry },
-    );
+  // Cross-field: entry must reference existing agent(s)
+  if (data.entry) {
+    if (typeof data.entry === "string") {
+      if (!agentKeys.includes(data.entry)) {
+        throw new ScoreValidationError(
+          `Invalid score file:\n  - entry: references unknown agent "${data.entry}". Available: ${agentKeys.join(", ")}`,
+          { field: "entry", value: data.entry },
+        );
+      }
+    } else {
+      // Parallel entry
+      for (const id of data.entry.agents) {
+        if (!agentKeys.includes(id)) {
+          throw new ScoreValidationError(
+            `Invalid score file:\n  - entry.agents: references unknown agent "${id}". Available: ${agentKeys.join(", ")}`,
+            { field: "entry.agents", value: id },
+          );
+        }
+      }
+    }
   }
 }
