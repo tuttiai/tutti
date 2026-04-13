@@ -30,7 +30,7 @@ const program = new Command();
 program
   .name("tutti-ai")
   .description("Tutti — multi-agent orchestration. All agents. All together.")
-  .version("0.8.0");
+  .version("0.9.0");
 
 program
   .command("init [project-name]")

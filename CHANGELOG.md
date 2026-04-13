@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/core@0.11.0` and `@tuttiai/cli@0.9.0` (durable execution)
+
+**Core**
+- Add durable execution with checkpoint persistence via Redis and PostgreSQL.
+- `CheckpointStore` interface with `save` / `loadLatest` / `load` / `delete` / `list`, plus three implementations:
+  - `MemoryCheckpointStore` (test-only — nested Map with structuredClone on save/load).
+  - `RedisCheckpointStore` (ioredis 5.10.1; `tutti:checkpoint:{session_id}:{turn}` + `:latest` pointer; pipeline-based save with `EX` TTL; `SCAN` for list/delete; per-command error checking on `pipeline.exec`).
+  - `PostgresCheckpointStore` (pg 8.20.0; lazy `CREATE EXTENSION` not needed — uses a plain JSONB column; auto-creates `tutti_checkpoints` + session/expires indexes on first use; transactional UPSERT with global-expiry sweep and per-session trim to the 10 most-recent turns).
+- `createCheckpointStore(config: AgentDurableConfig)` factory dispatching on `config.store`, reading `TUTTI_REDIS_URL` / `TUTTI_PG_URL` via `SecretsManager.optional`.
+- `AgentConfig.durable?: boolean | AgentDurableConfig` — per-agent opt-in. `AgentDurableConfig` carries `{ store: "redis" | "postgres" | "memory", ttl?: number }` (default 604800 s = 7 days). Exported from `@tuttiai/types`.
+- `AgentRunner` integration: on entry, if `durable` is truthy and `loadLatest` returns a mid-cycle checkpoint (`state.awaiting_tool_results === true`), restore messages + turn counter + token usage and emit `checkpoint:restored`. At the bottom of the tool-use branch, build a `Checkpoint` and `save()` it; emit `checkpoint:saved`. Save failures log at error but don't abort the run — durability is best-effort per turn. A narrow try/catch around the agentic loop logs the last checkpointed turn on crash, then rethrows.
+- `TuttiRuntime` constructor now accepts an optional `TuttiRuntimeOptions { checkpointStore? }` as a second argument (backwards-compatible — `new TuttiRuntime(score)` still works). New `runtime.sessions` getter for id-specific session seeding. `InMemorySessionStore` gains a non-interface `save(session)` method for the same reason.
+- Two new `TuttiEvent` variants: `checkpoint:saved` and `checkpoint:restored`, both `{ session_id, turn }`.
+- Tests: 18 unit tests for `MemoryCheckpointStore`, 6 factory unit tests, 7 Redis integration + 9 Postgres integration (`describe.skip` without `TUTTI_REDIS_URL` / `TUTTI_PG_URL`), plus constructor-level unit tests that always run. 1 new end-to-end integration test exercising crash-and-resume through the `AgentRunner`. Full core suite: 285 passing / 14 skipped.
+
+**CLI**
+- Add `tutti-ai resume <session-id>` command for resuming crashed sessions.
+- Options: `--store redis|postgres` (default `redis`), `-s/--score`, `-a/--agent`, `-y/--yes`.
+- Flow: load the score, validate API keys, resolve the target agent (explicit → `score.entry` → first key), load the checkpoint via `createCheckpointStore`, print a summary (session_id, last turn, timestamp, first 3 messages), prompt `Resume from turn N? (y/n)`, then hand off to `TuttiRuntime` (with the checkpoint store attached and the session pre-seeded) which triggers the `AgentRunner` resume path.
+- Progress UX mirrors `run` plus two new lines on `checkpoint:restored` and `checkpoint:saved` events.
+- README updated with env setup, full flag table, and a crash-and-resume walkthrough.
+
+**Dependencies**
+- New: `ioredis@5.10.1` (exact-pinned as a DB client per the security policy).
+
 ### Added — `@tuttiai/rag@0.1.0` (new voice)
 - Add RAG voice with document ingestion, semantic search, hybrid search, and HyDE query expansion.
 - Document ingestion from local paths, HTTP(S) URLs, and GitHub blob URLs (with PDF, Markdown, and plain-text parsers; SSRF-guarded network I/O).
