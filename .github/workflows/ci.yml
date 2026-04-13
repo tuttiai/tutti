@@ -31,7 +31,9 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Test with coverage
-        run: npm run test:ci -- --exclude 'voices/playwright/tests/**'
+        # Skip @tuttiai/playwright entirely — tests require a real browser
+        # (install via `npx playwright install chromium` in a dedicated job)
+        run: npx turbo run test --filter=!@tuttiai/playwright -- --coverage --reporter=verbose
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
