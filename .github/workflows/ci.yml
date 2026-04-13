@@ -38,7 +38,9 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: packages/core/coverage/lcov.info,packages/cli/coverage/lcov.info
-          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          # Reporting step — don't block CI if upload fails (e.g., no token configured)
+          fail_ci_if_error: false
 
   typecheck:
     runs-on: ubuntu-latest
