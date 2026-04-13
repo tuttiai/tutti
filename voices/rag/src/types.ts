@@ -1,6 +1,7 @@
 /** Public types for the RAG voice. */
 
 import type { EmbeddingConfig } from "./embeddings/types.js";
+import type { VectorStoreConfig } from "./stores/types.js";
 
 /**
  * Chunking strategies supported by the ingestion pipeline.
@@ -79,6 +80,8 @@ export interface RagConfig {
   collection: string;
   /** Embedding provider configuration. Consumed by `createEmbeddingProvider`. */
   embeddings?: EmbeddingConfig;
+  /** Vector store configuration. Consumed by `createVectorStore`. */
+  storage?: VectorStoreConfig;
   /** Default top-K returned by `search_knowledge` if not specified per call. */
   default_top_k?: number;
   /** Maximum number of characters per chunk during ingestion. */

@@ -28,6 +28,16 @@ export {
   type AnthropicEmbeddingConfig,
   type LocalEmbeddingConfig,
 } from "./embeddings/index.js";
+export {
+  createVectorStore,
+  MemoryVectorStore,
+  PgVectorStore,
+  type VectorStore,
+  type EmbeddedChunk,
+  type VectorStoreConfig,
+  type MemoryStoreConfig,
+  type PgVectorStoreConfig,
+} from "./stores/index.js";
 
 export {
   createIngestDocumentTool,
