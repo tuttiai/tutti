@@ -38,6 +38,14 @@ export {
   type MemoryStoreConfig,
   type PgVectorStoreConfig,
 } from "./stores/index.js";
+export {
+  SearchEngine,
+  type SearchOptions,
+  type SearchEngineConfig,
+  type SearchEngineDeps,
+  type LlmFn,
+} from "./search.js";
+export { KeywordIndex } from "./keyword-index.js";
 
 export {
   createIngestDocumentTool,
