@@ -210,16 +210,31 @@ describe("EventBus", () => {
       const bus = new EventBus();
       bus.on("agent:start", () => Promise.reject(new Error("async boom")));
 
-      bus.emit({
-        type: "agent:start",
-        agent_name: "test",
-        session_id: "s1",
-      });
+      // Actively collect any unhandledRejection the process observes
+      // during this test. If EventBus's isolation works, the list stays
+      // empty; if it regresses, Node will fire the event and we fail
+      // with a meaningful diff rather than a bare `expect(true)`.
+      const unhandled: unknown[] = [];
+      const listener = (reason: unknown): void => {
+        unhandled.push(reason);
+      };
+      process.on("unhandledRejection", listener);
 
-      // Yield to let the microtask queue drain; if unhandled, Node would warn.
-      await new Promise((r) => setImmediate(r));
-      // Reaching here without an unhandled-rejection is the pass condition.
-      expect(true).toBe(true);
+      try {
+        bus.emit({
+          type: "agent:start",
+          agent_name: "test",
+          session_id: "s1",
+        });
+        // Two microtask drains: first for the handler's rejection, second
+        // for whatever catch handler EventBus installed on it.
+        await new Promise((r) => setImmediate(r));
+        await new Promise((r) => setImmediate(r));
+
+        expect(unhandled).toEqual([]);
+      } finally {
+        process.off("unhandledRejection", listener);
+      }
     });
   });
 });

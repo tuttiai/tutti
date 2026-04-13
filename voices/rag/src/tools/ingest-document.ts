@@ -117,16 +117,9 @@ export function createIngestDocumentTool(
 
         const embedded: EmbeddedChunk[] = [];
         for (const [i, c] of chunks.entries()) {
-          // Direct numeric indexing — `i` is a non-negative counter from
-          // Array.prototype.entries() and the length guard above makes
-          // this position present. `.at(i)` was a previous iteration but
-          // accepts negative indices and muddies the invariant; plain
-          // `[i]` is the exact contract. The eslint-disable is for
-          // security/detect-object-injection which false-positives on
-          // any non-literal numeric indexing.
+          // Bounded numeric index — length guard above ensures this is in range.
           // eslint-disable-next-line security/detect-object-injection
           const vector = vectors[i];
-          if (!vector) continue; // unreachable after the length guard above.
           embedded.push({
             ...c,
             vector,
