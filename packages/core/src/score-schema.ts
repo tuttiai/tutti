@@ -26,6 +26,14 @@ const BudgetSchema = z
   })
   .strict();
 
+const CacheSchema = z
+  .object({
+    enabled: z.boolean(),
+    ttl_ms: z.number().int().positive("cache.ttl_ms must be a positive number").optional(),
+    excluded_tools: z.array(z.string()).optional(),
+  })
+  .strict();
+
 const AgentSchema = z
   .object({
     name: z.string().min(1, "Agent name cannot be empty"),
@@ -42,6 +50,7 @@ const AgentSchema = z
     allow_human_input: z.boolean().optional(),
     delegates: z.array(z.string()).optional(),
     role: z.enum(["orchestrator", "specialist"]).optional(),
+    cache: CacheSchema.optional(),
   })
   .passthrough();
 

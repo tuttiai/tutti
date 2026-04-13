@@ -5,6 +5,8 @@ import { InMemorySessionStore } from "./session-store.js";
 import { PostgresSessionStore } from "./memory/postgres.js";
 import { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
+import type { ToolCache } from "./cache/tool-cache.js";
+import { InMemoryToolCache } from "./cache/in-memory-cache.js";
 import { PermissionGuard } from "./permission-guard.js";
 import { logger } from "./logger.js";
 import { AgentNotFoundError, ScoreValidationError } from "./errors.js";
@@ -13,6 +15,7 @@ import { initTelemetry } from "./telemetry-setup.js";
 export class TuttiRuntime {
   readonly events: EventBus;
   readonly semanticMemory: SemanticMemoryStore;
+  readonly toolCache: ToolCache;
   private _sessions: SessionStore;
   private _runner: AgentRunner;
   private _score: ScoreConfig;
@@ -22,12 +25,14 @@ export class TuttiRuntime {
     this.events = new EventBus();
     this._sessions = TuttiRuntime.createStore(score);
     this.semanticMemory = new InMemorySemanticStore();
+    this.toolCache = new InMemoryToolCache();
     this._runner = new AgentRunner(
       score.provider,
       this.events,
       this._sessions,
       this.semanticMemory,
       score.hooks,
+      this.toolCache,
     );
 
     if (score.telemetry) {

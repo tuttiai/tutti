@@ -21,6 +21,25 @@ export interface AgentMemoryConfig {
   inject_system?: boolean;
 }
 
+/**
+ * Per-agent tool result cache configuration.
+ *
+ * When `enabled`, repeated tool calls with the same input within `ttl_ms`
+ * are served from cache and emit a `cache:hit` event. Known write /
+ * side-effect tools (write_file, delete_file, move_file, create_issue,
+ * comment_on_issue) are always excluded regardless of this setting;
+ * callers can add more via `excluded_tools`. Errored results
+ * (`is_error: true`) are never cached, so transient failures don't get
+ * pinned.
+ */
+export interface AgentCacheConfig {
+  enabled: boolean;
+  /** Per-agent TTL override in milliseconds. Falls back to the cache default (5 min). */
+  ttl_ms?: number;
+  /** Tool names to exclude in addition to the built-in write-tool list. */
+  excluded_tools?: string[];
+}
+
 export interface AgentConfig {
   name: string;
   description?: string;
@@ -44,6 +63,8 @@ export interface AgentConfig {
   role?: "orchestrator" | "specialist";
   /** Agent-level lifecycle hooks — merged with global hooks from ScoreConfig. */
   hooks?: TuttiHooks;
+  /** Tool result cache — serves repeated identical tool calls from memory. */
+  cache?: AgentCacheConfig;
 }
 
 export interface AgentResult {

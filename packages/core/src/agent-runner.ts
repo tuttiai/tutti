@@ -24,6 +24,8 @@ import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
+import type { ToolCache } from "./cache/tool-cache.js";
+import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { logger } from "./logger.js";
 import { TuttiTracer } from "./telemetry.js";
 import { ToolTimeoutError, ProviderError, RateLimitError } from "./errors.js";
@@ -69,6 +71,7 @@ export class AgentRunner {
     private sessions: SessionStore,
     private semanticMemory?: SemanticMemoryStore,
     private globalHooks?: TuttiHooks,
+    private toolCache?: ToolCache,
   ) {}
 
   private async safeHook<T>(fn: (() => Promise<T> | T | undefined) | undefined): Promise<T | undefined> {
@@ -338,7 +341,15 @@ export class AgentRunner {
 
         const toolResults: ToolResultBlock[] = await Promise.all(
           toolUseBlocks.map((block) =>
-            this.executeTool(allTools, block, toolContext, toolTimeoutMs, hookCtx, agentHooks),
+            this.executeTool(
+              allTools,
+              block,
+              toolContext,
+              toolTimeoutMs,
+              hookCtx,
+              agentHooks,
+              agent.cache,
+            ),
           ),
         );
 
@@ -489,6 +500,7 @@ export class AgentRunner {
     timeoutMs: number,
     hookCtx?: HookContext,
     agentHooks?: TuttiHooks,
+    cacheCfg?: { enabled: boolean; ttl_ms?: number; excluded_tools?: string[] },
   ): Promise<ToolResultBlock> {
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
@@ -501,6 +513,8 @@ export class AgentRunner {
       };
     }
 
+    // Cache lookup happens inside the tracer span so cache hits still show
+    // up in traces as zero-cost tool calls.
     return TuttiTracer.toolCall(block.name, async () => {
       // beforeToolCall hooks — return false to block, or modified input
       if (hookCtx) {
@@ -523,14 +537,65 @@ export class AgentRunner {
         input: block.input,
       });
 
+      // Decide whether the cache can participate for this call:
+      // - cache must be attached to the runtime AND enabled on the agent
+      // - tool must not appear in the built-in write-tool list
+      // - tool must not appear in the agent's custom excluded_tools list
+      const cacheable =
+        !!this.toolCache &&
+        !!cacheCfg?.enabled &&
+        !DEFAULT_WRITE_TOOLS.includes(block.name) &&
+        !(cacheCfg.excluded_tools ?? []).includes(block.name);
+
       try {
         // Validate input with Zod
         const parsed = tool.parameters.parse(block.input);
+
+        // Cache lookup on the parsed input so semantically-equal inputs hit.
+        if (cacheable && this.toolCache) {
+          const cached = await this.toolCache.get(block.name, parsed);
+          if (cached) {
+            this.events.emit({
+              type: "cache:hit",
+              agent_name: context.agent_name,
+              tool: block.name,
+            });
+            this.events.emit({
+              type: "tool:end",
+              agent_name: context.agent_name,
+              tool_name: block.name,
+              result: cached,
+            });
+            return {
+              type: "tool_result" as const,
+              tool_use_id: block.id,
+              content: PromptGuard.wrap(block.name, cached.content),
+              is_error: cached.is_error,
+            };
+          }
+          this.events.emit({
+            type: "cache:miss",
+            agent_name: context.agent_name,
+            tool: block.name,
+          });
+        }
+
         let result = await this.executeWithTimeout(
           () => tool.execute(parsed, context),
           timeoutMs,
           block.name,
         );
+
+        // Populate cache with the successful raw result. Skip error results
+        // so transient failures don't get pinned for minutes.
+        if (cacheable && this.toolCache && !result.is_error) {
+          await this.toolCache.set(
+            block.name,
+            parsed,
+            result,
+            cacheCfg?.ttl_ms,
+          );
+        }
 
         // afterToolCall hooks — may modify result
         if (hookCtx) {

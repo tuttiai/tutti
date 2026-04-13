@@ -63,6 +63,16 @@ export { PromptGuard } from "./prompt-guard.js";
 export { TokenBudget } from "./token-budget.js";
 export { validateScore } from "./score-schema.js";
 
+// Tool result cache
+export type { ToolCache } from "./cache/tool-cache.js";
+export {
+  InMemoryToolCache,
+  DEFAULT_CACHE_TTL_MS,
+  DEFAULT_CACHE_MAX_ENTRIES,
+} from "./cache/in-memory-cache.js";
+export type { InMemoryToolCacheOptions } from "./cache/in-memory-cache.js";
+export { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
+
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";
 export type { AnthropicProviderOptions } from "./providers/anthropic.js";
@@ -97,6 +107,7 @@ export type {
   // Agent
   BudgetConfig,
   AgentMemoryConfig,
+  AgentCacheConfig,
   AgentConfig,
   AgentResult,
   ParallelAgentResult,

@@ -1,0 +1,85 @@
+---
+title: "Tool Result Caching"
+description: "Skip repeated tool work with a TTL + LRU in-memory cache"
+sidebar:
+  order: 7
+---
+
+Tool result caching short-circuits identical tool calls — same tool, same input — within a TTL window. It's opt-in per agent and it's safe by default: known write / side-effect tools are never cached.
+
+## Quick start
+
+Enable caching by setting `cache` on any `AgentConfig`:
+
+```ts title="tutti.score.ts"
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    researcher: {
+      name: "Researcher",
+      system_prompt: "...",
+      voices: [new FilesystemVoice()],
+      cache: { enabled: true }, // 5-minute TTL by default
+    },
+  },
+});
+```
+
+The runtime attaches an `InMemoryToolCache` automatically. Subsequent identical calls to `read_file({ path: "README.md" })` return the cached `ToolResult` and emit `cache:hit` instead of re-executing the tool.
+
+## Configuration
+
+```ts
+cache: {
+  enabled: true,
+  // Per-agent TTL override (ms). Defaults to the cache's default: 5 minutes.
+  ttl_ms: 60_000,
+  // Tool names to exclude *in addition* to the built-in write-tool list.
+  excluded_tools: ["run_migration", "publish_release"],
+}
+```
+
+## What's never cached
+
+These rules apply regardless of configuration:
+
+- **Built-in write tools**: `write_file`, `delete_file`, `move_file`, `create_issue`, `comment_on_issue` — caching would stale-serve mutations.
+- **Errored results** (`is_error: true`) — pinning a transient failure for 5 minutes would be worse than retrying.
+
+The exclusion list is exported as `DEFAULT_WRITE_TOOLS`. Add your own via `cache.excluded_tools`.
+
+## Observability
+
+Two events fire around tool execution:
+
+| Event | Fields | When |
+| ----- | ------ | ---- |
+| `cache:hit` | `agent_name`, `tool` | Cached result returned; tool did NOT execute |
+| `cache:miss` | `agent_name`, `tool` | No cache entry (or TTL expired); tool executed and result stored |
+
+```ts
+runtime.events.on("cache:hit", (e) => {
+  metrics.increment(`tool.cache.hit`, { tool: e.tool, agent: e.agent_name });
+});
+```
+
+## Custom cache backends
+
+Implement the `ToolCache` interface to plug in Redis, Memcached, etc:
+
+```ts
+import type { ToolCache, ToolResult } from "@tuttiai/core";
+
+class RedisToolCache implements ToolCache {
+  async get(tool: string, input: unknown): Promise<ToolResult | null> { /* ... */ }
+  async set(tool: string, input: unknown, result: ToolResult, ttl_ms?: number) { /* ... */ }
+  async invalidate(tool: string, input?: unknown) { /* ... */ }
+  async clear() { /* ... */ }
+}
+```
+
+Keys are derived per-implementation — `InMemoryToolCache` uses `sha256(tool + '|' + JSON.stringify(input))`. Follow the same convention for cross-process consistency.
+
+:::caution
+Cache keys are derived from the *parsed* (post-Zod) tool input, so equivalent but differently-typed inputs (e.g. `{ path: "a" }` vs `{ path: "a", extra: undefined }`) may hash differently. Prefer canonical schemas.
+:::
