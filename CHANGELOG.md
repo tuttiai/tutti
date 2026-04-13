@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-04-13
+
+### Added — `@tuttiai/cli@0.10.0` (hot reload)
+- Add `--watch` / `-w` flag to `tutti-ai run` for hot reload on score file changes.
+- New `ReactiveScore` wrapper (chokidar-backed, 200ms debounce) watches the score file plus its parent directory tree (excluding `node_modules`, `dist`, dotfiles). ESM cache is bypassed per reload via `?t=<timestamp>` cache-busting.
+- Turn-boundary guarantee: reloads never interrupt a mid-tool-call. The REPL checks `reactive.pendingReload` at the top of each loop iteration and swaps the runtime only between turns.
+- Session continuity: conversation `session_id` survives reloads — the REPL builds an `InMemorySessionStore` up front and reuses it across runtime swaps via the new `TuttiRuntimeOptions.sessionStore` override.
+- Syntax-error recovery: a failed reload leaves `reactive.current` pointing at the last-known-good score, logs the error, and the REPL keeps running.
+- Scope trade-offs documented in the README: directory-tree watch (not a resolved import graph — follow-up), full runtime rebuild on any change (in-runtime caches reset; conversation history survives via the shared session store).
+- Adds `chokidar@5.0.0` as an exact-pinned CLI dependency.
+
 ### Added — `@tuttiai/core@0.11.0` and `@tuttiai/cli@0.9.0` (durable execution)
 
 **Core**
@@ -49,6 +60,14 @@
 - Registered `guides/tool-caching` in the Starlight sidebar (was unreachable via nav).
 - `api/overview.mdx` — `AgentRouter.runParallel` / `runParallelWithSummary` signatures, `ParallelAgentResult` / `ToolCache` / `AgentCacheConfig` / `ParallelEntryConfig` types, and the `TuttiRuntime.toolCache` field.
 - `getting-started/core-concepts.mdx` — all v0.17 events (`cache:*`, `parallel:*`, `hitl:*`), a Tool Result Caching section, and a Parallel Execution section.
+
+### Published
+- `@tuttiai/core@0.11.0` — durable execution (Redis + Postgres checkpoint stores, `AgentRunner` integration, `TuttiRuntimeOptions`, checkpoint events).
+- `@tuttiai/cli@0.10.0` — `tutti-ai resume <session-id>` + `--watch` / `-w` hot reload.
+- `@tuttiai/rag@0.1.0` — new voice: ingestion, semantic + BM25 hybrid search with RRF fusion, optional HyDE, pgvector backend.
+
+### Not republished
+- `@tuttiai/types` — `AgentDurableConfig`, `AgentConfig.durable`, and the `checkpoint:saved` / `checkpoint:restored` event variants were added to the types package but no new version was cut. `@tuttiai/core@0.11.0` bundles these declarations inline via `tsup`'s DTS pipeline, so consumers importing from `@tuttiai/core` see the new shape correctly. Users importing directly from `@tuttiai/types` will see the v0.7.0 shape until a `0.8.0` republish lands.
 
 ## [0.17.0] - 2026-04-13
 
