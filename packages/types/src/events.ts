@@ -25,7 +25,9 @@ export type TuttiEvent =
   | { type: "token:stream"; agent_name: string; text: string }
   | { type: "hitl:requested"; agent_name: string; session_id: string; question: string; options?: string[] }
   | { type: "hitl:answered"; agent_name: string; session_id: string; answer: string }
-  | { type: "hitl:timeout"; agent_name: string; session_id: string };
+  | { type: "hitl:timeout"; agent_name: string; session_id: string }
+  | { type: "checkpoint:saved"; session_id: string; turn: number }
+  | { type: "checkpoint:restored"; session_id: string; turn: number };
 
 export type TuttiEventType = TuttiEvent["type"];
 

@@ -19,6 +19,7 @@ import type {
   TokenUsage,
   TuttiHooks,
 } from "@tuttiai/types";
+import type { Checkpoint, CheckpointStore } from "./checkpoint/index.js";
 import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
@@ -72,6 +73,7 @@ export class AgentRunner {
     private semanticMemory?: SemanticMemoryStore,
     private globalHooks?: TuttiHooks,
     private toolCache?: ToolCache,
+    private checkpointStore?: CheckpointStore,
   ) {}
 
   private async safeHook<T>(fn: (() => Promise<T> | T | undefined) | undefined): Promise<T | undefined> {
@@ -150,21 +152,58 @@ export class AgentRunner {
 
       const toolDefs = allTools.map(toolToDefinition);
 
-      // Add user message
-      const messages: ChatMessage[] = [
-        ...session.messages,
-        { role: "user", content: input },
-      ];
+      // Durable-checkpoint resume: if the agent opted in and a checkpoint
+      // exists for this session, splice its state back in before we build
+      // the message list. Only `awaiting_tool_results=true` checkpoints are
+      // safe to resume automatically — they sit at a mid-cycle boundary
+      // where the LLM's next move is to consume the tool_results already
+      // in the message list. End-of-turn checkpoints aren't saved (the
+      // run exits cleanly), so we don't need to handle that branch.
+      const durableEnabled = agent.durable !== undefined && agent.durable !== false;
+      const checkpoint =
+        durableEnabled && this.checkpointStore
+          ? await this.checkpointStore.loadLatest(session.id)
+          : null;
+      const resuming = !!checkpoint && checkpoint.state.awaiting_tool_results === true;
+
+      const messages: ChatMessage[] = resuming && checkpoint
+        ? [...checkpoint.messages]
+        : [...session.messages, { role: "user", content: input }];
 
       const maxTurns = agent.max_turns ?? DEFAULT_MAX_TURNS;
       const maxToolCalls = agent.max_tool_calls ?? DEFAULT_MAX_TOOL_CALLS;
       const budget = agent.budget
         ? new TokenBudget(agent.budget, agent.model ?? "")
         : undefined;
-      const totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
-      let turns = 0;
+      const totalUsage: TokenUsage =
+        resuming && checkpoint
+          ? {
+              input_tokens: checkpoint.state.prompt_tokens_used,
+              output_tokens: checkpoint.state.completion_tokens_used,
+            }
+          : { input_tokens: 0, output_tokens: 0 };
+      let turns = resuming && checkpoint ? checkpoint.turn : 0;
       let totalToolCalls = 0;
+      // Tracks the highest turn a checkpoint was successfully written for.
+      // Used to log the last durable point if the loop later throws.
+      let lastCheckpointedTurn = resuming && checkpoint ? checkpoint.turn : -1;
 
+      if (resuming && checkpoint) {
+        logger.info(
+          { agent: agent.name, session: session.id, turn: checkpoint.turn },
+          "Resuming from checkpoint",
+        );
+        this.events.emit({
+          type: "checkpoint:restored",
+          session_id: session.id,
+          turn: checkpoint.turn,
+        });
+      }
+
+      // Agentic loop. The try/catch around it only exists to surface the
+      // last durable checkpoint on crash — the error itself still
+      // propagates so callers see the real failure.
+      try {
       // Agentic loop
       while (turns < maxTurns) {
         turns++;
@@ -355,6 +394,69 @@ export class AgentRunner {
 
         // Add tool results as a user message (Anthropic API format)
         messages.push({ role: "user", content: toolResults });
+
+        // Durable checkpoint at the bottom of the tool-use branch: the
+        // turn is fully processed (assistant message + tool_results both
+        // persisted to `messages`) and we're about to ask the LLM to act
+        // on those results. This is the natural "safe to resume from"
+        // boundary — state.awaiting_tool_results=true flags exactly that.
+        if (durableEnabled && this.checkpointStore) {
+          const cp: Checkpoint = {
+            session_id: session.id,
+            turn: turns,
+            messages: [...messages],
+            tool_results: toolResults.map((r) => ({
+              content: r.content,
+              ...(r.is_error ? { is_error: r.is_error } : {}),
+            })),
+            state: {
+              next_turn: turns + 1,
+              prompt_tokens_used: totalUsage.input_tokens,
+              completion_tokens_used: totalUsage.output_tokens,
+              awaiting_tool_results: true,
+            },
+            saved_at: new Date(),
+          };
+          try {
+            await this.checkpointStore.save(cp);
+            lastCheckpointedTurn = turns;
+            this.events.emit({
+              type: "checkpoint:saved",
+              session_id: session.id,
+              turn: turns,
+            });
+          } catch (err) {
+            // Durability is best-effort — a transient Redis / Postgres
+            // outage shouldn't abort the agent run. Log loudly so the
+            // operator sees it; the next turn will retry.
+            logger.error(
+              {
+                agent: agent.name,
+                session: session.id,
+                turn: turns,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "Checkpoint save failed — continuing without durability for this turn",
+            );
+          }
+        }
+      }
+
+      } catch (err) {
+        if (durableEnabled) {
+          logger.error(
+            {
+              agent: agent.name,
+              session: session.id,
+              last_checkpointed_turn: lastCheckpointedTurn,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            lastCheckpointedTurn >= 0
+              ? "Agent run crashed; resume is available from the last checkpoint"
+              : "Agent run crashed before any checkpoint was written",
+          );
+        }
+        throw err;
       }
 
       // Persist updated messages
