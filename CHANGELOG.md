@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/server@0.1.0` (scaffold)
+- New `packages/server` package — the HTTP surface for `tutti-ai serve`.
+- `createServer(config: ServerConfig): FastifyInstance` builds a Fastify 5 app with a bearer-token auth hook and a `/health` route; routes are not implemented yet.
+- `ServerConfig` shape covers `port` (default 3847), `host` (default 127.0.0.1), optional `api_key` (falls back to `TUTTI_API_KEY` via `SecretsManager.optional`), optional `rate_limit`, and a required `agent_config`.
+- `src/middleware/auth.ts` rejects requests missing or mismatching `Authorization: Bearer <key>` with a constant-time comparison; `/health` is on the public-paths allowlist. Requests are rejected when neither config nor env supplies a key (fail-closed).
+- Pins `fastify@5.2.0` as an exact dep; depends on `@tuttiai/core` and `@tuttiai/types` via workspace.
+- 3 unit tests covering health on a configured server, health without any api_key, and bind-on-ephemeral-port startup.
+
 ## [0.18.0] - 2026-04-13
 
 ### Added — `@tuttiai/cli@0.10.0` (hot reload)

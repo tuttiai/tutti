@@ -1,0 +1,47 @@
+{
+  "name": "@tuttiai/server",
+  "version": "0.1.0",
+  "description": "Tutti HTTP server — runs agents over REST via `tutti-ai serve`",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tuttiai/core": "*",
+    "@tuttiai/types": "*",
+    "fastify": "5.2.0"
+  },
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "orchestration",
+    "server",
+    "http",
+    "fastify"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "packages/server"
+  },
+  "homepage": "https://tutti-ai.com"
+}
