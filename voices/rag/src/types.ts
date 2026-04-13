@@ -1,6 +1,71 @@
 /** Public types for the RAG voice. */
 
 /**
+ * Chunking strategies supported by the ingestion pipeline.
+ *
+ * - `fixed` — split by approximate token count with overlap between windows.
+ * - `sentence` — split on sentence boundaries (`.`, `!`, `?`).
+ * - `paragraph` — split on blank lines (double newlines).
+ */
+export enum ChunkStrategy {
+  Fixed = "fixed",
+  Sentence = "sentence",
+  Paragraph = "paragraph",
+}
+
+/**
+ * A single chunk of text produced by the ingestion pipeline, ready to be
+ * embedded and stored in a vector index.
+ */
+export interface Chunk {
+  /** The chunk's text content. */
+  text: string;
+  /** Identifier of the source document this chunk belongs to. */
+  source_id: string;
+  /** Zero-based position of this chunk within its source. */
+  chunk_index: number;
+  /** Copy of source metadata merged with chunk-level fields (e.g. strategy). */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * One input document to feed into the ingestion pipeline. Exactly one of
+ * `path` or `url` must be set.
+ */
+export interface IngestSourceInput {
+  /** Stable identifier for this source. Used as `Chunk.source_id`. */
+  source_id: string;
+  /** Local filesystem path. Mutually exclusive with `url`. */
+  path?: string;
+  /** Remote URL (http(s) or GitHub). Mutually exclusive with `path`. */
+  url?: string;
+  /** Human-readable title. */
+  title?: string;
+  /** MIME type override. When unset the pipeline infers from extension/headers. */
+  mime_type?: string;
+  /** Free-form metadata propagated to every resulting chunk. */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Options controlling how a document is chunked.
+ */
+export interface ChunkOptions {
+  /** Chunking strategy. Defaults to {@link ChunkStrategy.Fixed}. */
+  strategy?: ChunkStrategy;
+  /**
+   * For `fixed`: target number of whitespace-separated tokens per chunk.
+   * Ignored by other strategies. Defaults to 512.
+   */
+  chunk_size?: number;
+  /**
+   * For `fixed`: fraction of `chunk_size` to overlap between consecutive
+   * windows. Clamped to [0, 0.9]. Defaults to 0.2 (20%).
+   */
+  overlap_ratio?: number;
+}
+
+/**
  * Configuration accepted by the {@link RagVoice} factory.
  *
  * Concrete implementations of the embedding store, vector index, and

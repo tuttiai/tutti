@@ -10,7 +10,12 @@ export type {
   IngestOptions,
   SearchResult,
   SourceRecord,
+  Chunk,
+  ChunkOptions,
+  IngestSourceInput,
 } from "./types.js";
+export { ChunkStrategy } from "./types.js";
+export { ingestDocument, loadSource } from "./ingest.js";
 
 export {
   createIngestDocumentTool,

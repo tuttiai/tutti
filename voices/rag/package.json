@@ -21,7 +21,14 @@
   },
   "dependencies": {
     "@tuttiai/types": "*",
+    "pdf-parse": "2.4.5",
+    "remark": "^15.0.1",
+    "strip-markdown": "^6.0.0",
+    "unified": "^11.0.5",
     "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
   },
   "keywords": ["tutti", "ai", "agents", "voice", "rag", "retrieval", "knowledge-base", "embeddings"],
   "license": "MIT",
