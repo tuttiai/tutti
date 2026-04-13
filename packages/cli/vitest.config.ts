@@ -22,6 +22,7 @@ export default defineConfig({
         "src/commands/search.ts",
         "src/commands/add.ts",
         "src/commands/eval.ts",
+        "src/commands/resume.ts",
       ],
       thresholds: {
         lines: 70,
