@@ -32,7 +32,13 @@ export interface AgentMemoryConfig {
 export interface AgentDurableConfig {
   /** Which checkpoint store to write to. */
   store: "redis" | "postgres" | "memory";
-  /** Checkpoint TTL in seconds. Defaults to 604800 (7 days). */
+  /**
+   * Checkpoint TTL in seconds. When omitted, `createCheckpointStore`
+   * (in `@tuttiai/core`) substitutes its `DEFAULT_CHECKPOINT_TTL_SECONDS`
+   * constant — currently 604800 (7 days). The default is applied by the
+   * factory, not by this interface; a `CheckpointStore` constructed
+   * directly may define its own default.
+   */
   ttl?: number;
 }
 

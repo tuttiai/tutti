@@ -6,7 +6,17 @@ import type { TuttiHooks } from "./hooks.js";
 
 export interface MemoryConfig {
   provider: "in-memory" | "postgres" | "redis";
-  /** Connection URL (e.g. DATABASE_URL for postgres). */
+  /**
+   * Connection URL for database-backed providers. Ignored by `in-memory`.
+   *
+   * - `postgres` — a PostgreSQL connection string, e.g.
+   *   `postgres://user:pass@host:5432/db` (commonly stored in
+   *   `DATABASE_URL`).
+   * - `redis` — a Redis connection URL, e.g.
+   *   `redis://default:pass@host:6379/0` (commonly stored in `REDIS_URL`).
+   *   Note: the Redis-backed session store is not yet implemented — the
+   *   enum value is reserved.
+   */
   url?: string;
 }
 

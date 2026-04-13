@@ -59,10 +59,10 @@ suite("PgVectorStore (integration)", () => {
     });
     try {
       // Access the private pool via a type assertion — tests-only.
-      const poolled = admin as unknown as {
+      const pooled = admin as unknown as {
         pool: { query: (text: string) => Promise<unknown> };
       };
-      await poolled.pool.query("DROP TABLE IF EXISTS " + TABLE);
+      await pooled.pool.query("DROP TABLE IF EXISTS " + TABLE);
     } finally {
       await admin.close();
       await store.close();
