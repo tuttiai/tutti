@@ -31,24 +31,27 @@ export class MemoryVectorStore implements VectorStore {
   private readonly chunks = new Map<string, EmbeddedChunk>();
   private expectedDim: number | undefined;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   constructor(_config: MemoryStoreConfig = { provider: "memory" }) {
     // Config is reserved for future flags (e.g. max chunks); no-op for now.
   }
 
-  async upsert(chunks: EmbeddedChunk[]): Promise<void> {
+  upsert(chunks: EmbeddedChunk[]): Promise<void> {
     for (const c of chunks) {
       if (this.expectedDim === undefined) this.expectedDim = c.vector.length;
       if (c.vector.length !== this.expectedDim) {
-        throw new Error(
-          "MemoryVectorStore: vector dimension mismatch — expected " +
-            this.expectedDim +
-            ", got " +
-            c.vector.length,
+        return Promise.reject(
+          new Error(
+            "MemoryVectorStore: vector dimension mismatch — expected " +
+              this.expectedDim +
+              ", got " +
+              c.vector.length,
+          ),
         );
       }
       this.chunks.set(c.chunk_id, c);
     }
+    return Promise.resolve();
   }
 
   async search(
@@ -74,7 +77,7 @@ export class MemoryVectorStore implements VectorStore {
     for (let start = 0; start < entries.length; start += SCAN_BATCH_SIZE) {
       const end = Math.min(start + SCAN_BATCH_SIZE, entries.length);
       for (let i = start; i < end; i++) {
-        const chunk = entries[i]!;
+        const chunk = entries[i];
         if (filter && !matchesFilter(chunk, filter)) continue;
         scored.push({
           chunk_id: chunk.chunk_id,
@@ -91,13 +94,14 @@ export class MemoryVectorStore implements VectorStore {
     return scored.slice(0, top_k);
   }
 
-  async delete(source_id: string): Promise<void> {
+  delete(source_id: string): Promise<void> {
     for (const [id, chunk] of this.chunks) {
       if (chunk.source_id === source_id) this.chunks.delete(id);
     }
+    return Promise.resolve();
   }
 
-  async list(): Promise<SourceRecord[]> {
+  list(): Promise<SourceRecord[]> {
     const summaries = new Map<string, SourceSummary>();
     for (const chunk of this.chunks.values()) {
       const existing = summaries.get(chunk.source_id);
@@ -115,14 +119,16 @@ export class MemoryVectorStore implements VectorStore {
         metadata: chunk.metadata,
       });
     }
-    return Array.from(summaries.values()).map((s) => ({
-      source_id: s.source_id,
-      ...(s.title !== undefined ? { title: s.title } : {}),
-      ...(s.mime_type !== undefined ? { mime_type: s.mime_type } : {}),
-      chunk_count: s.chunk_count,
-      ingested_at: s.last_seen,
-      ...(s.metadata !== undefined ? { metadata: s.metadata } : {}),
-    }));
+    return Promise.resolve(
+      Array.from(summaries.values()).map((s) => ({
+        source_id: s.source_id,
+        ...(s.title !== undefined ? { title: s.title } : {}),
+        ...(s.mime_type !== undefined ? { mime_type: s.mime_type } : {}),
+        chunk_count: s.chunk_count,
+        ingested_at: s.last_seen,
+        ...(s.metadata !== undefined ? { metadata: s.metadata } : {}),
+      })),
+    );
   }
 
   /** Test-only: clear all state. Not part of the VectorStore contract. */
@@ -136,7 +142,7 @@ export class MemoryVectorStore implements VectorStore {
 function cosine(a: number[], b: number[]): number {
   let sum = 0;
   const n = Math.min(a.length, b.length);
-  for (let i = 0; i < n; i++) sum += a[i]! * b[i]!;
+  for (let i = 0; i < n; i++) sum += a[i] * b[i];
   return sum;
 }
 

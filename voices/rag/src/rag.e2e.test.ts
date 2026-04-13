@@ -52,7 +52,7 @@ describe("RagVoice end-to-end", () => {
   beforeEach(async () => {
     workDir = await mkdtemp(join(tmpdir(), "rag-e2e-"));
 
-    fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+    fetchMock = vi.fn((_url: string | URL, init?: RequestInit) => {
       const body = JSON.parse(init!.body as string) as OpenAIEmbeddingsRequestBody;
       const data = body.input.map((text, index) => ({
         index,
@@ -62,10 +62,12 @@ describe("RagVoice end-to-end", () => {
         data,
         model: "text-embedding-3-small",
       };
-      return new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
+      return Promise.resolve(
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
     });
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -130,10 +132,10 @@ describe("RagVoice end-to-end", () => {
 
     // The second paragraph must win — only it shares the "widget" vector
     // with the query.
-    expect(hits[0]!.text).toBe(paragraphs[1]);
-    expect(hits[0]!.source_url).toBe(filePath);
-    expect(hits[0]!.chunk_index).toBe(1);
-    expect(hits[0]!.score).toBeGreaterThan(hits[1]!.score);
+    expect(hits[0].text).toBe(paragraphs[1]);
+    expect(hits[0].source_url).toBe(filePath);
+    expect(hits[0].chunk_index).toBe(1);
+    expect(hits[0].score).toBeGreaterThan(hits[1].score);
 
     // --- list_sources -----------------------------------------------------
     const list = findTool(voice.tools, "list_sources");
@@ -148,9 +150,9 @@ describe("RagVoice end-to-end", () => {
       ingested_at: string;
     }>;
     expect(sources).toHaveLength(1);
-    expect(sources[0]!.source_id).toBe("doc-1");
-    expect(sources[0]!.filename).toBe("doc.txt");
-    expect(sources[0]!.chunks).toBe(3);
+    expect(sources[0].source_id).toBe("doc-1");
+    expect(sources[0].filename).toBe("doc.txt");
+    expect(sources[0].chunks).toBe(3);
 
     // --- delete_source ----------------------------------------------------
     const del = findTool<{ source_id: string }>(voice.tools, "delete_source");

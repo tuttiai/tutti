@@ -27,12 +27,22 @@ function mockFetch(
 ): { calls: MockCall[]; fn: typeof fetch } {
   const calls: MockCall[] = [];
   let i = 0;
-  const fn: typeof fetch = vi.fn(async (input: RequestInfo | URL, init) => {
-    const url = typeof input === "string" ? input : input.toString();
+  const fn: typeof fetch = vi.fn((input: RequestInfo | URL, init) => {
+    // RequestInfo = Request | string. URL.toString() and Request.url are
+    // the only well-defined stringifications; the bare base toString on a
+    // Request would yield "[object Request]".
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
     calls.push({ url, init });
     const next = responses[i++];
-    if (!next) throw new Error("mockFetch: no more responses queued");
-    return next();
+    if (!next) {
+      return Promise.reject(new Error("mockFetch: no more responses queued"));
+    }
+    return Promise.resolve(next());
   });
   vi.stubGlobal("fetch", fn);
   return { calls, fn };
@@ -82,7 +92,7 @@ describe("utils", () => {
     const v = normalize([3, 4]);
     expect(v[0]).toBeCloseTo(0.6, 10);
     expect(v[1]).toBeCloseTo(0.8, 10);
-    expect(Math.hypot(v[0]!, v[1]!)).toBeCloseTo(1, 10);
+    expect(Math.hypot(v[0], v[1])).toBeCloseTo(1, 10);
   });
 
   it("normalize leaves zero vectors unchanged", () => {
@@ -175,13 +185,13 @@ describe("OpenAIEmbeddingProvider", () => {
     const vectors = await provider.embed(["hello", "world"]);
 
     expect(vectors).toHaveLength(2);
-    expect(Math.hypot(...vectors[0]!)).toBeCloseTo(1, 10);
-    expect(Math.hypot(...vectors[1]!)).toBeCloseTo(1, 10);
+    expect(Math.hypot(...vectors[0])).toBeCloseTo(1, 10);
+    expect(Math.hypot(...vectors[1])).toBeCloseTo(1, 10);
 
-    expect(calls[0]!.url).toBe("https://api.openai.com/v1/embeddings");
-    const headers = calls[0]!.init!.headers as Record<string, string>;
+    expect(calls[0].url).toBe("https://api.openai.com/v1/embeddings");
+    const headers = calls[0].init!.headers as Record<string, string>;
     expect(headers.authorization).toBe("Bearer sk-test");
-    const body = JSON.parse(calls[0]!.init!.body as string) as {
+    const body = JSON.parse(calls[0].init!.body as string) as {
       model: string;
       input: string[];
     };
@@ -238,8 +248,8 @@ describe("OpenAIEmbeddingProvider", () => {
 
     expect(vectors).toHaveLength(2050);
     expect(calls).toHaveLength(2);
-    const b0 = JSON.parse(calls[0]!.init!.body as string) as { input: string[] };
-    const b1 = JSON.parse(calls[1]!.init!.body as string) as { input: string[] };
+    const b0 = JSON.parse(calls[0].init!.body as string) as { input: string[] };
+    const b1 = JSON.parse(calls[1].init!.body as string) as { input: string[] };
     expect(b0.input).toHaveLength(2048);
     expect(b1.input).toHaveLength(2);
   });
@@ -341,8 +351,8 @@ describe("AnthropicEmbeddingProvider", () => {
     const vectors = await provider.embed(["hi"]);
 
     expect(vectors).toHaveLength(1);
-    expect(calls[0]!.url).toBe("https://api.voyageai.com/v1/embeddings");
-    const body = JSON.parse(calls[0]!.init!.body as string) as {
+    expect(calls[0].url).toBe("https://api.voyageai.com/v1/embeddings");
+    const body = JSON.parse(calls[0].init!.body as string) as {
       model: string;
     };
     expect(body.model).toBe("voyage-3-lite");
@@ -419,14 +429,14 @@ describe("LocalEmbeddingProvider", () => {
     const vectors = await provider.embed(["a", "b"]);
 
     expect(calls).toHaveLength(2);
-    expect(calls[0]!.url).toBe("https://ollama.example.com/api/embeddings");
-    const body = JSON.parse(calls[0]!.init!.body as string) as {
+    expect(calls[0].url).toBe("https://ollama.example.com/api/embeddings");
+    const body = JSON.parse(calls[0].init!.body as string) as {
       model: string;
       prompt: string;
     };
     expect(body.model).toBe("nomic-embed-text");
     expect(body.prompt).toBe("a");
-    expect(Math.hypot(...vectors[0]!)).toBeCloseTo(1, 10);
+    expect(Math.hypot(...vectors[0])).toBeCloseTo(1, 10);
     expect(provider.dimensions).toBe(2);
   });
 
@@ -440,7 +450,7 @@ describe("LocalEmbeddingProvider", () => {
       model: "nomic-embed-text",
     });
     await provider.embed(["x"]);
-    expect(calls[0]!.url).toBe("https://ollama.example.com/api/embeddings");
+    expect(calls[0].url).toBe("https://ollama.example.com/api/embeddings");
   });
 
   it("rejects loopback URLs by default", () => {

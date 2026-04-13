@@ -106,7 +106,7 @@ export function createIngestDocumentTool(
 
         const embedded: EmbeddedChunk[] = chunks.map((c, i) => ({
           ...c,
-          vector: vectors[i]!,
+          vector: vectors[i],
           chunk_id: id + ":" + c.chunk_index,
           metadata: {
             ...(c.metadata ?? {}),

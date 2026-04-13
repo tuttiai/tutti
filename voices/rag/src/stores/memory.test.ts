@@ -36,8 +36,8 @@ describe("MemoryVectorStore", () => {
       // replacement vector, not the original.
       const hits = await store.search(unit(Math.PI / 2), 1);
       expect(hits).toHaveLength(1);
-      expect(hits[0]!.chunk_id).toBe("a");
-      expect(hits[0]!.score).toBeCloseTo(1, 10);
+      expect(hits[0].chunk_id).toBe("a");
+      expect(hits[0].score).toBeCloseTo(1, 10);
     });
 
     it("rejects dimension mismatches after the first insert", async () => {
@@ -60,9 +60,9 @@ describe("MemoryVectorStore", () => {
 
       const results = await store.search(unit(0), 2);
       expect(results).toHaveLength(2);
-      expect(results[0]!.chunk_id).toBe("near");
-      expect(results[1]!.chunk_id).toBe("mid");
-      expect(results[0]!.score).toBeGreaterThan(results[1]!.score);
+      expect(results[0].chunk_id).toBe("near");
+      expect(results[1].chunk_id).toBe("mid");
+      expect(results[0].score).toBeGreaterThan(results[1].score);
     });
 
     it("clamps negative cosines to 0", async () => {
@@ -70,7 +70,7 @@ describe("MemoryVectorStore", () => {
       await store.upsert([makeChunk("opp", "s1", unit(Math.PI))]);
 
       const [hit] = await store.search(unit(0), 1);
-      expect(hit!.score).toBe(0);
+      expect(hit.score).toBe(0);
     });
 
     it("applies AND-equality metadata filters", async () => {
@@ -157,10 +157,10 @@ describe("MemoryVectorStore", () => {
       const sources = await store.list();
       const byId = Object.fromEntries(sources.map((s) => [s.source_id, s]));
 
-      expect(byId.s1!.chunk_count).toBe(2);
-      expect(byId.s1!.title).toBe("Doc 1");
-      expect(byId.s2!.chunk_count).toBe(1);
-      expect(byId.s2!.mime_type).toBe("text/markdown");
+      expect(byId.s1.chunk_count).toBe(2);
+      expect(byId.s1.title).toBe("Doc 1");
+      expect(byId.s2.chunk_count).toBe(1);
+      expect(byId.s2.mime_type).toBe("text/markdown");
     });
 
     it("returns an empty list when nothing has been ingested", async () => {

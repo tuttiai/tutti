@@ -16,10 +16,14 @@ import { assertSafeUrl, UrlValidationError } from "./utils/url-guard.js";
 vi.mock("pdf-parse", () => {
   class PDFParse {
     constructor(public options: unknown) {}
-    async getText() {
-      return { text: "Hello from PDF.\n\nSecond paragraph." };
+    getText(): Promise<{ text: string }> {
+      return Promise.resolve({
+        text: "Hello from PDF.\n\nSecond paragraph.",
+      });
     }
-    async destroy() {}
+    destroy(): Promise<void> {
+      return Promise.resolve();
+    }
   }
   return { PDFParse };
 });
@@ -46,10 +50,10 @@ describe("chunkText", () => {
         overlap_ratio: 0.2, // overlap = 2 tokens, step = 8
       });
       expect(chunks).toHaveLength(3);
-      expect(chunks[0]!.split(" ")).toHaveLength(10);
+      expect(chunks[0].split(" ")).toHaveLength(10);
       // last two tokens of chunk 0 must match first two of chunk 1 (20% overlap).
-      const tail0 = chunks[0]!.split(" ").slice(-2);
-      const head1 = chunks[1]!.split(" ").slice(0, 2);
+      const tail0 = chunks[0].split(" ").slice(-2);
+      const head1 = chunks[1].split(" ").slice(0, 2);
       expect(head1).toEqual(tail0);
     });
 
@@ -57,7 +61,7 @@ describe("chunkText", () => {
       const text = Array.from({ length: 600 }, (_, i) => "w" + i).join(" ");
       const chunks = chunkText(text); // all defaults
       expect(chunks.length).toBeGreaterThanOrEqual(2);
-      expect(chunks[0]!.split(" ")).toHaveLength(512);
+      expect(chunks[0].split(" ")).toHaveLength(512);
     });
 
     it("returns [] for empty input", () => {
@@ -154,12 +158,12 @@ describe("ingestDocument", () => {
       source_id: "notes",
       chunk_index: 0,
     });
-    expect(chunks[0]!.metadata).toMatchObject({
+    expect(chunks[0].metadata).toMatchObject({
       format: "text",
       strategy: "sentence",
       title: "Notes",
     });
-    expect(chunks[1]!.chunk_index).toBe(1);
+    expect(chunks[1].chunk_index).toBe(1);
   });
 
   it("ingests a markdown file, stripping frontmatter and formatting", async () => {
@@ -191,7 +195,7 @@ describe("ingestDocument", () => {
     expect(joined).toContain("Heading");
     expect(joined).toContain("bold");
     expect(joined).toContain("Another paragraph");
-    expect(chunks[0]!.metadata).toMatchObject({ format: "markdown" });
+    expect(chunks[0].metadata).toMatchObject({ format: "markdown" });
   });
 
   it("ingests a PDF file via pdf-parse", async () => {
@@ -208,16 +212,17 @@ describe("ingestDocument", () => {
       "Hello from PDF.",
       "Second paragraph.",
     ]);
-    expect(chunks[0]!.metadata).toMatchObject({ format: "pdf" });
+    expect(chunks[0].metadata).toMatchObject({ format: "pdf" });
   });
 
   it("ingests a remote URL and uses the HTTP content-type", async () => {
-    const fetchMock = vi.fn(
-      async () =>
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
         new Response("First. Second. Third.", {
           status: 200,
           headers: { "content-type": "text/plain; charset=utf-8" },
         }),
+      ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -228,16 +233,17 @@ describe("ingestDocument", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(chunks.map((c) => c.text)).toEqual(["First.", "Second.", "Third."]);
-    expect(chunks[0]!.metadata).toMatchObject({ format: "text" });
+    expect(chunks[0].metadata).toMatchObject({ format: "text" });
   });
 
   it("ingests a GitHub blob URL by rewriting to raw.githubusercontent.com", async () => {
-    const fetchMock: typeof fetch = vi.fn(
-      async () =>
+    const fetchMock: typeof fetch = vi.fn(() =>
+      Promise.resolve(
         new Response("one two three four five", {
           status: 200,
           headers: { "content-type": "text/plain" },
         }),
+      ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -258,7 +264,7 @@ describe("ingestDocument", () => {
       "https://raw.githubusercontent.com/acme/widgets/main/README.md",
     );
     // README.md should be parsed as markdown due to the .md extension.
-    expect(chunks[0]!.metadata).toMatchObject({ format: "markdown" });
+    expect(chunks[0].metadata).toMatchObject({ format: "markdown" });
   });
 
   it("rejects inputs with both path and url", async () => {

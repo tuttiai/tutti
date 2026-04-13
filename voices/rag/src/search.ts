@@ -196,12 +196,12 @@ export class SearchEngine {
     const rrfScore = new Map<string, number>();
 
     for (let i = 0; i < semantic.length; i++) {
-      const hit = semantic[i]!;
+      const hit = semantic[i];
       byId.set(hit.chunk_id, hit);
       rrfScore.set(hit.chunk_id, (rrfScore.get(hit.chunk_id) ?? 0) + 1 / (k + (i + 1)));
     }
     for (let i = 0; i < keyword.length; i++) {
-      const hit = keyword[i]!;
+      const hit = keyword[i];
       rrfScore.set(hit.chunk_id, (rrfScore.get(hit.chunk_id) ?? 0) + 1 / (k + (i + 1)));
     }
 

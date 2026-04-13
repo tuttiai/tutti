@@ -73,8 +73,8 @@ suite("PgVectorStore (integration)", () => {
     await store.upsert([makeChunk("a", "s1", unit(0))]);
     const results = await store.search(unit(0), 1);
     expect(results).toHaveLength(1);
-    expect(results[0]!.chunk_id).toBe("a");
-    expect(results[0]!.score).toBeCloseTo(1, 5);
+    expect(results[0].chunk_id).toBe("a");
+    expect(results[0].score).toBeCloseTo(1, 5);
   });
 
   it("ranks results by cosine similarity", async () => {
@@ -87,7 +87,7 @@ suite("PgVectorStore (integration)", () => {
     const ids = results.map((r) => r.chunk_id);
     expect(ids[0]).toBe("near");
     expect(ids).toContain("mid");
-    expect(results[0]!.score).toBeGreaterThan(results[1]!.score);
+    expect(results[0].score).toBeGreaterThan(results[1].score);
   });
 
   it("applies JSONB containment filters", async () => {
@@ -110,8 +110,8 @@ suite("PgVectorStore (integration)", () => {
     ]);
 
     const results = await store.search(unit(Math.PI / 2), 1);
-    expect(results[0]!.chunk_id).toBe("dup");
-    expect(results[0]!.metadata).toMatchObject({ version: "v2" });
+    expect(results[0].chunk_id).toBe("dup");
+    expect(results[0].metadata).toMatchObject({ version: "v2" });
   });
 
   it("delete removes every chunk for the source", async () => {
@@ -143,7 +143,7 @@ describe("PgVectorStore constructor", () => {
     // Accessing process.env here is allowed because this block is the
     // test's inverse of SecretsManager — we need to transiently unset the
     // variable so the constructor genuinely finds nothing.
-    // eslint-disable-next-line no-restricted-syntax
+     
     const env = process.env as Record<string, string | undefined>;
     const saved = env.RAG_PG_URL;
     delete env.RAG_PG_URL;

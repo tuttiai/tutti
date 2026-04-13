@@ -22,23 +22,25 @@ function createMockEmbeddings(
     name: "mock",
     dimensions: 3,
     calls,
-    async embed(texts: string[]): Promise<number[][]> {
+    embed(texts: string[]): Promise<number[][]> {
       calls.push(...texts);
-      return texts.map((t) => {
-        const fixed = mapping[t];
-        if (fixed) return normalise(fixed);
-        // Default: hash each char to deterministic but diffuse coordinates.
-        let a = 0,
-          b = 0,
-          c = 0;
-        for (const ch of t) {
-          const code = ch.charCodeAt(0);
-          a += Math.sin(code);
-          b += Math.cos(code);
-          c += Math.sin(code * 2);
-        }
-        return normalise([a, b, c]);
-      });
+      return Promise.resolve(
+        texts.map((t) => {
+          const fixed = mapping[t];
+          if (fixed) return normalise(fixed);
+          // Default: hash each char to deterministic but diffuse coordinates.
+          let a = 0,
+            b = 0,
+            c = 0;
+          for (const ch of t) {
+            const code = ch.charCodeAt(0);
+            a += Math.sin(code);
+            b += Math.cos(code);
+            c += Math.sin(code * 2);
+          }
+          return normalise([a, b, c]);
+        }),
+      );
     },
   };
   return provider;
@@ -76,8 +78,13 @@ function createRecordingStore(
   } = {
     name: "recording",
     searchCalls,
-    async upsert(): Promise<void> {},
-    async search(vector, topK): Promise<
+    upsert(): Promise<void> {
+      return Promise.resolve();
+    },
+    search(
+      vector,
+      topK,
+    ): Promise<
       Array<{
         chunk_id: string;
         source_id: string;
@@ -88,18 +95,22 @@ function createRecordingStore(
       searchCalls.push({ vector, topK });
       // Return canned results keyed by the first coord's sign — lets us
       // have distinct vectors trigger distinct canned rankings.
-      const key = vector[0]! > 0 ? "positive" : "negative";
+      const key = vector[0] > 0 ? "positive" : "negative";
       const canned = results[key] ?? [];
-      return canned.map((c) => ({
-        chunk_id: c.chunk_id,
-        source_id: "src",
-        content: c.content,
-        score: c.score,
-      }));
+      return Promise.resolve(
+        canned.map((c) => ({
+          chunk_id: c.chunk_id,
+          source_id: "src",
+          content: c.content,
+          score: c.score,
+        })),
+      );
     },
-    async delete(): Promise<void> {},
-    async list(): Promise<[]> {
-      return [];
+    delete(): Promise<void> {
+      return Promise.resolve();
+    },
+    list(): Promise<[]> {
+      return Promise.resolve([]);
     },
   };
   return store;
@@ -125,7 +136,7 @@ describe("SearchEngine — semantic", () => {
 
     expect(embeddings.calls).toEqual(["find widgets"]);
     expect(results).toHaveLength(2);
-    expect(results[0]!.chunk_id).toBe("a"); // aligned with query vector
+    expect(results[0].chunk_id).toBe("a"); // aligned with query vector
   });
 
   it("returns [] when topK is zero or negative", async () => {
@@ -153,7 +164,7 @@ describe("SearchEngine — semantic", () => {
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0]!.chunk_id).toBe("b");
+    expect(results[0].chunk_id).toBe("b");
   });
 });
 
@@ -167,13 +178,15 @@ describe("SearchEngine — HyDE", () => {
     const store = createRecordingStore({
       positive: [{ chunk_id: "A", score: 0.9, content: "apples" }],
     });
-    const llm = vi.fn<LlmFn>(async () => "The hypothetical answer paragraph.");
+    const llm = vi.fn<LlmFn>(() =>
+      Promise.resolve("The hypothetical answer paragraph."),
+    );
 
     const engine = new SearchEngine({ embeddings, store, llm });
     await engine.search("what are apples?", { topK: 1, hyde: true });
 
     expect(llm).toHaveBeenCalledOnce();
-    const [prompt] = llm.mock.calls[0]!;
+    const [prompt] = llm.mock.calls[0];
     expect(prompt).toContain("what are apples?");
     // Provider got the hypothetical answer, NOT the raw query.
     expect(embeddings.calls).toEqual(["The hypothetical answer paragraph."]);
@@ -182,7 +195,7 @@ describe("SearchEngine — HyDE", () => {
   it("falls back to the raw query when the LLM returns an empty string", async () => {
     const embeddings = createMockEmbeddings();
     const store = createRecordingStore({});
-    const llm: LlmFn = async () => "   ";
+    const llm: LlmFn = () => Promise.resolve("   ");
 
     const engine = new SearchEngine({ embeddings, store, llm });
     await engine.search("raw query", { topK: 1, hyde: true });
@@ -193,7 +206,7 @@ describe("SearchEngine — HyDE", () => {
   it("uses config.hyde by default and options.hyde overrides it", async () => {
     const embeddings = createMockEmbeddings();
     const store = createRecordingStore({});
-    const llm = vi.fn<LlmFn>(async () => "hyde answer");
+    const llm = vi.fn<LlmFn>(() => Promise.resolve("hyde answer"));
 
     const engineConfigOn = new SearchEngine({
       embeddings,
@@ -223,7 +236,7 @@ describe("SearchEngine — HyDE", () => {
   it("uses a custom hyde_prompt when provided", async () => {
     const embeddings = createMockEmbeddings();
     const store = createRecordingStore({});
-    const llm = vi.fn<LlmFn>(async () => "answer");
+    const llm = vi.fn<LlmFn>(() => Promise.resolve("answer"));
     const hyde_prompt = (q: string): string => "CUSTOM: " + q;
 
     const engine = new SearchEngine({
@@ -270,9 +283,9 @@ describe("SearchEngine — hybrid", () => {
 
     expect(results).toHaveLength(3);
     // 'a' should win — top semantic AND top BM25 for "apple".
-    expect(results[0]!.chunk_id).toBe("a");
+    expect(results[0].chunk_id).toBe("a");
     // Content was preserved from the semantic hit.
-    expect(results[0]!.content).toBe("apples are red");
+    expect(results[0].content).toBe("apples are red");
   });
 
   it("de-duplicates chunk IDs that appear in both lists", async () => {
@@ -323,7 +336,7 @@ describe("SearchEngine — hybrid", () => {
     expect(results).toHaveLength(3);
     // With k=1, RRF reciprocals are (0.5, 0.333, 0.25) for ranks 1..3;
     // the top semantic result 'a' should stay on top.
-    expect(results[0]!.chunk_id).toBe("a");
+    expect(results[0].chunk_id).toBe("a");
   });
 
   it("honours the filter across both branches", async () => {
