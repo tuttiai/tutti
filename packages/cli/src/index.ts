@@ -50,8 +50,9 @@ program
 program
   .command("run [score]")
   .description("Run a Tutti score interactively")
-  .action(async (score?: string) => {
-    await runCommand(score);
+  .option("-w, --watch", "Reload the score on file changes")
+  .action(async (score: string | undefined, opts: { watch?: boolean }) => {
+    await runCommand(score, { watch: opts.watch });
   });
 
 program

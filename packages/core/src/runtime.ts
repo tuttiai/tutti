@@ -20,6 +20,13 @@ export interface TuttiRuntimeOptions {
    * save turn boundaries and resume after a crash.
    */
   checkpointStore?: CheckpointStore;
+  /**
+   * Reuse an existing session store across runtime instances. Used by the
+   * CLI's `--watch` mode so hot-reloading the score doesn't drop the
+   * conversation history that lives in an `InMemorySessionStore`.
+   * Overrides the score's `memory` config when supplied.
+   */
+  sessionStore?: SessionStore;
 }
 
 export class TuttiRuntime {
@@ -33,7 +40,7 @@ export class TuttiRuntime {
   constructor(score: ScoreConfig, options: TuttiRuntimeOptions = {}) {
     this._score = score;
     this.events = new EventBus();
-    this._sessions = TuttiRuntime.createStore(score);
+    this._sessions = options.sessionStore ?? TuttiRuntime.createStore(score);
     this.semanticMemory = new InMemorySemanticStore();
     this.toolCache = new InMemoryToolCache();
     this._runner = new AgentRunner(

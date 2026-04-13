@@ -29,6 +29,8 @@ Load a score file and open an interactive REPL:
 ```bash
 tutti-ai run                     # defaults to ./tutti.score.ts
 tutti-ai run ./custom-score.ts   # specify a score file
+tutti-ai run --watch             # hot-reload the score on file changes
+tutti-ai run -w ./score.ts       # short alias
 ```
 
 Features:
@@ -36,6 +38,44 @@ Features:
 - Colored tool execution trace
 - Session continuity across messages
 - Graceful Ctrl+C handling
+- Hot reload with `--watch` / `-w` (see below)
+
+#### Watch mode
+
+`--watch` reloads the score (and any file in the score's directory tree,
+excluding `node_modules`, `dist`, and dotfiles) whenever it changes on
+disk. Changes are debounced 200ms so editor saves that touch the file
+multiple times collapse into a single reload.
+
+```
+> research quantum computing
+[tutti] Score changed, reloading...
+[tutti] Score reloaded. Changes applied.
+> what did you learn last turn?
+```
+
+Semantics:
+
+- **Changes take effect at turn boundaries**, never mid-tool-call. The
+  current turn always completes with the config it started with; the
+  next turn reads the new config.
+- **Session history is preserved** across reloads — the REPL's
+  `session_id` carries over, so the conversation continues.
+- **Syntax errors are recovered** — if the reload fails to parse or
+  validate, the error is printed and the REPL keeps using the previous
+  config. Fix the file and save again.
+- **Trade-off**: runtime internals (tool cache, semantic memory) reset
+  on reload. Conversation history survives because the REPL owns the
+  session store and reuses it across runtime swaps.
+
+Deferred (known gaps):
+- The watcher uses a directory-tree watch, not a resolved import graph —
+  unrelated file edits in the project tree will also trigger reloads.
+  A future revision may use `madge` or the TS compiler API for
+  precision.
+- Voice-level partial reload isn't implemented; the whole runtime is
+  rebuilt on every change. Fast enough in practice (typically <50ms)
+  but means runtime-internal caches reset.
 
 ### `tutti-ai resume <session-id>`
 
