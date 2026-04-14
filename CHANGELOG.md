@@ -2,17 +2,42 @@
 
 ## [Unreleased]
 
-### Added
-- **Structured output**: `AgentConfig.outputSchema` (Zod schema) + `AgentConfig.maxRetries` (default 3). When set, the runtime appends a JSON-schema instruction to the system prompt, validates the final text output against the schema, and retries on parse failure. On success, the parsed object is attached as `AgentResult.structured`. On exhausted retries, throws `StructuredOutputError` with the last raw output.
-- **Guardrail hooks**: `AgentConfig.beforeRun` and `AgentConfig.afterRun` — input/output guardrails that can modify text, pass through, or throw `GuardrailError` to abort the run. Three built-in factories: `profanityFilter()` (word-list replacement), `piiDetector("redact" | "block")` (email, phone, SSN, credit card), `topicBlocker(topics)` (cosine-similarity topic blocking).
-- **TuttiGraph API** (types + stub): DAG-based multi-agent execution engine. Types: `GraphNode`, `GraphEdge`, `GraphConfig`, `NodeResult`, `GraphRunResult`, `RunOptions`, `GraphEvent`. Errors: `GraphValidationError`, `GraphCycleError`, `GraphStateError`, `GraphDeadEndError`. Constructor validates graph structure.
-- **TuttiGraph execution engine**: `run()` and `stream()` fully implemented. Linear chains, conditional branching (first-match edge evaluation), loop edges with per-node visit cap (`max_node_visits`, default 5, throws `GraphCycleError`), parallel forks via `GraphEdge.parallel` with `GraphNode.merge` join points. Shared Zod-validated state with `state_update` shallow-merge. Events: `node:start`, `node:end`, `edge:traverse`, `state:update`, `graph:start`, `graph:end`.
-- **Graph DSL**: `defineGraph(entrypoint)` fluent builder — `.node()`, `.edge()`, `.state()`, `.build()` chain for constructing `GraphConfig` in score files.
-- **Graph visualization**: `renderGraph(config)` returns a self-contained HTML page with D3-force interactive SVG layout and a static `<noscript>` SVG fallback. `graphToJSON(config)` serialises a graph config (stripping non-serialisable condition functions) for API consumption.
-- **Server `GET /graph`**: new endpoint on `@tuttiai/server` that returns the graph config as JSON when `ServerConfig.graph` is provided. Studio SSE integration for real-time node highlighting.
-- **Scheduler engine**: `SchedulerEngine` with `schedule()`, `trigger()`, `start()`, `stop()`. Supports cron expressions (via `node-cron`), interval shorthand (`"1h"`, `"30m"`), and one-shot ISO datetime triggers. `max_runs` auto-disables after N runs. Store backends: `MemoryScheduleStore` (dev), `PostgresScheduleStore` (production). Events: `schedule:triggered`, `schedule:completed`, `schedule:error`. New `AgentConfig.schedule` field and `AgentScheduleConfig` type.
-- **CLI schedule commands**: `tutti-ai schedule` starts the scheduler daemon (reads score, registers all agents with `schedule` config, runs until killed). `tutti-ai schedules list|enable|disable|trigger|runs` for management. Connects to PostgreSQL via `TUTTI_PG_URL`.
-- **Time-travel debugging**: `tutti-ai replay <session-id>` — interactive REPL for navigating session history from PostgreSQL. Commands: `list` (all turns), `show <n>` (full message detail with tool calls), `next`/`prev` (navigate), `inspect` (raw JSON), `replay-from <n>` (re-run from a turn with original or new input), `export json|md` (save session).
+## [0.20.0] - 2026-04-14
+
+Four major features: graph-based routing, input/output guardrails, native scheduling, and time-travel debugging. 398 tests across the monorepo.
+
+### Added — TuttiGraph (graph-based agent routing)
+- `TuttiGraph` execution engine with `run()` and `stream()` — linear chains, conditional branching (first-match edge evaluation), loop edges with per-node visit cap (`max_node_visits`, default 5, throws `GraphCycleError`), and parallel forks via `GraphEdge.parallel` with `GraphNode.merge` join points. Shared Zod-validated state with `state_update` shallow-merge.
+- `defineGraph(entrypoint)` fluent DSL builder — `.node()`, `.edge()`, `.state()`, `.build()` chain for constructing `GraphConfig` in score files.
+- `renderGraph(config)` — self-contained HTML page with D3-force interactive SVG and static `<noscript>` fallback. `graphToJSON(config)` for API serialisation.
+- Server `GET /graph` endpoint on `@tuttiai/server` when `ServerConfig.graph` is provided.
+- Graph events: `node:start`, `node:end`, `edge:traverse`, `state:update`, `graph:start`, `graph:end`.
+- Graph errors: `GraphValidationError`, `GraphCycleError`, `GraphStateError`, `GraphDeadEndError`.
+
+### Added — Guardrails (input/output safety)
+- `AgentConfig.beforeRun` and `AgentConfig.afterRun` hooks — modify text, pass through, or throw `GuardrailError` to abort.
+- Three built-in factories: `profanityFilter()` (word-list replacement), `piiDetector("redact" | "block")` (email, phone, SSN, credit card regex), `topicBlocker(topics)` (cosine-similarity blocking).
+- `GuardrailError` error class with `GUARDRAIL_BLOCKED` code.
+
+### Added — Structured output
+- `AgentConfig.outputSchema` (Zod schema) + `AgentConfig.maxRetries` (default 3). Appends JSON-schema instruction to system prompt, validates final output, retries on parse failure.
+- `AgentResult.structured` populated on success. `StructuredOutputError` thrown after exhausted retries.
+
+### Added — Scheduled agents
+- `SchedulerEngine` with `schedule()`, `trigger()`, `start()`, `stop()`. Cron expressions (via `node-cron`), interval shorthand (`"1h"`, `"30m"`), and one-shot ISO datetime triggers.
+- `max_runs` auto-disables after N runs. Store backends: `MemoryScheduleStore` (dev), `PostgresScheduleStore` (production, table: `tutti_schedules`).
+- Events: `schedule:triggered`, `schedule:completed`, `schedule:error`.
+- `AgentConfig.schedule` field and `AgentScheduleConfig` type.
+- CLI: `tutti-ai schedule [score]` daemon, `tutti-ai schedules list|enable|disable|trigger|runs` management.
+
+### Added — Time-travel debugging
+- `tutti-ai replay <session-id>` — interactive REPL for navigating session history from PostgreSQL.
+- Commands: `list`, `show <n>`, `next`/`prev`, `inspect`, `replay-from <n>` (re-run with original or new input), `export json|md`.
+
+### Package versions
+- `@tuttiai/types` 0.9.0
+- `@tuttiai/core` 0.14.0
+- `@tuttiai/cli` 0.13.0
 
 ## [0.19.0] - 2026-04-14
 
