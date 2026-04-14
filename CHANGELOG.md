@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added — Docker & deployment
+- Multi-stage `Dockerfile` (Node 20 Alpine): builder → deps → runner. Runs as non-root user `tutti` (uid 1001). HEALTHCHECK via `wget` every 30s against `/health`. ~333MB final image.
+- `packages/server/src/start.ts` — standalone entry point for Docker; reads all config from env vars (`TUTTI_PROVIDER`, `TUTTI_MODEL`, `TUTTI_SYSTEM_PROMPT`, `TUTTI_AGENT_NAME`, `TUTTI_PORT`, `TUTTI_HOST`). Built as `dist/start.js` alongside the library.
+- `docker-compose.yml` — three services (`tutti`, `postgres` via pgvector/pgvector:pg16, `redis:7-alpine`) on a shared `tutti-net` network with persistent volumes.
+- `.env.example` — documents all environment variables.
+- `.dockerignore` — excludes node_modules, dist, .git, docs, examples, coverage.
+- `scripts/deploy/railway.json` — one-click Railway deploy config.
+- `scripts/deploy/render.yaml` — one-click Render deploy config.
+- README "Deploy in 60 Seconds" section with docker-compose quick-start.
+
 ### Added — `@tuttiai/server@0.1.0` (REST API)
 - New `packages/server` package — the HTTP surface for `tutti-ai serve`.
 - `createServer(config: ServerConfig): FastifyInstance` builds a Fastify 5 app with bearer-token auth, four REST endpoints, and Fastify-native JSON Schema validation.

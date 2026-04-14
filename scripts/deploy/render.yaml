@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: tutti-server
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: TUTTI_API_KEY
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: TUTTI_PROVIDER
+        value: anthropic
+      - key: TUTTI_MODEL
+        value: claude-sonnet-4-20250514
+      - key: NODE_ENV
+        value: production
+
+  - type: pserv
+    name: tutti-redis
+    runtime: docker
+    dockerCommand: redis-server --appendonly yes
+    repo: https://hub.docker.com/_/redis
+    plan: starter
+    envVars:
+      - key: TUTTI_REDIS_URL
+        fromService:
+          type: pserv
+          name: tutti-redis
+          property: hostport
+        value: "redis://tutti-redis:6379"
+
+databases:
+  - name: tutti-db
+    plan: starter
+    postgresMajorVersion: "16"
+    ipAllowList: []

@@ -1,0 +1,56 @@
+services:
+  tutti:
+    build: .
+    ports:
+      - "${TUTTI_PORT:-3847}:3847"
+    env_file: .env
+    environment:
+      TUTTI_HOST: "0.0.0.0"
+      DATABASE_URL: "postgres://tutti:${POSTGRES_PASSWORD:-tutti_dev}@postgres:5432/tutti"
+      TUTTI_REDIS_URL: "redis://redis:6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tutti-net
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: tutti
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tutti_dev}
+      POSTGRES_DB: tutti
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tutti"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - tutti-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - tutti-net
+    restart: unless-stopped
+
+networks:
+  tutti-net:
+
+volumes:
+  pgdata:
+  redisdata:

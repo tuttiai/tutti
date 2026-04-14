@@ -203,6 +203,36 @@ tutti-ai doctor [score]     # Alias for check
 └──────────────────────────────────────────────────────┘
 ```
 
+## Deploy in 60 Seconds
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/tuttiai/tutti.git && cd tutti
+cp .env.example .env
+# Edit .env — set TUTTI_API_KEY and your LLM provider key
+
+# 2. Start everything (server + Postgres + Redis)
+docker compose up -d
+
+# 3. Verify
+curl http://localhost:3847/health
+# → {"status":"ok","version":"0.1.0","uptime_s":2}
+
+# 4. Run your first agent call
+curl -X POST http://localhost:3847/run \
+  -H "Authorization: Bearer <your-tutti-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "What is Tutti?"}'
+```
+
+The Docker image runs as non-root user `tutti` (uid 1001). Postgres uses
+[pgvector](https://github.com/pgvector/pgvector) for RAG and session storage.
+Redis is used for durable execution checkpoints.
+
+See [`.env.example`](.env.example) for all configuration options.
+One-click deploy configs for [Railway](scripts/deploy/railway.json) and
+[Render](scripts/deploy/render.yaml) are in `scripts/deploy/`.
+
 ## Testing
 
 217 tests across 18 files. 96% line coverage on core.
