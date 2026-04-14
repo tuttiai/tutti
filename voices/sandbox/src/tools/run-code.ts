@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Tool, ToolResult } from "@tuttiai/types";
 import { execute } from "../executor.js";
 import type { ExecOptions } from "../executor.js";
+import type { SessionSandbox } from "../sandbox.js";
 
 const parameters = z.object({
   code: z.string().min(1).describe("Source code to execute"),
@@ -23,22 +24,26 @@ type RunCodeInput = z.infer<typeof parameters>;
  * Create the `run_code` tool.
  *
  * @param defaults - Default {@link ExecOptions} applied to every call.
- *                   Per-call `timeout_ms` from the agent overrides the
- *                   default.
+ * @param sandbox  - When provided, the sandbox root is used as
+ *                   `working_dir` so executed code can access files the
+ *                   agent created via `sandbox_write_file`.
  */
 export function createRunCodeTool(
   defaults: ExecOptions = {},
+  sandbox?: SessionSandbox,
 ): Tool<RunCodeInput> {
   return {
     name: "run_code",
     description:
       "Execute a code snippet and return its stdout, stderr, and exit code. " +
-      "Supports TypeScript (via tsx), Python 3, and Bash.",
+      "Supports TypeScript (via tsx), Python 3, and Bash. " +
+      "The working directory is the sandbox root.",
     parameters,
     execute: async (input): Promise<ToolResult> => {
       try {
         const result = await execute(input.code, input.language, {
           ...defaults,
+          working_dir: sandbox?.root ?? defaults.working_dir,
           timeout_ms: input.timeout_ms ?? defaults.timeout_ms,
         });
 

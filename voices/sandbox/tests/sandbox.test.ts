@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import type { ToolContext } from "@tuttiai/types";
+import { describe, it, expect, afterEach } from "vitest";
+import { existsSync } from "node:fs";
+import type { ToolContext, VoiceContext } from "@tuttiai/types";
 import { SandboxVoice } from "../src/index.js";
 import { createRunCodeTool } from "../src/tools/run-code.js";
 
@@ -8,20 +9,87 @@ const ctx: ToolContext = {
   agent_name: "test-agent",
 };
 
+const voiceCtx: VoiceContext = {
+  session_id: "voice-test-" + Date.now(),
+  agent_name: "test-agent",
+};
+
 // ── SandboxVoice ─────────────────────────────────────────────
 
 describe("SandboxVoice", () => {
-  it("implements the Voice interface with 1 tool", () => {
-    const voice = new SandboxVoice();
-    expect(voice.name).toBe("sandbox");
-    expect(voice.required_permissions).toEqual(["shell"]);
-    expect(voice.tools).toHaveLength(1);
-    expect(voice.tools[0]?.name).toBe("run_code");
+  let voice: SandboxVoice;
+
+  afterEach(async () => {
+    if (voice) await voice.teardown();
   });
 
-  it("passes options through to the tool", () => {
-    const voice = new SandboxVoice({ timeout_ms: 5_000 });
-    expect(voice.tools).toHaveLength(1);
+  it("has no tools before setup", () => {
+    voice = new SandboxVoice();
+    expect(voice.name).toBe("sandbox");
+    expect(voice.required_permissions).toEqual(["shell"]);
+    expect(voice.tools).toHaveLength(0);
+  });
+
+  it("creates 4 tools after setup", async () => {
+    voice = new SandboxVoice();
+    await voice.setup(voiceCtx);
+
+    expect(voice.tools).toHaveLength(4);
+    const names = voice.tools.map((t) => t.name);
+    expect(names).toContain("run_code");
+    expect(names).toContain("sandbox_read_file");
+    expect(names).toContain("sandbox_write_file");
+    expect(names).toContain("install_package");
+  });
+
+  it("teardown removes the sandbox directory", async () => {
+    voice = new SandboxVoice();
+    await voice.setup(voiceCtx);
+
+    // Get the sandbox root before teardown.
+    const runCode = voice.tools.find((t) => t.name === "run_code");
+    const r = await runCode!.execute(
+      runCode!.parameters.parse({ code: "pwd", language: "bash" }),
+      ctx,
+    );
+    const dir = r.content.split("\n").find((l) => l.startsWith("stdout:"))
+      ?.replace("stdout:", "")
+      .trim();
+
+    await voice.teardown();
+    if (dir) expect(existsSync(dir)).toBe(false);
+  });
+
+  it("passes allowedPackages through to install_package", async () => {
+    voice = new SandboxVoice({ allowedPackages: ["lodash"] });
+    await voice.setup(voiceCtx);
+
+    const install = voice.tools.find((t) => t.name === "install_package");
+    const result = await install!.execute(
+      install!.parameters.parse({ name: "express" }),
+      ctx,
+    );
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("not in the allowed list");
+  });
+
+  it("run_code uses the sandbox as working_dir", async () => {
+    voice = new SandboxVoice();
+    await voice.setup(voiceCtx);
+
+    // Write a file then read it from run_code.
+    const write = voice.tools.find((t) => t.name === "sandbox_write_file");
+    await write!.execute(
+      write!.parameters.parse({ path: "data.txt", content: "hello" }),
+      ctx,
+    );
+
+    const run = voice.tools.find((t) => t.name === "run_code");
+    const r = await run!.execute(
+      run!.parameters.parse({ code: "cat data.txt", language: "bash" }),
+      ctx,
+    );
+    expect(r.content).toContain("hello");
   });
 });
 
