@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
 
 describe("GET /sessions/:id", () => {
-  let app: ReturnType<typeof buildTestServer>["app"] | undefined;
+  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
 
   afterEach(async () => {
     if (app) {
@@ -13,7 +13,7 @@ describe("GET /sessions/:id", () => {
   });
 
   it("returns session history after a run", async () => {
-    const harness = buildTestServer([textResponse("Hello!")]);
+    const harness = await buildTestServer([textResponse("Hello!")]);
     app = harness.app;
 
     // Run the agent to create a session.
@@ -43,7 +43,7 @@ describe("GET /sessions/:id", () => {
   });
 
   it("returns 404 for an unknown session id", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "GET",
@@ -56,7 +56,7 @@ describe("GET /sessions/:id", () => {
   });
 
   it("returns 401 without Authorization header", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "GET",

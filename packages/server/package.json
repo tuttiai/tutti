@@ -24,6 +24,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fastify/cors": "11.2.0",
+    "@fastify/rate-limit": "10.3.0",
     "@tuttiai/core": "*",
     "@tuttiai/types": "*",
     "fastify": "5.2.0"

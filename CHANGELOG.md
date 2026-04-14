@@ -11,8 +11,13 @@
 - **`GET /sessions/:id`** — returns session conversation history with timestamps.
 - **`GET /health`** — returns `{ status, version, uptime_s }`.
 - `src/middleware/auth.ts` — constant-time bearer-token verification; `/health` on public-paths allowlist; fail-closed when no key is configured.
+- `src/middleware/rate-limit.ts` — `@fastify/rate-limit` wrapper; 60 req/min per API key by default; configurable via `ServerConfig.rate_limit: { max, timeWindow }`; `/health` exempted; 429 with `{ error, retry_after_ms, request_id }`.
+- `src/middleware/cors.ts` — `@fastify/cors` wrapper; origins from `ServerConfig.cors_origins` → `TUTTI_ALLOWED_ORIGINS` env → `"*"` fallback; allows `Authorization` + `Content-Type` headers.
+- `src/middleware/errors.ts` — global Fastify error handler; maps TuttiError subtypes to HTTP status codes (`AuthenticationError→401`, `AgentNotFoundError→404`, `PermissionError→403`, `ToolTimeoutError→504`, `BudgetExceededError→402`); hides stack traces in production; logs 5xx with request ID.
+- `src/middleware/request-id.ts` — attaches `x-request-id` header to every response; echoes client-provided ID or generates UUID v4.
 - `src/cost.ts` — Sonnet-class fallback cost estimator matching `agent-router.ts`.
-- 20 integration tests across 4 files covering all endpoints, auth, validation, timeout, SSE parsing, session continuity, and error paths.
+- `createServer` is now async (required for Fastify plugin `register()` awaiting).
+- 42 integration tests across 8 files covering all endpoints, middleware layers, auth, validation, timeout, SSE parsing, error mapping, CORS, rate limiting, and request ID propagation.
 
 ## [0.18.0] - 2026-04-13
 

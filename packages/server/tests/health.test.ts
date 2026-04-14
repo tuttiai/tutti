@@ -4,7 +4,7 @@ import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
 import { SERVER_VERSION } from "../src/config.js";
 
 describe("GET /health", () => {
-  let app: ReturnType<typeof buildTestServer>["app"] | undefined;
+  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
 
   afterEach(async () => {
     if (app) {
@@ -14,7 +14,7 @@ describe("GET /health", () => {
   });
 
   it("returns 200 with status, version, and uptime_s", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({ method: "GET", url: "/health" });
 
@@ -27,7 +27,7 @@ describe("GET /health", () => {
   });
 
   it("skips authentication", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     // No Authorization header — should still succeed.
     const res = await app.inject({ method: "GET", url: "/health" });
@@ -35,14 +35,14 @@ describe("GET /health", () => {
   });
 
   it("returns 200 even when no api_key is configured", async () => {
-    ({ app } = buildTestServer([textResponse("unused")], { api_key: undefined }));
+    ({ app } = await buildTestServer([textResponse("unused")], { api_key: undefined }));
 
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
   });
 
   it("returns 401 on authenticated routes without a bearer token", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "POST",
@@ -54,14 +54,14 @@ describe("GET /health", () => {
   });
 
   it("binds and closes on an ephemeral port", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const address = await app.listen({ port: 0, host: "127.0.0.1" });
     expect(address).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
   });
 
   it("accepts a valid Authorization header on authenticated routes", async () => {
-    ({ app } = buildTestServer([textResponse("Hello!")]));
+    ({ app } = await buildTestServer([textResponse("Hello!")]));
 
     const res = await app.inject({
       method: "POST",

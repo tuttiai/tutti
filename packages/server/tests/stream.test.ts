@@ -18,7 +18,7 @@ function parseSSE(raw: string): Record<string, unknown>[] {
 }
 
 describe("POST /run/stream", () => {
-  let app: ReturnType<typeof buildTestServer>["app"] | undefined;
+  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
 
   afterEach(async () => {
     if (app) {
@@ -28,7 +28,7 @@ describe("POST /run/stream", () => {
   });
 
   it("returns SSE content-type and ends with run_complete", async () => {
-    ({ app } = buildTestServer([textResponse("Streamed!")]));
+    ({ app } = await buildTestServer([textResponse("Streamed!")]));
 
     const res = await app.inject({
       method: "POST",
@@ -52,7 +52,7 @@ describe("POST /run/stream", () => {
   });
 
   it("emits turn_start and turn_end events", async () => {
-    ({ app } = buildTestServer([textResponse("OK")]));
+    ({ app } = await buildTestServer([textResponse("OK")]));
 
     const res = await app.inject({
       method: "POST",
@@ -69,7 +69,7 @@ describe("POST /run/stream", () => {
   });
 
   it("returns 400 when input is missing", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "POST",
@@ -82,7 +82,7 @@ describe("POST /run/stream", () => {
   });
 
   it("returns 401 without Authorization header", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "POST",
@@ -94,7 +94,7 @@ describe("POST /run/stream", () => {
   });
 
   it("emits an error event when the runtime throws", async () => {
-    const harness = buildTestServer([]);
+    const harness = await buildTestServer([]);
     app = harness.app;
 
     harness.runtime.run = () => Promise.reject(new Error("boom"));

@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
 
 describe("POST /run", () => {
-  let app: ReturnType<typeof buildTestServer>["app"] | undefined;
+  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
 
   afterEach(async () => {
     if (app) {
@@ -13,7 +13,7 @@ describe("POST /run", () => {
   });
 
   it("returns the agent output with usage and cost", async () => {
-    ({ app } = buildTestServer([textResponse("Hello from Tutti!")]));
+    ({ app } = await buildTestServer([textResponse("Hello from Tutti!")]));
 
     const res = await app.inject({
       method: "POST",
@@ -34,7 +34,7 @@ describe("POST /run", () => {
   });
 
   it("continues an existing session when session_id is provided", async () => {
-    const harness = buildTestServer([
+    const harness = await buildTestServer([
       textResponse("First reply"),
       textResponse("Second reply"),
     ]);
@@ -61,7 +61,7 @@ describe("POST /run", () => {
   });
 
   it("returns 400 when input is missing", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "POST",
@@ -74,7 +74,7 @@ describe("POST /run", () => {
   });
 
   it("returns 400 when input is empty string", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "POST",
@@ -89,7 +89,7 @@ describe("POST /run", () => {
   it("returns 504 when the agent exceeds timeout_ms", async () => {
     // Provider that never resolves.
     const neverResolve = new Promise<never>(() => {});
-    const harness = buildTestServer([], { timeout_ms: 50 });
+    const harness = await buildTestServer([], { timeout_ms: 50 });
     app = harness.app;
 
     // Replace runtime.run with a never-resolving promise.
@@ -107,7 +107,7 @@ describe("POST /run", () => {
   });
 
   it("returns 401 without Authorization header", async () => {
-    ({ app } = buildTestServer([textResponse("unused")]));
+    ({ app } = await buildTestServer([textResponse("unused")]));
 
     const res = await app.inject({
       method: "POST",

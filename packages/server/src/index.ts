@@ -1,7 +1,11 @@
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { DEFAULT_TIMEOUT_MS } from "./config.js";
+import { registerRequestId } from "./middleware/request-id.js";
+import { registerCors } from "./middleware/cors.js";
+import { registerRateLimit } from "./middleware/rate-limit.js";
 import { registerAuth, resolveApiKey } from "./middleware/auth.js";
+import { registerErrorHandler } from "./middleware/errors.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerRunRoute } from "./routes/run.js";
 import { registerStreamRoute } from "./routes/stream.js";
@@ -24,23 +28,19 @@ import type { ServerConfig } from "./config.js";
 /**
  * Build (but do not start) the Tutti HTTP server.
  *
+ * Middleware is registered in order:
+ *  1. Request ID — attaches `x-request-id` to every response.
+ *  2. CORS — resolves from config / `TUTTI_ALLOWED_ORIGINS` / `"*"`.
+ *  3. Rate limit — 60 req/min per API key by default.
+ *  4. Bearer auth — fail-closed API key verification.
+ *  5. Global error handler — maps TuttiError subtypes to HTTP status codes.
+ *  6. Routes — /health, /run, /run/stream, /sessions/:id.
+ *
  * @param config - Runtime server configuration. See {@link ServerConfig}.
  * @returns A configured {@link FastifyInstance}. Call `.listen()` to bind
  *          a socket, or `.inject()` to exercise routes in tests.
- *
- * @example
- * ```ts
- * const runtime = new TuttiRuntime(score);
- * const app = createServer({
- *   port: 3847,
- *   host: "127.0.0.1",
- *   runtime,
- *   agent_name: "assistant",
- * });
- * await app.listen({ port: 3847, host: "127.0.0.1" });
- * ```
  */
-export function createServer(config: ServerConfig): FastifyInstance {
+export async function createServer(config: ServerConfig): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false,
     disableRequestLogging: true,
@@ -49,7 +49,25 @@ export function createServer(config: ServerConfig): FastifyInstance {
 
   const timeoutMs = config.timeout_ms ?? DEFAULT_TIMEOUT_MS;
 
+  // 1. Request ID
+  registerRequestId(app);
+
+  // 2. CORS (plugin — must be awaited)
+  await registerCors(app, config.cors_origins);
+
+  // 3. Rate limit (plugin — must be awaited; false disables)
+  if (config.rate_limit !== false) {
+    const rl = config.rate_limit === undefined ? undefined : config.rate_limit;
+    await registerRateLimit(app, rl);
+  }
+
+  // 4. Auth
   registerAuth(app, { api_key: resolveApiKey(config.api_key) });
+
+  // 5. Global error handler
+  registerErrorHandler(app);
+
+  // 6. Routes
   registerHealthRoute(app);
   registerRunRoute(app, config.runtime, config.agent_name, timeoutMs);
   registerStreamRoute(app, config.runtime, config.agent_name);

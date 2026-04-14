@@ -79,10 +79,10 @@ export interface TestHarness {
  * @param responses - Canned LLM responses the mock provider returns.
  * @param overrides - Extra {@link ServerConfig} fields to merge.
  */
-export function buildTestServer(
+export async function buildTestServer(
   responses: ChatResponse[],
   overrides: Partial<ServerConfig> = {},
-): TestHarness {
+): Promise<TestHarness> {
   const provider = createMockProvider(responses);
 
   const score: ScoreConfig = {
@@ -99,7 +99,7 @@ export function buildTestServer(
 
   const runtime = new TuttiRuntime(score);
 
-  const app = createServer({
+  const app = await createServer({
     port: 0,
     host: "127.0.0.1",
     api_key: API_KEY,

@@ -21,17 +21,18 @@ export const DEFAULT_TIMEOUT_MS = 120_000;
 export const SERVER_VERSION = "0.1.0";
 
 /**
- * Optional per-window rate limit configuration applied to all routes.
+ * Rate-limit policy applied to authenticated routes.
  *
  * @remarks
- * The server itself only exposes this shape; enforcement lives in the
- * rate-limit middleware.
+ * Backed by `@fastify/rate-limit`. The `timeWindow` value is passed
+ * directly to the plugin and accepts human-readable strings like
+ * `"1 minute"` or `"30 seconds"`.
  */
 export interface RateLimitConfig {
-  /** Maximum number of requests allowed in a single window. */
+  /** Maximum requests allowed within a single window. */
   max: number;
-  /** Window length in milliseconds. */
-  window_ms: number;
+  /** Window duration — e.g. `"1 minute"`, `"30 seconds"`. */
+  timeWindow: string;
 }
 
 /**
@@ -53,8 +54,16 @@ export interface ServerConfig {
    * Falls back to `TUTTI_API_KEY` env var when omitted.
    */
   api_key?: string;
-  /** Optional rate-limit policy applied to all routes. */
-  rate_limit?: RateLimitConfig;
+  /**
+   * Rate-limit policy. Defaults to 60 req/min per API key.
+   * Pass `false` to disable entirely.
+   */
+  rate_limit?: RateLimitConfig | false;
+  /**
+   * Allowed CORS origins. Falls back to the `TUTTI_ALLOWED_ORIGINS` env
+   * var (comma-separated), then `"*"` (open) if neither is set.
+   */
+  cors_origins?: string | readonly string[];
   /** Pre-built runtime that owns the provider, event bus, and sessions. */
   runtime: TuttiRuntime;
   /** Agent key in the score's `agents` map to expose over HTTP. */

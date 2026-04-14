@@ -54,6 +54,8 @@ export function registerRunRoute(
       if (timer) clearTimeout(timer);
       unsubStream();
 
+      // Route-local timeout handling — not a TuttiError, so we handle it
+      // here rather than letting the global error handler map it.
       const isTimeout = err instanceof Error && err.message === "TIMEOUT";
       if (isTimeout) {
         return reply.code(504).send({
@@ -64,8 +66,9 @@ export function registerRunRoute(
         });
       }
 
-      const message = err instanceof Error ? err.message : "Internal server error";
-      return reply.code(500).send({ error: "run_failed", message });
+      // Everything else (TuttiError subclasses, provider failures, etc.)
+      // propagates to the global error handler.
+      throw err;
     }
   });
 }
