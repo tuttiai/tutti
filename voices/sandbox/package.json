@@ -1,0 +1,48 @@
+{
+  "name": "@tuttiai/sandbox",
+  "version": "0.1.0",
+  "description": "Sandbox voice for Tutti — secure code execution for TypeScript, Python, and Bash",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.7.0"
+  },
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "orchestration",
+    "voice",
+    "sandbox",
+    "execution",
+    "typescript",
+    "python",
+    "bash"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "voices/sandbox"
+  },
+  "homepage": "https://tutti-ai.com"
+}

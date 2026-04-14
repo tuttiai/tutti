@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/sandbox@0.1.0` (code execution voice)
+- New `voices/sandbox` package — gives agents a `run_code` tool for TypeScript, Python 3, and Bash.
+- Core executor (`src/executor.ts`): spawns `child_process.spawn` with `detached: false`, kills process + children on timeout via `SIGKILL`, returns `{ stdout, stderr, exit_code, duration_ms, truncated }`.
+- TypeScript runs via `npx tsx --no-cache` with `.mts` extension (ESM, top-level await). Python writes to a temp file. Bash uses `/bin/bash -c`.
+- Output sanitization: ANSI escape codes stripped, stdout/stderr truncated to 10 KB each, host filesystem paths redacted from error messages.
+- `SandboxVoiceOptions`: `{ timeout_ms?, working_dir?, env? }`. Tool-level `timeout_ms` capped at 120s.
+- 34 unit tests across 3 files covering all three languages, timeout kill, truncation, ANSI stripping, path redaction, spawn errors, and tool validation.
+
 ### Added — `@tuttiai/web@0.1.0` (web voice)
 - New `voices/web` package — gives agents 3 tools: `web_search`, `fetch_url`, `fetch_sitemap`.
 - `WebVoiceConfig` — `{ provider?, cache?, max_results?, rate_limit?, timeout_ms? }`. Provider accepts `"brave" | "serper" | "duckduckgo"` string or a custom `SearchProvider` instance. `max_results` sets the default result count for `web_search` (1–20, default 5).
