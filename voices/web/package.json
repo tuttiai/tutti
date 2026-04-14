@@ -1,7 +1,7 @@
 {
   "name": "@tuttiai/web",
   "version": "0.1.0",
-  "description": "Web search voice for Tutti — search the web with Brave, Serper, or DuckDuckGo",
+  "description": "Web voice for Tutti — search, fetch pages, and read sitemaps with Brave, Serper, or DuckDuckGo",
   "type": "module",
   "exports": {
     ".": {
@@ -25,11 +25,13 @@
   },
   "dependencies": {
     "@mozilla/readability": "0.6.0",
-    "@tuttiai/core": "*",
-    "@tuttiai/types": "*",
     "linkedom": "0.18.12",
     "lru-cache": "11.3.5",
     "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.7.0"
   },
   "keywords": [
     "tutti",
@@ -41,7 +43,9 @@
     "search",
     "brave",
     "serper",
-    "duckduckgo"
+    "duckduckgo",
+    "fetch",
+    "sitemap"
   ],
   "license": "MIT",
   "repository": {
