@@ -11,6 +11,15 @@ import type {
 import { TuttiRuntime } from "./runtime.js";
 import type { EventBus } from "./event-bus.js";
 
+/** Safe lookup into score.agents by dynamic key. */
+function getAgent(
+  agents: ScoreConfig["agents"],
+  id: string,
+): ScoreConfig["agents"][string] | undefined {
+  const map = new Map(Object.entries(agents));
+  return map.get(id);
+}
+
 // Sonnet-class fallback pricing (per million tokens) — matches eval runner.
 const DEFAULT_INPUT_PER_M = 3;
 const DEFAULT_OUTPUT_PER_M = 15;
@@ -66,8 +75,7 @@ export class AgentRouter {
       }
       const available = Object.keys(_score.agents);
       for (const id of entry.agents) {
-        // eslint-disable-next-line security/detect-object-injection -- id from validated entry.agents array
-        if (!_score.agents[id]) {
+        if (!getAgent(_score.agents, id)) {
           throw new Error(
             `Parallel entry agent "${id}" not found. Available: ${available.join(", ")}`,
           );
@@ -80,8 +88,7 @@ export class AgentRouter {
 
     // Build a modified score where the entry agent has the delegate tool
     const entryId = entry ?? "orchestrator";
-    // eslint-disable-next-line security/detect-object-injection -- entryId from score.entry config
-    const entryAgent = _score.agents[entryId];
+    const entryAgent = getAgent(_score.agents, entryId);
 
     if (!entryAgent) {
       const available = Object.keys(_score.agents).join(", ");
@@ -98,8 +105,7 @@ export class AgentRouter {
 
     // Validate all delegate IDs exist
     for (const delegateId of entryAgent.delegates) {
-      // eslint-disable-next-line security/detect-object-injection -- delegateId from validated delegates array
-      if (!_score.agents[delegateId]) {
+      if (!getAgent(_score.agents, delegateId)) {
         throw new Error(
           `Delegate "${delegateId}" not found in agents. Available: ${Object.keys(_score.agents).join(", ")}`,
         );
@@ -190,8 +196,7 @@ export class AgentRouter {
     // Validate agent IDs up-front so we fail fast on typos
     const available = Object.keys(this._score.agents);
     for (const { agent_id } of inputs) {
-      // eslint-disable-next-line security/detect-object-injection -- agent_id from validated inputs array
-      if (!this._score.agents[agent_id]) {
+      if (!getAgent(this._score.agents, agent_id)) {
         throw new Error(
           `Parallel input references unknown agent "${agent_id}". Available: ${available.join(", ")}`,
         );
@@ -311,8 +316,10 @@ export class AgentRouter {
     score: ScoreConfig,
     entryId: string,
   ): ScoreConfig {
-    // eslint-disable-next-line security/detect-object-injection -- entryId validated in constructor
-    const entryAgent = score.agents[entryId];
+    const entryAgent = getAgent(score.agents, entryId);
+    if (!entryAgent) {
+      throw new Error(`Entry agent "${entryId}" not found.`);
+    }
     if (!entryAgent.delegates || entryAgent.delegates.length === 0) {
       throw new Error(`Entry agent "${entryId}" has no delegates.`);
     }
@@ -331,9 +338,8 @@ export class AgentRouter {
     // Enhance the system prompt with delegate info
     const delegateDescriptions = delegates
       .map((id) => {
-        // eslint-disable-next-line security/detect-object-injection -- id from validated delegates array
-        const agent = score.agents[id];
-        return `  - "${id}": ${agent.name}${agent.description ? ` — ${agent.description}` : ""}`;
+        const agent = getAgent(score.agents, id);
+        return `  - "${id}": ${agent?.name ?? id}${agent?.description ? ` — ${agent.description}` : ""}`;
       })
       .join("\n");
 
@@ -345,15 +351,16 @@ ${delegateDescriptions}
 When the user's request matches a specialist's expertise, delegate to them with a clear task description. You can delegate to multiple specialists in sequence. After receiving a specialist's response, summarize the result for the user.`;
 
     // Return a new score with the modified entry agent
+    const enhanced: ScoreConfig["agents"][string] = {
+      ...entryAgent,
+      system_prompt: enhancedPrompt,
+      voices: [...entryAgent.voices, routerVoice],
+    };
     return {
       ...score,
       agents: {
         ...score.agents,
-        [entryId]: {
-          ...entryAgent,
-          system_prompt: enhancedPrompt,
-          voices: [...entryAgent.voices, routerVoice],
-        },
+        [entryId]: enhanced,
       },
     };
   }
@@ -365,8 +372,7 @@ When the user's request matches a specialist's expertise, delegate to them with 
   ): Tool<{ agent_id: string; task: string }> {
     const runtime = (): TuttiRuntime => this.runtime;
     const events = (): EventBus => this.runtime.events;
-    // eslint-disable-next-line security/detect-object-injection -- entryId validated in constructor
-    const entryName = score.agents[entryId]?.name ?? "orchestrator";
+    const entryName = getAgent(score.agents, entryId)?.name ?? "orchestrator";
 
     const parameters = z.object({
       agent_id: z

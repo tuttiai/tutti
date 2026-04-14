@@ -33,7 +33,6 @@ export function createReadFileTool(
     execute: async (input): Promise<ToolResult> => {
       try {
         const resolved = sandbox.resolve(input.path);
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path resolved via sandbox.resolve() which enforces confinement
         const content = await readFile(resolved, input.encoding);
         return { content };
       } catch (err) {

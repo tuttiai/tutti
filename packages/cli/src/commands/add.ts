@@ -7,14 +7,14 @@ import { createLogger } from "@tuttiai/core";
 
 const logger = createLogger("tutti-cli");
 
-const OFFICIAL_VOICES: Record<string, { package: string; setup: string }> = {
-  filesystem: {
+const OFFICIAL_VOICES = new Map<string, { package: string; setup: string }>([
+  ["filesystem", {
     package: "@tuttiai/filesystem",
     setup: `  Add to your score:
     ${chalk.cyan('import { FilesystemVoice } from "@tuttiai/filesystem"')}
     ${chalk.cyan("voices: [new FilesystemVoice()]")}`,
-  },
-  github: {
+  }],
+  ["github", {
     package: "@tuttiai/github",
     setup: `  Add ${chalk.bold("GITHUB_TOKEN")} to your .env file:
     ${chalk.cyan("GITHUB_TOKEN=ghp_your_token_here")}
@@ -22,8 +22,8 @@ const OFFICIAL_VOICES: Record<string, { package: string; setup: string }> = {
   Add to your score:
     ${chalk.cyan('import { GitHubVoice } from "@tuttiai/github"')}
     ${chalk.cyan("voices: [new GitHubVoice()]")}`,
-  },
-  playwright: {
+  }],
+  ["playwright", {
     package: "@tuttiai/playwright",
     setup: `  Install the browser:
     ${chalk.cyan("npx playwright install chromium")}
@@ -31,8 +31,8 @@ const OFFICIAL_VOICES: Record<string, { package: string; setup: string }> = {
   Add to your score:
     ${chalk.cyan('import { PlaywrightVoice } from "@tuttiai/playwright"')}
     ${chalk.cyan("voices: [new PlaywrightVoice()]")}`,
-  },
-  postgres: {
+  }],
+  ["postgres", {
     package: "pg",
     setup: `  Add ${chalk.bold("DATABASE_URL")} to your .env file:
     ${chalk.cyan("DATABASE_URL=postgres://user:pass@localhost:5432/tutti")}
@@ -45,15 +45,14 @@ const OFFICIAL_VOICES: Record<string, { package: string; setup: string }> = {
 
   Use the async factory for initialization:
     ${chalk.cyan("const tutti = await TuttiRuntime.create(score)")}`,
-  },
-};
+  }],
+]);
 
 function resolvePackageName(input: string): string {
   // Known official voice
-  // eslint-disable-next-line security/detect-object-injection -- key from known static OFFICIAL_VOICES map
-  if (OFFICIAL_VOICES[input]) {
-    // eslint-disable-next-line security/detect-object-injection -- key from known static OFFICIAL_VOICES map
-    return OFFICIAL_VOICES[input].package;
+  const voice = OFFICIAL_VOICES.get(input);
+  if (voice) {
+    return voice.package;
   }
   // Already a scoped package
   if (input.startsWith("@")) {
@@ -65,11 +64,9 @@ function resolvePackageName(input: string): string {
 
 function isAlreadyInstalled(packageName: string): boolean {
   const pkgPath = resolve(process.cwd(), "package.json");
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   if (!existsSync(pkgPath)) return false;
 
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     const deps: Record<string, string> = { ...pkg.dependencies, ...pkg.devDependencies };
     return packageName in deps;
@@ -83,7 +80,6 @@ export function addCommand(voiceName: string): void {
 
   // Check if package.json exists in cwd
   const pkgPath = resolve(process.cwd(), "package.json");
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   if (!existsSync(pkgPath)) {
     logger.error("No package.json found in the current directory");
     console.error(chalk.dim('Run "tutti-ai init" to create a new project first.'));
@@ -113,8 +109,7 @@ export function addCommand(voiceName: string): void {
   }
 
   // Print setup instructions
-  // eslint-disable-next-line security/detect-object-injection -- key from user CLI arg matched against known map
-  const official = OFFICIAL_VOICES[voiceName];
+  const official = OFFICIAL_VOICES.get(voiceName);
   if (official) {
     console.log();
     console.log("  Setup:");

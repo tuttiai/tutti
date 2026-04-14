@@ -17,7 +17,6 @@ export async function loadFromFile(path: string): Promise<LoadedSource> {
   // The dynamic path IS the contract — callers ingest arbitrary local
   // files. Path traversal is the caller's responsibility (sanitise before
   // passing in); we deliberately don't second-guess the resolved path here.
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
   const buffer = await readFile(resolved);
   return { buffer, filename: basename(resolved) };
 }

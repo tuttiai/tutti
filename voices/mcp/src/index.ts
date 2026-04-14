@@ -162,7 +162,7 @@ function jsonSchemaToZod(schema: Record<string, unknown>): z.ZodTypeAny {
     return z.record(z.unknown());
   }
 
-  const shape: Record<string, z.ZodTypeAny> = {};
+  const shapeMap = new Map<string, z.ZodTypeAny>();
   for (const [key, prop] of Object.entries(properties)) {
     let field: z.ZodTypeAny = convertType(prop);
     if (typeof prop.description === "string") {
@@ -171,11 +171,10 @@ function jsonSchemaToZod(schema: Record<string, unknown>): z.ZodTypeAny {
     if (!required.includes(key)) {
       field = field.optional();
     }
-    // eslint-disable-next-line security/detect-object-injection -- key from Object.entries of MCP schema properties
-    shape[key] = field;
+    shapeMap.set(key, field);
   }
 
-  return z.object(shape).passthrough();
+  return z.object(Object.fromEntries(shapeMap)).passthrough();
 }
 
 function convertType(prop: Record<string, unknown>): z.ZodTypeAny {

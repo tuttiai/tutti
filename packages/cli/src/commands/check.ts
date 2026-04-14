@@ -20,7 +20,6 @@ export async function checkCommand(scorePath?: string): Promise<void> {
 
   console.log(chalk.cyan(`\nChecking ${file}...\n`));
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(file)) {
     fail("Score file not found: " + file);
     process.exit(1);
@@ -80,12 +79,11 @@ export async function checkCommand(scorePath?: string): Promise<void> {
       const voiceName = voice.name;
 
       // Check for known voices and their env vars
-      const voiceEnvMap: Record<string, string> = {
-        github: "GITHUB_TOKEN",
-      };
+      const voiceEnvMap = new Map<string, string>([
+        ["github", "GITHUB_TOKEN"],
+      ]);
 
-      // eslint-disable-next-line security/detect-object-injection -- key from voice name, matched against known env map
-      const envVar = voiceEnvMap[voiceName];
+      const envVar = voiceEnvMap.get(voiceName);
       if (envVar) {
         const key = SecretsManager.optional(envVar);
         if (key) {

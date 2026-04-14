@@ -118,8 +118,8 @@ export class TuttiRuntime {
     input: string,
     session_id?: string,
   ): Promise<AgentResult> {
-    // eslint-disable-next-line security/detect-object-injection -- agent_name validated against score.agents below
-    const agent = this._score.agents[agent_name];
+    const agentMap = new Map(Object.entries(this._score.agents));
+    const agent = agentMap.get(agent_name);
     if (!agent) {
       throw new AgentNotFoundError(agent_name, Object.keys(this._score.agents));
     }

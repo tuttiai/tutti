@@ -15,13 +15,13 @@ import type { ScheduleConfig, ScheduledRun, ScheduleRecord } from "./types.js";
 
 // eslint-disable-next-line security/detect-unsafe-regex -- simple regex with no nested quantifiers
 const INTERVAL_RE = /^(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)$/;
-const MULTIPLIERS: Record<string, number> = {
-  ms: 1,
-  s: 1_000,
-  m: 60_000,
-  h: 3_600_000,
-  d: 86_400_000,
-};
+const MULTIPLIERS = new Map<string, number>([
+  ["ms", 1],
+  ["s", 1_000],
+  ["m", 60_000],
+  ["h", 3_600_000],
+  ["d", 86_400_000],
+]);
 
 /**
  * Parse a human-friendly interval string into milliseconds.
@@ -40,8 +40,7 @@ export function parseInterval(every: string): number {
   }
   const value = parseFloat(match[1] ?? "0");
   const unit = match[2] ?? "ms";
-  // eslint-disable-next-line security/detect-object-injection -- unit from regex match against known set (ms|s|m|h|d)
-  return value * (MULTIPLIERS[unit] ?? 0);
+  return value * (MULTIPLIERS.get(unit) ?? 0);
 }
 
 /**

@@ -195,7 +195,7 @@ export async function executeGraph(
 
   // ── Mutable run state ──────────────────────────────────────────
   const visits = new Map<string, number>();
-  const outputs: Record<string, NodeResult> = {};
+  const outputs = new Map<string, NodeResult>();
   const path: string[] = [];
   const totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
 
@@ -245,8 +245,7 @@ export async function executeGraph(
 
     totalUsage.input_tokens += usage.input_tokens;
     totalUsage.output_tokens += usage.output_tokens;
-    // eslint-disable-next-line security/detect-object-injection -- currentNodeId from validated graph nodes
-    outputs[currentNodeId] = nodeResult;
+    outputs.set(currentNodeId, nodeResult);
     path.push(currentNodeId);
 
     // State update
@@ -289,8 +288,7 @@ export async function executeGraph(
 
           totalUsage.input_tokens += branch.usage.input_tokens;
           totalUsage.output_tokens += branch.usage.output_tokens;
-          // eslint-disable-next-line security/detect-object-injection -- targetId from validated graph edges
-          outputs[targetId] = branch.nodeResult;
+          outputs.set(targetId, branch.nodeResult);
           path.push(targetId);
 
           const branchState = applyStateUpdate(targetId, branch.nodeResult, state, config);
@@ -343,11 +341,10 @@ export async function executeGraph(
 
   // ── Build result ───────────────────────────────────────────────
   const lastNodeId = path.at(-1);
-  // eslint-disable-next-line security/detect-object-injection -- lastNodeId from validated graph path
-  const finalOutput = lastNodeId ? (outputs[lastNodeId]?.output ?? "") : "";
+  const finalOutput = lastNodeId ? (outputs.get(lastNodeId)?.output ?? "") : "";
 
   const result: GraphRunResult = {
-    outputs,
+    outputs: Object.fromEntries(outputs),
     path,
     final_output: finalOutput,
     total_usage: totalUsage,

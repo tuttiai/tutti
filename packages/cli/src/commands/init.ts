@@ -27,7 +27,6 @@ export async function initCommand(projectName?: string, templateId?: string): Pr
 
   const dir = join(process.cwd(), projectName);
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via join() from cwd
   if (existsSync(dir)) {
     logger.error({ dir: `${projectName}/` }, "Directory already exists");
     process.exit(1);
@@ -57,7 +56,6 @@ export async function initCommand(projectName?: string, templateId?: string): Pr
     if (!template) template = TEMPLATES[0];
   }
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via join() from cwd
   mkdirSync(dir, { recursive: true });
 
   const deps: Record<string, string> = {
@@ -145,7 +143,6 @@ npm run dev
   };
 
   for (const [filename, content] of Object.entries(files)) {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via join() with validated dir
     writeFileSync(join(dir, filename), content);
   }
 

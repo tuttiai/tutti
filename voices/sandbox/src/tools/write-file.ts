@@ -48,9 +48,7 @@ export function createWriteFileTool(
         }
 
         const resolved = sandbox.resolve(input.path);
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path resolved via sandbox.resolve() which enforces confinement
         await mkdir(dirname(resolved), { recursive: true });
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path resolved via sandbox.resolve() which enforces confinement
         await writeFile(resolved, input.content, "utf-8");
         return { content: "Wrote " + input.path + " (" + bytes + " bytes)" };
       } catch (err) {

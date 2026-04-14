@@ -19,9 +19,7 @@ interface PkgJson {
 
 function readPkg(dir: string): PkgJson | undefined {
   const p = resolve(dir, "package.json");
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(p)) return undefined;
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   return JSON.parse(readFileSync(p, "utf-8")) as PkgJson;
 }
 
@@ -50,7 +48,6 @@ export async function publishCommand(opts: { dryRun?: boolean }): Promise<void> 
 
   // 1a. Must be a voice directory
   if (!pkg) fail("No package.json found in the current directory.");
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   if (!existsSync(resolve(cwd, "src/index.ts"))) fail("No src/index.ts found — are you inside a voice directory?");
 
   // 1b. Required fields
@@ -70,7 +67,6 @@ export async function publishCommand(opts: { dryRun?: boolean }): Promise<void> 
   if (!validName) fail("Package name must start with @tuttiai/ or tutti — got: " + name);
 
   // 1d. Check required_permissions is declared in source
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   const src = readFileSync(resolve(cwd, "src/index.ts"), "utf-8");
   if (!src.includes("required_permissions")) {
     fail("Voice class must declare required_permissions in src/index.ts");
@@ -247,18 +243,19 @@ async function openRegistryPR(
     tags: [shortName],
   };
 
-  // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
-  if (!registry[section]) registry[section] = [];
-  // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
-  const exists = registry[section].some((v) => v.package === packageName);
-  if (exists) {
-    // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
-    const idx = registry[section].findIndex((v) => v.package === packageName);
-    // eslint-disable-next-line security/detect-object-injection -- idx from findIndex on validated array, section is typed
-    registry[section][idx] = { ...registry[section][idx], ...entry };
+  const sectionList = section === "official" ? registry.official : registry.community;
+  const list = sectionList ?? [];
+  if (section === "official") {
+    registry.official = list;
   } else {
-    // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
-    registry[section].push(entry);
+    registry.community = list;
+  }
+  const existingIdx = list.findIndex((v) => v.package === packageName);
+  if (existingIdx >= 0) {
+    const existing = list.at(existingIdx);
+    list.splice(existingIdx, 1, { ...existing, ...entry });
+  } else {
+    list.push(entry);
   }
 
   const updatedContent = Buffer.from(JSON.stringify(registry, null, 2) + "\n").toString("base64");

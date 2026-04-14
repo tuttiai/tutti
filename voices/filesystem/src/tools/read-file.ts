@@ -21,7 +21,6 @@ export const readFileTool: Tool<z.infer<typeof parameters>> = {
       const filePath = PathSanitizer.sanitize(input.path);
       PathSanitizer.assertSafe(filePath);
       await PathSanitizer.assertMaxSize(filePath);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
       const content = await readFile(filePath, input.encoding);
       return { content };
     } catch (error) {

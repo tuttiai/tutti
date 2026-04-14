@@ -139,9 +139,8 @@ export function createIngestDocumentTool(
 
         const embedded: EmbeddedChunk[] = [];
         for (const [i, c] of chunks.entries()) {
-          // Bounded numeric index — length guard above ensures this is in range.
-          // eslint-disable-next-line security/detect-object-injection
-          const vector = vectors[i];
+          // Length guard above ensures vectors[i] exists; fallback satisfies the type checker.
+          const vector = vectors.at(i) ?? [];
           embedded.push({
             ...c,
             vector,

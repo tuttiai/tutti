@@ -22,13 +22,10 @@ export const writeFileTool: Tool<z.infer<typeof parameters>> = {
       const filePath = PathSanitizer.sanitize(input.path);
       PathSanitizer.assertSafe(filePath);
       if (input.append) {
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
         await appendFile(filePath, input.content, "utf-8");
       } else {
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
         await writeFile(filePath, input.content, "utf-8");
       }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
       const info = await stat(filePath);
       const action = input.append ? "Appended to" : "Wrote";
       return {

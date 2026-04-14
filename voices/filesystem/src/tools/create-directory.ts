@@ -17,11 +17,9 @@ export const createDirectoryTool: Tool<z.infer<typeof parameters>> = {
     try {
       const dirPath = PathSanitizer.sanitize(input.path);
       PathSanitizer.assertSafe(dirPath);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
       if (existsSync(dirPath)) {
         return { content: `Directory already exists: ${dirPath}` };
       }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
       await mkdir(dirPath, { recursive: true });
       return { content: `Created directory: ${dirPath}` };
     } catch (error) {

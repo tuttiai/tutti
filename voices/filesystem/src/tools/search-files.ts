@@ -25,7 +25,6 @@ async function collectFiles(dir: string, filePattern?: string): Promise<string[]
     return matches.map((m) => join(dir, m));
   }
   const files: string[] = [];
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir sanitized via PathSanitizer before call
   const entries = await readdir(dir, { withFileTypes: true, recursive: true });
   for (const entry of entries) {
     if (entry.isFile()) {
@@ -49,7 +48,6 @@ export const searchFilesTool: Tool<z.infer<typeof parameters>> = {
     }
 
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
       await stat(dirPath);
     } catch (error) {
       return { content: fsErrorMessage(error, dirPath), is_error: true };
@@ -64,15 +62,13 @@ export const searchFilesTool: Tool<z.infer<typeof parameters>> = {
       const results: string[] = [];
       for (const filePath of files) {
         try {
-          // eslint-disable-next-line security/detect-non-literal-fs-filename -- path from sanitized directory listing
           const content = await readFile(filePath, "utf-8");
           const lines = content.split("\n");
           const matches: string[] = [];
           for (let i = 0; i < lines.length; i++) {
-            // eslint-disable-next-line security/detect-object-injection -- index from bounded loop
-            if (regex.test(lines[i])) {
-              // eslint-disable-next-line security/detect-object-injection -- index from bounded loop
-              matches.push(`  ${i + 1}: ${lines[i]}`);
+            const line = lines.at(i);
+            if (line !== undefined && regex.test(line)) {
+              matches.push(`  ${i + 1}: ${line}`);
             }
           }
           if (matches.length > 0) {

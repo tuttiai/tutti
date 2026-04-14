@@ -266,11 +266,17 @@ function convertJsonSchemaToGemini(
   schema: Record<string, unknown>,
 ): FunctionDeclaration["parameters"] {
   const type = schema.type as string;
-  const geminiType = type?.toUpperCase() as keyof typeof SchemaType;
+  const schemaTypeMap = new Map<string, SchemaType>([
+    ["STRING", SchemaType.STRING],
+    ["NUMBER", SchemaType.NUMBER],
+    ["INTEGER", SchemaType.INTEGER],
+    ["BOOLEAN", SchemaType.BOOLEAN],
+    ["ARRAY", SchemaType.ARRAY],
+    ["OBJECT", SchemaType.OBJECT],
+  ]);
 
   return {
-    // eslint-disable-next-line security/detect-object-injection -- geminiType derived from JSON schema type field
-    type: SchemaType[geminiType] ?? SchemaType.OBJECT,
+    type: schemaTypeMap.get(type?.toUpperCase() ?? "") ?? SchemaType.OBJECT,
     properties: schema.properties as Record<string, unknown> | undefined,
     required: schema.required as string[] | undefined,
     description: schema.description as string | undefined,

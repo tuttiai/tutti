@@ -33,7 +33,6 @@ export async function serveCommand(
   // ── Resolve score file ──────────────────────────────────────
   const file = resolve(scorePath ?? "./tutti.score.ts");
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(file)) {
     logger.error({ file }, "Score file not found");
     console.error(chalk.dim('Run "tutti-ai init" to create a new project.'));
@@ -75,8 +74,7 @@ export async function serveCommand(
     (typeof score.entry === "string" ? score.entry : undefined) ??
     agentNames[0];
 
-  // eslint-disable-next-line security/detect-object-injection -- agentName from CLI option or score entry config
-  if (!agentName || !score.agents[agentName]) {
+  if (!agentName || !Object.hasOwn(score.agents, agentName)) {
     logger.error(
       { requested: agentName, available: agentNames },
       "Agent not found in score",

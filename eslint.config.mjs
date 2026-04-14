@@ -61,11 +61,27 @@ export default tseslint.config(
     },
   },
 
-  // CLI commands: allow console.log for user-facing output
+  // CLI commands: allow console.log and dynamic file paths (score loading,
+  // export, init scaffolding all operate on user-supplied paths resolved
+  // at runtime via path.resolve()).
   {
     files: ["packages/cli/src/**/*.ts"],
     rules: {
       "no-console": "off",
+      "security/detect-non-literal-fs-filename": "off",
+    },
+  },
+
+  // Voices that perform dynamic file I/O as their core purpose.
+  // Paths are validated through PathSanitizer before use.
+  {
+    files: [
+      "voices/filesystem/src/**/*.ts",
+      "voices/sandbox/src/**/*.ts",
+      "voices/rag/src/**/*.ts",
+    ],
+    rules: {
+      "security/detect-non-literal-fs-filename": "off",
     },
   },
 

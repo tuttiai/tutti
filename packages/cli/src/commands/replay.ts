@@ -165,12 +165,10 @@ export async function replayCommand(
           const format = args[0];
           if (format === "json") {
             const filename = "session-" + session.id.slice(0, 8) + ".json";
-            // eslint-disable-next-line security/detect-non-literal-fs-filename -- filename built from validated session ID
             await writeFile(filename, exportJSON(session));
             console.log(chalk.green("Exported to " + filename));
           } else if (format === "md" || format === "markdown") {
             const filename = "session-" + session.id.slice(0, 8) + ".md";
-            // eslint-disable-next-line security/detect-non-literal-fs-filename -- filename built from validated session ID
             await writeFile(filename, exportMarkdown(session));
             console.log(chalk.green("Exported to " + filename));
           } else {
@@ -200,15 +198,13 @@ async function handleReplayFrom(
   opts: ReplayOptions,
 ): Promise<void> {
   const scoreFile = resolve(opts.score ?? "./tutti.score.ts");
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(scoreFile)) {
     console.log(chalk.red("Score file not found: " + scoreFile));
     console.log(chalk.dim("Use --score to specify the score file."));
     return;
   }
 
-  // eslint-disable-next-line security/detect-object-injection -- turn is a validated integer index
-  const originalMsg = session.messages[turn];
+  const originalMsg = session.messages.at(turn);
   const originalInput = originalMsg ? messageToText(originalMsg) : "";
 
   const answer = await rl.question(
@@ -257,8 +253,8 @@ async function handleReplayFrom(
   }
 
   const agentName = session.agent_name;
-  // eslint-disable-next-line security/detect-object-injection -- key from session's agent_name field
-  const agent = score.agents[agentName];
+  const agentMap = new Map(Object.entries(score.agents));
+  const agent = agentMap.get(agentName);
   if (!agent) {
     console.log(chalk.red("Agent \"" + agentName + "\" not found in score."));
     return;

@@ -144,12 +144,8 @@ function cosine(a: number[], b: number[]): number {
   let sum = 0;
   const n = Math.min(a.length, b.length);
   for (let i = 0; i < n; i++) {
-    // `i` is a bounded counter, not user input; security/detect-object-injection
-    // is a false positive over numeric arrays.
-    /* eslint-disable security/detect-object-injection */
-    const av = a[i];
-    const bv = b[i];
-    /* eslint-enable security/detect-object-injection */
+    const av = a.at(i);
+    const bv = b.at(i);
     if (av !== undefined && bv !== undefined) sum += av * bv;
   }
   return sum;

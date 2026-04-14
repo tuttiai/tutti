@@ -34,7 +34,6 @@ export const moveFileTool: Tool<z.infer<typeof parameters>> = {
           // destination doesn't exist — safe to proceed
         }
       }
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths sanitized via PathSanitizer
       await rename(src, dest);
       return { content: `Moved ${src} → ${dest}` };
     } catch (error) {

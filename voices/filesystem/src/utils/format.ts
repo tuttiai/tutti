@@ -7,8 +7,7 @@ export function formatBytes(bytes: number): string {
     units.length - 1,
   );
   const value = bytes / Math.pow(1024, i);
-  // eslint-disable-next-line security/detect-object-injection -- index from Math.min/floor, bounded by units.length
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units.at(i)}`;
 }
 
 /** Extract a short, human-readable error message from an fs error. */

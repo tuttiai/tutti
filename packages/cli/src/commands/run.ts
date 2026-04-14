@@ -29,7 +29,6 @@ export async function runCommand(
 ): Promise<void> {
   const file = resolve(scorePath ?? "./tutti.score.ts");
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(file)) {
     logger.error({ file }, "Score file not found");
     console.error(chalk.dim('Run "tutti-ai init" to create a new project.'));

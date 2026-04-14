@@ -55,7 +55,6 @@ export class SessionSandbox {
   /** Create the sandbox directory. Idempotent. */
   async init(): Promise<void> {
     if (this.initialized) return;
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built from sanitized session ID
     await mkdir(this.root, { recursive: true });
     this.initialized = true;
   }

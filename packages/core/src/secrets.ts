@@ -22,8 +22,8 @@ export class SecretsManager {
   }
 
   static require(key: string): string {
-    // eslint-disable-next-line security/detect-object-injection -- key is a known env var name passed by callers
-    const val = process.env[key];
+    const env = new Map(Object.entries(process.env));
+    const val = env.get(key);
     if (!val)
       throw new Error(
         "Missing required env var: " +
@@ -37,7 +37,7 @@ export class SecretsManager {
   }
 
   static optional(key: string, fallback?: string): string | undefined {
-    // eslint-disable-next-line security/detect-object-injection -- key is a known env var name passed by callers
-    return process.env[key] ?? fallback;
+    const env = new Map(Object.entries(process.env));
+    return env.get(key) ?? fallback;
   }
 }
