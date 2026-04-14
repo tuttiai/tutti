@@ -1,0 +1,46 @@
+{
+  "name": "@tuttiai/web",
+  "version": "0.1.0",
+  "description": "Web search voice for Tutti — search the web with Brave, Serper, or DuckDuckGo",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tuttiai/core": "*",
+    "@tuttiai/types": "*",
+    "zod": "3.25.76"
+  },
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "orchestration",
+    "voice",
+    "web",
+    "search",
+    "brave",
+    "serper",
+    "duckduckgo"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "voices/web"
+  },
+  "homepage": "https://tutti-ai.com"
+}

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/web@0.1.0` (web search voice)
+- New `voices/web` package — gives agents web search via `web_search` tool.
+- Three provider backends: Brave Search API (`BRAVE_SEARCH_API_KEY`), Serper.dev (`SERPER_API_KEY`), DuckDuckGo Instant Answer API (free, no key, limited results).
+- Auto-selection factory: picks the highest-priority provider whose env var is set (Brave > Serper > DuckDuckGo).
+- All providers normalise to `SearchResult[]` (`{ title, url, snippet, published_date? }`), handle HTTP errors gracefully (empty array + warn log), and respect configurable `timeout_ms` (default 5000).
+- 23 unit tests covering all three providers, the factory, the tool, and the voice class.
+
 ## @tuttiai/server@0.1.0 · @tuttiai/cli@0.11.0
 
 ### Added — `@tuttiai/cli@0.11.0` `tutti-ai serve` command
