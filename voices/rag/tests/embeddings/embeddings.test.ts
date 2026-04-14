@@ -5,9 +5,9 @@ import {
   LocalEmbeddingProvider,
   OpenAIEmbeddingProvider,
   createEmbeddingProvider,
-} from "./index.js";
-import { batch, isRetryable, normalize, EmbeddingRequestError } from "./utils.js";
-import type { EmbeddingConfig } from "./types.js";
+} from "../../src/embeddings/index.js";
+import { batch, isRetryable, normalize, EmbeddingRequestError } from "../../src/embeddings/utils.js";
+import type { EmbeddingConfig } from "../../src/embeddings/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

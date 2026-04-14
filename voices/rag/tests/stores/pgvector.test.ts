@@ -1,8 +1,8 @@
 import { SecretsManager } from "@tuttiai/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PgVectorStore } from "./pgvector.js";
-import type { EmbeddedChunk } from "./types.js";
+import { PgVectorStore } from "../../src/stores/pgvector.js";
+import type { EmbeddedChunk } from "../../src/stores/types.js";
 
 /**
  * Integration tests — require a reachable Postgres with the `vector`

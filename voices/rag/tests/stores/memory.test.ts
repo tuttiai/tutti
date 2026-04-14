@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { MemoryVectorStore } from "./memory.js";
-import { createVectorStore } from "./index.js";
-import type { EmbeddedChunk } from "./types.js";
+import { MemoryVectorStore } from "../../src/stores/memory.js";
+import { createVectorStore } from "../../src/stores/index.js";
+import type { EmbeddedChunk } from "../../src/stores/types.js";
 
 /** Build a unit-normalised 2D vector at angle `theta` (radians). */
 function unit(theta: number): number[] {

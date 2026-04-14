@@ -21,10 +21,7 @@ export default defineConfig({
       thresholds: {
         lines: 80,
         functions: 80,
-        // Most uncovered branches are Octokit error-handling paths that
-        // require a live GitHub API — 50% reflects the realistic unit-test
-        // coverage floor for mock-based testing.
-        branches: 50,
+        branches: 70,
         statements: 80,
       },
     },

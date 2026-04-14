@@ -11,6 +11,7 @@ import { createGetFileContentsTool } from "../src/tools/get-file-contents.js";
 import { createSearchCodeTool } from "../src/tools/search-code.js";
 import { createListRepositoriesTool } from "../src/tools/list-repositories.js";
 import { createGetRepositoryTool } from "../src/tools/get-repository.js";
+import { ghErrorMessage, truncate, formatNumber } from "../src/utils/format.js";
 
 const ctx: ToolContext = { session_id: "test", agent_name: "test" };
 
@@ -492,5 +493,126 @@ describe("get_repository", () => {
     expect(result.content).toContain("100");
     expect(result.content).toContain("TypeScript");
     expect(result.content).toContain("ai, agents");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error handling — every tool's catch block
+// ---------------------------------------------------------------------------
+
+describe("error handling", () => {
+  it("get_issue returns is_error on Octokit failure", async () => {
+    octokit.issues.get.mockRejectedValue(Object.assign(new Error("Not found"), { status: 404 }));
+    const tool = createGetIssueTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", issue_number: 1 }), ctx);
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Not found");
+  });
+
+  it("create_issue returns is_error on Octokit failure", async () => {
+    octokit.issues.create.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
+    const tool = createCreateIssueTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", title: "t" }), ctx);
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("forbidden");
+  });
+
+  it("comment_on_issue returns is_error on Octokit failure", async () => {
+    octokit.issues.createComment.mockRejectedValue(new Error("fail"));
+    const tool = createCommentOnIssueTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", issue_number: 1, body: "hi" }), ctx);
+    expect(result.is_error).toBe(true);
+  });
+
+  it("get_pull_request returns is_error on Octokit failure", async () => {
+    octokit.pulls.get.mockRejectedValue(Object.assign(new Error("Auth"), { status: 401 }));
+    const tool = createGetPullRequestTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", pr_number: 1 }), ctx);
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("authentication failed");
+  });
+
+  it("list_pull_requests returns is_error on Octokit failure", async () => {
+    octokit.pulls.list.mockRejectedValue(new Error("timeout"));
+    const tool = createListPullRequestsTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r" }), ctx);
+    expect(result.is_error).toBe(true);
+  });
+
+  it("get_file_contents returns is_error on Octokit failure", async () => {
+    octokit.repos.getContent.mockRejectedValue(Object.assign(new Error("Not found"), { status: 404 }));
+    const tool = createGetFileContentsTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", path: "x" }), ctx);
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Not found");
+  });
+
+  it("search_code returns is_error on Octokit failure", async () => {
+    octokit.search.code.mockRejectedValue(Object.assign(new Error("Validation"), { status: 422 }));
+    const tool = createSearchCodeTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ query: "x" }), ctx);
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("validation failed");
+  });
+
+  it("list_repositories returns is_error on Octokit failure", async () => {
+    octokit.repos.listForOrg.mockRejectedValue(new Error("fail"));
+    octokit.repos.listForUser.mockRejectedValue(new Error("also fail"));
+    const tool = createListRepositoriesTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o" }), ctx);
+    expect(result.is_error).toBe(true);
+  });
+
+  it("get_repository returns is_error on Octokit failure", async () => {
+    octokit.repos.get.mockRejectedValue(Object.assign(new Error("Not found"), { status: 404 }));
+    const tool = createGetRepositoryTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r" }), ctx);
+    expect(result.is_error).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// format utilities
+// ---------------------------------------------------------------------------
+
+describe("format utilities", () => {
+  it("ghErrorMessage handles 401", () => {
+    const err = Object.assign(new Error("Unauthorized"), { status: 401 });
+    expect(ghErrorMessage(err, "o/r")).toContain("authentication failed");
+  });
+
+  it("ghErrorMessage handles 403", () => {
+    const err = Object.assign(new Error("Forbidden"), { status: 403 });
+    expect(ghErrorMessage(err)).toContain("rate limited");
+  });
+
+  it("ghErrorMessage handles 404", () => {
+    const err = Object.assign(new Error("Not Found"), { status: 404 });
+    expect(ghErrorMessage(err, "o/r")).toContain("Not found");
+  });
+
+  it("ghErrorMessage handles 422", () => {
+    const err = Object.assign(new Error("Validation Failed"), { status: 422 });
+    expect(ghErrorMessage(err)).toContain("validation failed");
+  });
+
+  it("ghErrorMessage handles generic Error", () => {
+    expect(ghErrorMessage(new Error("boom"))).toContain("boom");
+  });
+
+  it("ghErrorMessage handles non-Error", () => {
+    expect(ghErrorMessage("string error")).toBe("string error");
+  });
+
+  it("truncate shortens long strings", () => {
+    expect(truncate("abcdefghij", 7)).toBe("abcd...");
+  });
+
+  it("truncate keeps short strings", () => {
+    expect(truncate("abc", 10)).toBe("abc");
+  });
+
+  it("formatNumber adds commas", () => {
+    expect(formatNumber(12345)).toBe("12,345");
   });
 });

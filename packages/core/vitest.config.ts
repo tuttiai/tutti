@@ -30,14 +30,8 @@ export default defineConfig({
         // Checkpoint interface + types (no runtime code).
         "src/checkpoint/store.ts",
         "src/checkpoint/types.ts",
-        // Scheduler store backends — same pattern as checkpoint stores.
+        // Scheduler Postgres store — requires a live PostgreSQL instance.
         "src/scheduler/postgres.ts",
-        // Scheduler interface + types (no runtime code).
-        "src/scheduler/store.ts",
-        "src/scheduler/types.ts",
-        // Graph type declarations (no runtime code).
-        "src/graph/types.ts",
-        "src/graph/errors.ts",
       ],
       thresholds: {
         lines: 85,
