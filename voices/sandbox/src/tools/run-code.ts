@@ -1,39 +1,61 @@
 import { z } from "zod";
 import type { Tool, ToolResult } from "@tuttiai/types";
 import { execute } from "../executor.js";
-import type { ExecOptions } from "../executor.js";
+import type { ExecOptions, Language } from "../executor.js";
 import type { SessionSandbox } from "../sandbox.js";
 
-const parameters = z.object({
-  code: z.string().min(1).describe("Source code to execute"),
-  language: z
-    .enum(["typescript", "python", "bash"])
-    .describe("Execution runtime: typescript, python, or bash"),
-  timeout_ms: z
-    .number()
-    .int()
-    .positive()
-    .max(120_000)
-    .optional()
-    .describe("Wall-clock timeout in ms (default 30 000, max 120 000)"),
-});
+/** Options for {@link createExecuteCodeTool}. */
+export interface ExecuteCodeOptions {
+  /** Default exec options (timeout, env). */
+  defaults?: ExecOptions;
+  /** Session sandbox — its root becomes the working_dir. */
+  sandbox?: SessionSandbox;
+  /** Restrict which languages the agent can use. */
+  allowed_languages?: Language[];
+}
 
-type RunCodeInput = z.infer<typeof parameters>;
+const ALL_LANGUAGES: [Language, ...Language[]] = ["typescript", "python", "bash"];
 
 /**
- * Create the `run_code` tool.
- *
- * @param defaults - Default {@link ExecOptions} applied to every call.
- * @param sandbox  - When provided, the sandbox root is used as
- *                   `working_dir` so executed code can access files the
- *                   agent created via `sandbox_write_file`.
+ * Build the Zod parameters schema. When `allowed_languages` is set,
+ * the `language` enum is narrowed so the agent cannot select a
+ * disallowed runtime.
  */
-export function createRunCodeTool(
-  defaults: ExecOptions = {},
-  sandbox?: SessionSandbox,
-): Tool<RunCodeInput> {
+function buildParameters(allowed: Language[] | undefined) {
+  const langs: [string, ...string[]] =
+    allowed && allowed.length > 0
+      ? (allowed as [string, ...string[]])
+      : ALL_LANGUAGES;
+
+  return z.object({
+    code: z.string().min(1).describe("Source code to execute"),
+    language: z
+      .enum(langs)
+      .describe("Execution runtime: " + langs.join(", ")),
+    timeout_ms: z
+      .number()
+      .int()
+      .positive()
+      .max(120_000)
+      .optional()
+      .describe("Wall-clock timeout in ms (default 30 000, max 120 000)"),
+  });
+}
+
+/**
+ * Create the `execute_code` tool.
+ *
+ * @param opts - Execution defaults, sandbox, and language restrictions.
+ */
+export function createExecuteCodeTool(
+  opts: ExecuteCodeOptions = {},
+): Tool<z.infer<ReturnType<typeof buildParameters>>> {
+  const defaults = opts.defaults ?? {};
+  const sandbox = opts.sandbox;
+  const parameters = buildParameters(opts.allowed_languages);
+
   return {
-    name: "run_code",
+    name: "execute_code",
     description:
       "Execute a code snippet and return its stdout, stderr, and exit code. " +
       "Supports TypeScript (via tsx), Python 3, and Bash. " +
@@ -41,7 +63,8 @@ export function createRunCodeTool(
     parameters,
     execute: async (input): Promise<ToolResult> => {
       try {
-        const result = await execute(input.code, input.language, {
+        const lang = input.language as Language;
+        const result = await execute(input.code, lang, {
           ...defaults,
           working_dir: sandbox?.root ?? defaults.working_dir,
           timeout_ms: input.timeout_ms ?? defaults.timeout_ms,
@@ -65,11 +88,9 @@ export function createRunCodeTool(
           parts.push("(output was truncated to 10 KB)");
         }
 
-        const isError = result.exit_code !== 0;
-
         return {
           content: parts.join("\n\n"),
-          is_error: isError || undefined,
+          is_error: result.exit_code !== 0 || undefined,
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

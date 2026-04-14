@@ -3,14 +3,15 @@
 ## [Unreleased]
 
 ### Added — `@tuttiai/sandbox@0.1.0` (code execution voice)
-- New `voices/sandbox` package — 4 tools: `run_code`, `sandbox_read_file`, `sandbox_write_file`, `install_package`.
-- Per-session filesystem sandbox (`src/sandbox.ts`): creates `/tmp/tutti-sandbox/{session_id}/` on `setup()`, deletes on `teardown()`. All file tools and `run_code` working_dir are confined to this directory.
-- `SandboxEscapeError` thrown when a resolved path escapes the sandbox root (prevents `../../etc/passwd` traversal). Error message never leaks the host temp path.
-- `sandbox_read_file` / `sandbox_write_file`: read and write files restricted to the sandbox directory. Write creates parent dirs automatically.
-- `install_package(name, manager?)`: installs via `npm --prefix` or `pip --target` into the sandbox. Optional `allowedPackages` allowlist rejects unlisted names. Package names validated against shell metacharacter regex.
+- New `voices/sandbox` package — 4 tools: `execute_code`, `read_file`, `write_file`, `install_package`.
+- `SandboxConfig`: `{ allowed_languages?, allowed_packages?, timeout_ms?, max_file_size_bytes?, env?, install_timeout_ms? }`.
+- `allowed_languages` restricts the `execute_code` Zod enum at construction time — disallowed languages are rejected by schema validation before execution.
+- `max_file_size_bytes` (default 1 MB) — `write_file` rejects content exceeding the limit.
+- Per-session filesystem sandbox: creates `/tmp/tutti-sandbox/{session_id}/` on `setup()`, deletes on `teardown()`. `SandboxEscapeError` for `../../` traversal; error message never leaks host paths.
+- `install_package(name, manager?)`: `npm --prefix` or `pip --target` into sandbox. Optional `allowed_packages` allowlist. Shell metachar validation.
 - Core executor: `child_process.spawn` with `detached: false`, SIGKILL on timeout, `.mts` extension for TypeScript ESM, ANSI stripping, 10 KB truncation, path redaction.
-- `SandboxVoiceOptions`: `{ timeout_ms?, env?, allowedPackages?, install_timeout_ms? }`.
-- 61 unit tests across 5 files covering all languages, timeout, truncation, path traversal (9 escape vectors), file tools, install allowlist, sandbox lifecycle, and voice setup/teardown integration.
+- E2E test: write → execute TypeScript Fibonacci → read output file → assert contains 55.
+- 67 unit tests across 6 files covering all languages, timeout, truncation, path traversal, file size limits, language restrictions, sandbox lifecycle, and end-to-end Fibonacci.
 
 ### Added — `@tuttiai/web@0.1.0` (web voice)
 - New `voices/web` package — gives agents 3 tools: `web_search`, `fetch_url`, `fetch_sitemap`.

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { existsSync } from "node:fs";
 import type { ToolContext, VoiceContext } from "@tuttiai/types";
 import { SandboxVoice } from "../src/index.js";
-import { createRunCodeTool } from "../src/tools/run-code.js";
+import { createExecuteCodeTool } from "../src/tools/run-code.js";
 
 const ctx: ToolContext = {
   session_id: "test-session",
@@ -36,9 +36,9 @@ describe("SandboxVoice", () => {
 
     expect(voice.tools).toHaveLength(4);
     const names = voice.tools.map((t) => t.name);
-    expect(names).toContain("run_code");
-    expect(names).toContain("sandbox_read_file");
-    expect(names).toContain("sandbox_write_file");
+    expect(names).toContain("execute_code");
+    expect(names).toContain("read_file");
+    expect(names).toContain("write_file");
     expect(names).toContain("install_package");
   });
 
@@ -46,10 +46,9 @@ describe("SandboxVoice", () => {
     voice = new SandboxVoice();
     await voice.setup(voiceCtx);
 
-    // Get the sandbox root before teardown.
-    const runCode = voice.tools.find((t) => t.name === "run_code");
-    const r = await runCode!.execute(
-      runCode!.parameters.parse({ code: "pwd", language: "bash" }),
+    const exec = voice.tools.find((t) => t.name === "execute_code");
+    const r = await exec!.execute(
+      exec!.parameters.parse({ code: "pwd", language: "bash" }),
       ctx,
     );
     const dir = r.content.split("\n").find((l) => l.startsWith("stdout:"))
@@ -60,8 +59,8 @@ describe("SandboxVoice", () => {
     if (dir) expect(existsSync(dir)).toBe(false);
   });
 
-  it("passes allowedPackages through to install_package", async () => {
-    voice = new SandboxVoice({ allowedPackages: ["lodash"] });
+  it("passes allowed_packages through to install_package", async () => {
+    voice = new SandboxVoice({ allowed_packages: ["lodash"] });
     await voice.setup(voiceCtx);
 
     const install = voice.tools.find((t) => t.name === "install_package");
@@ -73,30 +72,61 @@ describe("SandboxVoice", () => {
     expect(result.content).toContain("not in the allowed list");
   });
 
-  it("run_code uses the sandbox as working_dir", async () => {
+  it("execute_code uses the sandbox as working_dir", async () => {
     voice = new SandboxVoice();
     await voice.setup(voiceCtx);
 
-    // Write a file then read it from run_code.
-    const write = voice.tools.find((t) => t.name === "sandbox_write_file");
+    const write = voice.tools.find((t) => t.name === "write_file");
     await write!.execute(
       write!.parameters.parse({ path: "data.txt", content: "hello" }),
       ctx,
     );
 
-    const run = voice.tools.find((t) => t.name === "run_code");
-    const r = await run!.execute(
-      run!.parameters.parse({ code: "cat data.txt", language: "bash" }),
+    const exec = voice.tools.find((t) => t.name === "execute_code");
+    const r = await exec!.execute(
+      exec!.parameters.parse({ code: "cat data.txt", language: "bash" }),
       ctx,
     );
     expect(r.content).toContain("hello");
   });
+
+  it("allowed_languages restricts execute_code", async () => {
+    voice = new SandboxVoice({ allowed_languages: ["python"] });
+    await voice.setup(voiceCtx);
+
+    const exec = voice.tools.find((t) => t.name === "execute_code");
+    // "bash" is not in the allowed list — Zod validation rejects it.
+    expect(() =>
+      exec!.parameters.parse({ code: "echo hi", language: "bash" }),
+    ).toThrow();
+
+    // "python" is allowed.
+    const input = exec!.parameters.parse({
+      code: 'print("ok")',
+      language: "python",
+    });
+    const r = await exec!.execute(input, ctx);
+    expect(r.content).toContain("ok");
+  });
+
+  it("max_file_size_bytes limits write_file", async () => {
+    voice = new SandboxVoice({ max_file_size_bytes: 10 });
+    await voice.setup(voiceCtx);
+
+    const write = voice.tools.find((t) => t.name === "write_file");
+    const result = await write!.execute(
+      write!.parameters.parse({ path: "big.txt", content: "x".repeat(100) }),
+      ctx,
+    );
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("too large");
+  });
 });
 
-// ── run_code tool ────────────────────────────────────────────
+// ── execute_code tool (standalone) ───────────────────────────
 
-describe("run_code tool", () => {
-  const tool = createRunCodeTool();
+describe("execute_code tool", () => {
+  const tool = createExecuteCodeTool();
 
   it("runs bash and returns output", async () => {
     const input = tool.parameters.parse({

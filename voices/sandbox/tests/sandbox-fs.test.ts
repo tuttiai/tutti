@@ -113,9 +113,9 @@ describe("SessionSandbox lifecycle", () => {
   });
 });
 
-// ── sandbox_read_file ────────────────────────────────────────
+// ── read_file ────────────────────────────────────────
 
-describe("sandbox_read_file", () => {
+describe("read_file", () => {
   it("reads a file from the sandbox", async () => {
     const tool = createReadFileTool(sandbox);
     const writeTool = createWriteFileTool(sandbox);
@@ -154,9 +154,9 @@ describe("sandbox_read_file", () => {
   });
 });
 
-// ── sandbox_write_file ───────────────────────────────────────
+// ── write_file ───────────────────────────────────────
 
-describe("sandbox_write_file", () => {
+describe("write_file", () => {
   it("writes a file to the sandbox", async () => {
     const tool = createWriteFileTool(sandbox);
     const result = await tool.execute(
@@ -189,5 +189,26 @@ describe("sandbox_write_file", () => {
     );
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("escapes the sandbox");
+  });
+
+  it("rejects files exceeding max_file_size_bytes", async () => {
+    const tool = createWriteFileTool(sandbox, 16);
+    const result = await tool.execute(
+      tool.parameters.parse({ path: "big.txt", content: "x".repeat(100) }),
+      ctx,
+    );
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("too large");
+    expect(result.content).toContain("16 byte limit");
+  });
+
+  it("allows files under the size limit", async () => {
+    const tool = createWriteFileTool(sandbox, 1024);
+    const result = await tool.execute(
+      tool.parameters.parse({ path: "ok.txt", content: "small" }),
+      ctx,
+    );
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("ok.txt");
   });
 });

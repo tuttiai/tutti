@@ -25,7 +25,7 @@ export function createReadFileTool(
   sandbox: SessionSandbox,
 ): Tool<ReadFileInput> {
   return {
-    name: "sandbox_read_file",
+    name: "read_file",
     description:
       "Read a file from the sandbox directory. " +
       "The path must be relative to (or inside) the sandbox root.",
