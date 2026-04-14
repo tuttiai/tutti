@@ -29,13 +29,14 @@ import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { logger } from "./logger.js";
 import { TuttiTracer } from "./telemetry.js";
-import { ToolTimeoutError, ProviderError, RateLimitError } from "./errors.js";
+import { ToolTimeoutError, ProviderError, RateLimitError, StructuredOutputError } from "./errors.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 const DEFAULT_HITL_TIMEOUT_S = 300;
 const MAX_PROVIDER_RETRIES = 3;
+const DEFAULT_STRUCTURED_OUTPUT_MAX_RETRIES = 3;
 
 const hitlRequestSchema = z.object({
   question: z.string().describe("The question to ask the human"),
@@ -200,6 +201,18 @@ export class AgentRunner {
         });
       }
 
+      // Build base system prompt — append structured output instruction when
+      // an outputSchema is configured so the LLM knows the expected format.
+      let baseSystemPrompt = agent.system_prompt;
+      if (agent.outputSchema) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Zod generic variance
+        const outputJsonSchema = zodToJsonSchema(agent.outputSchema, { target: "openApi3" });
+        baseSystemPrompt +=
+          "\n\nYou must respond with a valid JSON object matching this schema: " +
+          JSON.stringify(outputJsonSchema) +
+          ". No other text.";
+      }
+
       // Agentic loop. The try/catch around it only exists to surface the
       // last durable checkpoint on crash — the error itself still
       // propagates so callers see the real failure.
@@ -218,7 +231,7 @@ export class AgentRunner {
         });
 
         // Inject semantic memories into system prompt if enabled
-        let systemPrompt = agent.system_prompt;
+        let systemPrompt = baseSystemPrompt;
         const memCfg = agent.semantic_memory;
         if (memCfg?.enabled && this.semanticMemory) {
           const maxMemories = memCfg.max_memories ?? 5;
@@ -459,15 +472,63 @@ export class AgentRunner {
         throw err;
       }
 
+      // Extract final text output
+      let output = extractText(
+        messages.filter((m) => m.role === "assistant").at(-1)?.content,
+      );
+
+      // Structured output validation + retry loop
+      let structuredResult: unknown = undefined;
+      if (agent.outputSchema) {
+        const maxRetries = agent.maxRetries ?? DEFAULT_STRUCTURED_OUTPUT_MAX_RETRIES;
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const parsed: unknown = JSON.parse(output);
+            structuredResult = agent.outputSchema.parse(parsed);
+            break;
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+
+            if (attempt >= maxRetries) {
+              throw new StructuredOutputError(output, errorMsg);
+            }
+
+            logger.warn(
+              { agent: agent.name, attempt: attempt + 1, error: errorMsg },
+              "Structured output validation failed, retrying",
+            );
+
+            messages.push({
+              role: "user",
+              content: `Your response was invalid JSON. Error: ${errorMsg}. Try again.`,
+            });
+
+            turns++;
+
+            const retryRequest: ChatRequest = {
+              model: agent.model,
+              system: baseSystemPrompt,
+              messages,
+            };
+
+            const retryResponse = await withRetry(() =>
+              agent.streaming
+                ? this.streamToResponse(agent.name, retryRequest)
+                : this.provider.chat(retryRequest),
+            );
+
+            totalUsage.input_tokens += retryResponse.usage.input_tokens;
+            totalUsage.output_tokens += retryResponse.usage.output_tokens;
+            messages.push({ role: "assistant", content: retryResponse.content });
+
+            output = extractText(retryResponse.content);
+          }
+        }
+      }
+
       // Persist updated messages
       this.sessions.update(session.id, messages);
-
-      // Extract final text output
-      const lastAssistant = messages
-        .filter((m) => m.role === "assistant")
-        .at(-1);
-
-      const output = extractText(lastAssistant?.content);
 
       logger.info(
         { agent: agent.name, session: session.id, turns, usage: totalUsage },
@@ -486,6 +547,7 @@ export class AgentRunner {
         messages,
         turns,
         usage: totalUsage,
+        ...(structuredResult !== undefined ? { structured: structuredResult } : {}),
       };
 
       // afterAgentRun hooks

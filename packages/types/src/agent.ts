@@ -1,5 +1,6 @@
 /** Agent configuration and result types. */
 
+import type { ZodType } from "zod";
 import type { ChatMessage, TokenUsage } from "./llm.js";
 import type { Permission } from "./voice.js";
 import type { Voice } from "./voice.js";
@@ -93,6 +94,18 @@ export interface AgentConfig {
    * or override the retention window.
    */
   durable?: boolean | AgentDurableConfig;
+  /**
+   * When set, the agent's final text output is validated against this Zod
+   * schema. The runtime appends a JSON-schema instruction to the system
+   * prompt and retries on parse failure up to {@link maxRetries} times.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  outputSchema?: ZodType<unknown, any, any>;
+  /**
+   * Maximum validation retries for structured output (default 3).
+   * Only used when {@link outputSchema} is set.
+   */
+  maxRetries?: number;
 }
 
 export interface AgentResult {
@@ -101,6 +114,8 @@ export interface AgentResult {
   messages: ChatMessage[];
   turns: number;
   usage: TokenUsage;
+  /** Parsed structured output — present when {@link AgentConfig.outputSchema} is set and validation succeeds. */
+  structured?: unknown;
 }
 
 /**

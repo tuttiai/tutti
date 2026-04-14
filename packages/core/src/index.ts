@@ -10,6 +10,7 @@ export {
   AuthenticationError,
   RateLimitError,
   ContextWindowError,
+  StructuredOutputError,
   VoiceError,
   PathTraversalError,
   UrlValidationError,

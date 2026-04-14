@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Structured output**: `AgentConfig.outputSchema` (Zod schema) + `AgentConfig.maxRetries` (default 3). When set, the runtime appends a JSON-schema instruction to the system prompt, validates the final text output against the schema, and retries on parse failure. On success, the parsed object is attached as `AgentResult.structured`. On exhausted retries, throws `StructuredOutputError` with the last raw output.
+
 ## [0.19.0] - 2026-04-14
 
 Three new packages: REST API server, web search voice, and code execution sandbox.

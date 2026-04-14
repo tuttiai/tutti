@@ -126,6 +126,23 @@ export class ContextWindowError extends ProviderError {
   }
 }
 
+// ── Structured Output ─────────────────────────────────────────
+
+export class StructuredOutputError extends TuttiError {
+  public readonly rawOutput: string;
+
+  constructor(rawOutput: string, lastError: string) {
+    super(
+      "STRUCTURED_OUTPUT_FAILED",
+      `Structured output validation failed after max retries.\n` +
+        `Last error: ${lastError}\n` +
+        `Ensure the model can produce valid JSON matching the requested schema.`,
+      { raw_output: rawOutput, last_error: lastError },
+    );
+    this.rawOutput = rawOutput;
+  }
+}
+
 // ── Voice ──────────────────────────────────────────────────────
 
 export class VoiceError extends TuttiError {
