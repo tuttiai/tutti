@@ -18,7 +18,7 @@ export const DEFAULT_HOST = "127.0.0.1";
 export const DEFAULT_TIMEOUT_MS = 120_000;
 
 /** Package version, surfaced via the `/health` endpoint. */
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "0.1.1";
 
 /**
  * Rate-limit policy applied to authenticated routes.
