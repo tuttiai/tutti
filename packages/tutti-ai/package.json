@@ -10,7 +10,7 @@
     "@tuttiai/cli": "*"
   },
   "files": ["bin", "README.md"],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://tutti-ai.com",
   "repository": {
     "type": "git",

@@ -329,4 +329,4 @@ tutti-ai schedules runs nightly-report
 
 ## License
 
-MIT
+Apache 2.0

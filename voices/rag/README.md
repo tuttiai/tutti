@@ -183,4 +183,4 @@ const hits = await engine.search("how do I install this", { topK: 3 });
 
 ## License
 
-MIT
+Apache 2.0

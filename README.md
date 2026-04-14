@@ -295,4 +295,4 @@ See [SECURITY.md](./SECURITY.md). Report vulnerabilities to security@tutti-ai.co
 
 ## License
 
-MIT &copy; [Tutti AI](https://tutti-ai.com)
+Apache 2.0 &copy; [Tutti AI](https://tutti-ai.com)

@@ -30,4 +30,4 @@ tutti-ai run                 # interactive REPL
 
 ## License
 
-MIT
+Apache 2.0

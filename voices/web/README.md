@@ -163,4 +163,4 @@ All URLs are validated before fetching:
 
 ## License
 
-MIT
+Apache 2.0

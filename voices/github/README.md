@@ -63,4 +63,4 @@ Without a token, tools still work for public repos but are limited to 60 request
 
 ## License
 
-MIT
+Apache 2.0

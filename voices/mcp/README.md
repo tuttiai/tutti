@@ -37,4 +37,4 @@ the server process is stopped.
 
 ## License
 
-MIT
+Apache 2.0

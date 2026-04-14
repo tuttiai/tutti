@@ -21,7 +21,7 @@
     "zod": "3.25.76"
   },
   "keywords": ["tutti", "ai", "agents", "orchestration", "types", "typescript"],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/tuttiai/tutti",

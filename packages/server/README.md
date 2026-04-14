@@ -91,4 +91,4 @@ See the repo root `docker-compose.yml` for a full stack with Postgres and Redis.
 
 ## License
 
-MIT
+Apache 2.0

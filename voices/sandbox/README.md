@@ -134,4 +134,4 @@ Required permission: `"shell"` (must be explicitly granted in `AgentConfig.permi
 
 ## License
 
-MIT
+Apache 2.0

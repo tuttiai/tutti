@@ -53,4 +53,4 @@ All tool inputs are validated with Zod. Errors are returned as structured result
 
 ## License
 
-MIT
+Apache 2.0

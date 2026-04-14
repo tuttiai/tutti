@@ -59,4 +59,4 @@ tutti.events.on("tool:start", (e) => {
 
 ## License
 
-MIT
+Apache 2.0

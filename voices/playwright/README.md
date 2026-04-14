@@ -71,4 +71,4 @@ new PlaywrightVoice({
 
 ## License
 
-MIT
+Apache 2.0

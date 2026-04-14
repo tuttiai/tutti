@@ -35,4 +35,4 @@ Most users should install `@tuttiai/core` instead — it re-exports all types fr
 
 ## License
 
-MIT
+Apache 2.0
