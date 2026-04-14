@@ -11,7 +11,7 @@
   </p>
 
   <img src="https://img.shields.io/npm/v/@tuttiai/core?color=0F6E56&label=%40tuttiai%2Fcore" alt="npm" />
-  <img src="https://img.shields.io/github/license/tuttiai/tutti?color=0F6E56" alt="license" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-0F6E56" alt="Apache 2.0" /></a>
   <img src="https://img.shields.io/github/stars/tuttiai/tutti?color=0F6E56" alt="stars" />
 </div>
 
