@@ -8,7 +8,6 @@ export const MAX_OUTPUT_BYTES = 10_240; // 10 KB
 export function stripAnsi(text: string): string {
   // Covers SGR, CSI, OSC, and common escape sequences.
   return text.replace(
-    // eslint-disable-next-line no-control-regex
     /\x1b\[[0-9;]*[A-Za-z]|\x1b\].*?(?:\x07|\x1b\\)|\x1b[()][AB012]|\x1b[@-_]/g,
     "",
   );

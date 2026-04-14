@@ -105,24 +105,26 @@ export async function serveCommand(
       console.log(chalk.cyan("\n[tutti] Score changed, reloading..."));
     });
 
-    reactive.on("reloaded", async () => {
-      try {
-        const nextScore = reactive!.current;
-        const nextRuntime = buildRuntime(nextScore, sharedSessions);
-        const nextApp = await buildApp(nextRuntime, agentName, port, host, options.apiKey);
+    reactive.on("reloaded", () => {
+      void (async () => {
+        try {
+          const nextScore = reactive!.current;
+          const nextRuntime = buildRuntime(nextScore, sharedSessions);
+          const nextApp = await buildApp(nextRuntime, agentName, port, host, options.apiKey);
 
-        await app.close();
-        runtime = nextRuntime;
-        app = nextApp;
-        await app.listen({ port, host });
+          await app.close();
+          runtime = nextRuntime;
+          app = nextApp;
+          await app.listen({ port, host });
 
-        console.log(chalk.green("[tutti] Score reloaded. Server restarted."));
-      } catch (err) {
-        logger.error(
-          { error: err instanceof Error ? err.message : String(err) },
-          "[tutti] Reload failed — server continues with previous config",
-        );
-      }
+          console.log(chalk.green("[tutti] Score reloaded. Server restarted."));
+        } catch (err) {
+          logger.error(
+            { error: err instanceof Error ? err.message : String(err) },
+            "[tutti] Reload failed — server continues with previous config",
+          );
+        }
+      })();
     });
 
     reactive.on("reload-failed", (err) => {

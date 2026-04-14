@@ -13,7 +13,7 @@ export function resolveOrigins(
   configured: string | readonly string[] | undefined,
 ): string | string[] {
   if (typeof configured === "string") return configured;
-  if (Array.isArray(configured)) return [...configured];
+  if (Array.isArray(configured)) return Array.from(configured) as string[];
 
   const env = SecretsManager.optional("TUTTI_ALLOWED_ORIGINS");
   if (env) {

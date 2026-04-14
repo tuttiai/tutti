@@ -98,6 +98,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions): void {
  * Fastify plugin form of the auth middleware. Useful when composing
  * multiple plugins via `app.register`.
  */
-export const authPlugin: FastifyPluginAsync<AuthOptions> = async (app, options) => {
+export const authPlugin: FastifyPluginAsync<AuthOptions> = async (app, options): Promise<void> => {
   registerAuth(app, options);
+  await Promise.resolve();
 };

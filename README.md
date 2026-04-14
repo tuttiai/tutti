@@ -58,12 +58,17 @@ npx tutti-ai run
 
 | Package | Version | Description |
 | ------- | ------- | ----------- |
-| [`@tuttiai/types`](packages/types) | 0.3.0 | Type definitions and interfaces |
-| [`@tuttiai/core`](packages/core) | 0.5.0 | Runtime, providers, security, memory |
-| [`@tuttiai/cli`](packages/cli) | 0.4.0 | CLI (`tutti-ai init`, `run`, `add`, `check`, `doctor`) |
+| [`@tuttiai/types`](packages/types) | 0.7.0 | Type definitions and Zod schemas |
+| [`@tuttiai/core`](packages/core) | 0.11.0 | Runtime, providers, security, memory, telemetry |
+| [`@tuttiai/cli`](packages/cli) | 0.11.0 | CLI (`tutti-ai init`, `run`, `serve`, `studio`, `eval`) |
+| [`@tuttiai/server`](packages/server) | 0.1.0 | HTTP server: REST API, SSE streaming, Docker support |
 | [`@tuttiai/filesystem`](voices/filesystem) | 0.1.0 | 7 file tools (read, write, search, etc.) |
 | [`@tuttiai/github`](voices/github) | 0.1.0 | 10 GitHub tools (issues, PRs, repos, code search) |
 | [`@tuttiai/playwright`](voices/playwright) | 0.1.0 | 12 browser tools (navigate, click, type, screenshot) |
+| [`@tuttiai/web`](voices/web) | 0.1.0 | 3 web tools (search, fetch URL, sitemap) |
+| [`@tuttiai/sandbox`](voices/sandbox) | 0.1.0 | 4 code execution tools (TS, Python, Bash + file I/O) |
+| [`@tuttiai/mcp`](voices/mcp) | 0.1.0 | MCP bridge — wraps any MCP server |
+| [`@tuttiai/rag`](voices/rag) | 0.1.0 | RAG: ingest, chunk, embed, search |
 
 ## Features
 
@@ -235,7 +240,7 @@ One-click deploy configs for [Railway](scripts/deploy/railway.json) and
 
 ## Testing
 
-217 tests across 18 files. 96% line coverage on core.
+460+ tests across 40+ files. 96% line coverage on core.
 
 ```bash
 npx vitest run              # all tests

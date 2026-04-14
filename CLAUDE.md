@@ -33,11 +33,14 @@ Tutti is an open-source multi-agent orchestration framework for TypeScript.
 packages/types/      @tuttiai/types      Interfaces and Zod schemas (ZERO runtime deps)
 packages/core/       @tuttiai/core       Runtime, agent loop, providers, security
 packages/cli/        @tuttiai/cli        Binary: tutti-ai
+packages/server/     @tuttiai/server     HTTP server: REST API + SSE streaming
 packages/tutti-ai/   tutti-ai            Thin wrapper re-exporting the CLI binary
 voices/filesystem/   @tuttiai/filesystem 7 file system tools
 voices/github/       @tuttiai/github     10 GitHub API tools
 voices/playwright/   @tuttiai/playwright 12 browser automation tools
 voices/mcp/          @tuttiai/mcp        MCP bridge — wraps any MCP server
+voices/web/          @tuttiai/web        3 web tools: search, fetch, sitemap
+voices/sandbox/      @tuttiai/sandbox    4 tools: execute, read, write, install
 docs/                                    Astro Starlight documentation site
 ```
 
