@@ -103,13 +103,14 @@ export type {
 } from "./guardrails/index.js";
 
 // Graph execution engine
-export { TuttiGraph, END } from "./graph/index.js";
+export { TuttiGraph, END, defineGraph, GraphBuilder } from "./graph/index.js";
 export {
   GraphValidationError,
   GraphCycleError,
   GraphDeadEndError,
   GraphStateError,
 } from "./graph/index.js";
+export { renderGraph, graphToJSON } from "./graph/index.js";
 export type {
   GraphConfig,
   GraphEdge,
@@ -118,6 +119,8 @@ export type {
   GraphRunResult,
   NodeResult,
   RunOptions as GraphRunOptions,
+  EdgeOptions,
+  NodeOptions,
 } from "./graph/index.js";
 
 // Providers

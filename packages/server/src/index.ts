@@ -10,6 +10,7 @@ import { registerHealthRoute } from "./routes/health.js";
 import { registerRunRoute } from "./routes/run.js";
 import { registerStreamRoute } from "./routes/stream.js";
 import { registerSessionsRoute } from "./routes/sessions.js";
+import { registerGraphRoute } from "./routes/graph.js";
 
 export {
   DEFAULT_HOST,
@@ -72,6 +73,7 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
   registerRunRoute(app, config.runtime, config.agent_name, timeoutMs);
   registerStreamRoute(app, config.runtime, config.agent_name);
   registerSessionsRoute(app, config.runtime);
+  registerGraphRoute(app, config.graph);
 
   return app;
 }

@@ -220,3 +220,6 @@ export {
   GraphDeadEndError,
   GraphStateError,
 } from "./errors.js";
+export { defineGraph, GraphBuilder } from "./dsl.js";
+export type { EdgeOptions, NodeOptions } from "./dsl.js";
+export { renderGraph, graphToJSON } from "./visualize.js";

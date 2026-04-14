@@ -7,6 +7,9 @@
 - **Guardrail hooks**: `AgentConfig.beforeRun` and `AgentConfig.afterRun` — input/output guardrails that can modify text, pass through, or throw `GuardrailError` to abort the run. Three built-in factories: `profanityFilter()` (word-list replacement), `piiDetector("redact" | "block")` (email, phone, SSN, credit card), `topicBlocker(topics)` (cosine-similarity topic blocking).
 - **TuttiGraph API** (types + stub): DAG-based multi-agent execution engine. Types: `GraphNode`, `GraphEdge`, `GraphConfig`, `NodeResult`, `GraphRunResult`, `RunOptions`, `GraphEvent`. Errors: `GraphValidationError`, `GraphCycleError`, `GraphStateError`, `GraphDeadEndError`. Constructor validates graph structure.
 - **TuttiGraph execution engine**: `run()` and `stream()` fully implemented. Linear chains, conditional branching (first-match edge evaluation), loop edges with per-node visit cap (`max_node_visits`, default 5, throws `GraphCycleError`), parallel forks via `GraphEdge.parallel` with `GraphNode.merge` join points. Shared Zod-validated state with `state_update` shallow-merge. Events: `node:start`, `node:end`, `edge:traverse`, `state:update`, `graph:start`, `graph:end`.
+- **Graph DSL**: `defineGraph(entrypoint)` fluent builder — `.node()`, `.edge()`, `.state()`, `.build()` chain for constructing `GraphConfig` in score files.
+- **Graph visualization**: `renderGraph(config)` returns a self-contained HTML page with D3-force interactive SVG layout and a static `<noscript>` SVG fallback. `graphToJSON(config)` serialises a graph config (stripping non-serialisable condition functions) for API consumption.
+- **Server `GET /graph`**: new endpoint on `@tuttiai/server` that returns the graph config as JSON when `ServerConfig.graph` is provided. Studio SSE integration for real-time node highlighting.
 
 ## [0.19.0] - 2026-04-14
 

@@ -1,4 +1,4 @@
-import type { TuttiRuntime } from "@tuttiai/core";
+import type { TuttiRuntime, GraphConfig } from "@tuttiai/core";
 
 /**
  * Default HTTP port for the Tutti server.
@@ -70,4 +70,6 @@ export interface ServerConfig {
   agent_name: string;
   /** Non-streaming request timeout in ms. Defaults to {@link DEFAULT_TIMEOUT_MS}. */
   timeout_ms?: number;
+  /** Optional graph config — when provided, `GET /graph` returns its JSON representation. */
+  graph?: GraphConfig;
 }
