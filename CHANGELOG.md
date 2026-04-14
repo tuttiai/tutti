@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-04-14
+
+Three new packages: REST API server, web search voice, and code execution sandbox.
+172 new tests. Docker deployment support. `tutti-ai serve` CLI command.
+
 ### Added — `@tuttiai/sandbox@0.1.0` (code execution voice)
 - New `voices/sandbox` package — 4 tools: `execute_code`, `read_file`, `write_file`, `install_package`.
 - `SandboxConfig`: `{ allowed_languages?, allowed_packages?, timeout_ms?, max_file_size_bytes?, env?, install_timeout_ms? }`.
@@ -23,8 +28,6 @@
 - Per-tool rate limiting via sliding-window counter: `rate_limit: { per_minute: N }` returns `is_error: true` when budget exceeded.
 - SSRF guard: rejects loopback, private-range, non-http(s) URLs.
 - 63 unit tests across 5 files covering all providers, factory, all three tools, caching, truncation, rate limiting, error handling, and SSRF protection.
-
-## @tuttiai/server@0.1.0 · @tuttiai/cli@0.11.0
 
 ### Added — `@tuttiai/cli@0.11.0` `tutti-ai serve` command
 - New `tutti-ai serve [score]` command starts the HTTP server from a score file.
