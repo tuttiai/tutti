@@ -19,9 +19,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tuttiai/types": "*",
     "playwright": "1.59.1",
     "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/types": ">=0.7.0"
   },
   "files": ["dist", "README.md", "LICENSE"],
   "license": "MIT",

@@ -20,9 +20,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "@tuttiai/types": "*",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/types": ">=0.7.0"
   },
   "keywords": ["tutti", "ai", "agents", "orchestration", "voice", "mcp", "model-context-protocol", "bridge"],
   "license": "MIT",

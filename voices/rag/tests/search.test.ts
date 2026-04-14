@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { EmbeddingProvider } from "./embeddings/types.js";
-import { SearchEngine, type LlmFn } from "./search.js";
-import { MemoryVectorStore } from "./stores/memory.js";
-import type { EmbeddedChunk, VectorStore } from "./stores/types.js";
+import type { EmbeddingProvider } from "../src/embeddings/types.js";
+import { SearchEngine, type LlmFn } from "../src/search.js";
+import { MemoryVectorStore } from "../src/stores/memory.js";
+import type { EmbeddedChunk, VectorStore } from "../src/stores/types.js";
 
 // ---------------------------------------------------------------------------
 // Test doubles

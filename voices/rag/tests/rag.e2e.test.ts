@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Tool } from "@tuttiai/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ChunkStrategy, RagVoice } from "./index.js";
+import { ChunkStrategy, RagVoice } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
 // End-to-end happy path: ingest → search through the Voice's Tool surface.

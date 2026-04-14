@@ -20,9 +20,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tuttiai/types": "*",
     "glob": "11.1.0",
     "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/types": ">=0.7.0"
   },
   "keywords": ["tutti", "ai", "agents", "orchestration", "voice", "filesystem", "files", "io"],
   "license": "MIT",

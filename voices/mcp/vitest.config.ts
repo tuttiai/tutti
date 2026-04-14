@@ -13,9 +13,13 @@ export default defineConfig({
       reporter: ["text", "lcov", "html", "json-summary"],
       reportsDirectory: "./coverage",
       include: ["src/**/*.ts"],
-      // src/index.ts contains the full implementation for this voice, not just re-exports
-      exclude: ["dist/**", "**/*.d.ts"],
-      // No thresholds — MCP voice requires a real server process for meaningful tests
+      exclude: ["src/index.ts", "dist/**", "**/*.d.ts"],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 70,
+        statements: 80,
+      },
     },
   },
 });

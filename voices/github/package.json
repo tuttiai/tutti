@@ -19,10 +19,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tuttiai/core": "*",
-    "@tuttiai/types": "*",
     "@octokit/rest": "21.1.1",
     "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.7.0"
   },
   "files": ["dist", "README.md", "LICENSE"],
   "license": "MIT",

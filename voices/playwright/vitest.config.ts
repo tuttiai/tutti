@@ -11,8 +11,12 @@ export default defineConfig({
       reportsDirectory: "./coverage",
       include: ["src/**/*.ts"],
       exclude: ["src/index.ts", "dist/**", "**/*.d.ts"],
-      // No thresholds — Playwright tests require a real browser
-      // Coverage enforced via E2E test suite separately
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 70,
+        statements: 80,
+      },
     },
   },
 });

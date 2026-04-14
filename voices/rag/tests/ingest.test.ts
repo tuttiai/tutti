@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { chunkText } from "./chunking.js";
-import { ingestDocument } from "./ingest.js";
-import { ChunkStrategy } from "./types.js";
-import { toRawUrl, isGitHubUrl } from "./sources/github.js";
-import { assertSafeUrl, UrlValidationError } from "./utils/url-guard.js";
+import { chunkText } from "../src/chunking.js";
+import { ingestDocument } from "../src/ingest.js";
+import { ChunkStrategy } from "../src/types.js";
+import { toRawUrl, isGitHubUrl } from "../src/sources/github.js";
+import { assertSafeUrl, UrlValidationError } from "../src/utils/url-guard.js";
 
 // ---------------------------------------------------------------------------
 // pdf-parse is mocked globally — avoids bundling a fixture PDF and keeps the

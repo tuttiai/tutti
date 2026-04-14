@@ -20,20 +20,22 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tuttiai/core": "*",
-    "@tuttiai/types": "*",
     "pdf-parse": "2.4.5",
     "pg": "8.20.0",
     "pgvector": "0.2.1",
-    "remark": "^15.0.1",
-    "strip-markdown": "^6.0.0",
-    "unified": "^11.0.5",
+    "remark": "15.0.1",
+    "strip-markdown": "6.0.0",
+    "unified": "11.0.5",
     "wink-bm25-text-search": "3.1.2",
     "wink-nlp-utils": "2.1.0",
     "zod": "3.25.76"
   },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.7.0"
+  },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0"
   },
   "keywords": ["tutti", "ai", "agents", "voice", "rag", "retrieval", "knowledge-base", "embeddings"],
