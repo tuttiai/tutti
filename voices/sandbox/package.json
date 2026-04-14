@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/sandbox",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Sandbox voice for Tutti — secure code execution for TypeScript, Python, and Bash",
   "type": "module",
   "exports": {

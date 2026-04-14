@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Web voice for Tutti — search, fetch pages, and read sitemaps with Brave, Serper, or DuckDuckGo",
   "type": "module",
   "exports": {
