@@ -5,13 +5,36 @@
  * and sanitises the output.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { writeFile, unlink, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 
 import { stripAnsi, truncateOutput, redactPaths } from "./utils/sanitize.js";
+
+/**
+ * Resolve the tsx binary path. Prefers the locally-installed version
+ * (fast) over npx (slow cold-start in CI).
+ */
+let tsxBin: string | undefined;
+function resolveTsx(): [string, string[]] {
+  if (tsxBin === undefined) {
+    try {
+      tsxBin = execFileSync("which", ["tsx"], { encoding: "utf-8" }).trim();
+    } catch {
+      try {
+        // npm/pnpm puts binaries in node_modules/.bin which is on PATH
+        // when running via npm scripts, but not in raw shells.
+        tsxBin = execFileSync("npx", ["which", "tsx"], { encoding: "utf-8" }).trim();
+      } catch {
+        tsxBin = "";
+      }
+    }
+  }
+  if (tsxBin) return [tsxBin, ["--no-cache"]];
+  return ["npx", ["tsx", "--no-cache"]];
+}
 
 /** Supported execution languages. */
 export type Language = "typescript" | "python" | "bash";
@@ -57,7 +80,8 @@ async function buildCommand(
       // Use .mts so tsx treats the file as ESM (enables top-level await).
       const file = join(dir, randomUUID() + ".mts");
       await writeFile(file, code, "utf-8");
-      return ["npx", ["tsx", "--no-cache", file], file];
+      const [bin, args] = resolveTsx();
+      return [bin, [...args, file], file];
     }
     case "python": {
       const dir = await mkdtemp(join(tmpdir(), "tutti-py-"));
