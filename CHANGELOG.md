@@ -12,6 +12,7 @@
 - **Server `GET /graph`**: new endpoint on `@tuttiai/server` that returns the graph config as JSON when `ServerConfig.graph` is provided. Studio SSE integration for real-time node highlighting.
 - **Scheduler engine**: `SchedulerEngine` with `schedule()`, `trigger()`, `start()`, `stop()`. Supports cron expressions (via `node-cron`), interval shorthand (`"1h"`, `"30m"`), and one-shot ISO datetime triggers. `max_runs` auto-disables after N runs. Store backends: `MemoryScheduleStore` (dev), `PostgresScheduleStore` (production). Events: `schedule:triggered`, `schedule:completed`, `schedule:error`. New `AgentConfig.schedule` field and `AgentScheduleConfig` type.
 - **CLI schedule commands**: `tutti-ai schedule` starts the scheduler daemon (reads score, registers all agents with `schedule` config, runs until killed). `tutti-ai schedules list|enable|disable|trigger|runs` for management. Connects to PostgreSQL via `TUTTI_PG_URL`.
+- **Time-travel debugging**: `tutti-ai replay <session-id>` — interactive REPL for navigating session history from PostgreSQL. Commands: `list` (all turns), `show <n>` (full message detail with tool calls), `next`/`prev` (navigate), `inspect` (raw JSON), `replay-from <n>` (re-run from a turn with original or new input), `export json|md` (save session).
 
 ## [0.19.0] - 2026-04-14
 

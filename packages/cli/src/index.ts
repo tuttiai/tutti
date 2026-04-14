@@ -26,6 +26,7 @@ import { publishCommand } from "./commands/publish.js";
 import { evalCommand } from "./commands/eval.js";
 import { serveCommand, type ServeOptions } from "./commands/serve.js";
 import { scheduleCommand } from "./commands/schedule.js";
+import { replayCommand } from "./commands/replay.js";
 import {
   schedulesListCommand,
   schedulesEnableCommand,
@@ -163,6 +164,14 @@ program
   .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
   .action(async (suitePath: string, opts: { ci?: boolean; score?: string }) => {
     await evalCommand(suitePath, opts);
+  });
+
+program
+  .command("replay <session-id>")
+  .description("Time-travel debugger — navigate and replay a session from PostgreSQL")
+  .option("-s, --score <path>", "Path to score file for replay-from (default: ./tutti.score.ts)")
+  .action(async (sessionId: string, opts: { score?: string }) => {
+    await replayCommand(sessionId, { score: opts.score });
   });
 
 program
