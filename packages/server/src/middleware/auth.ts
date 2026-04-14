@@ -98,7 +98,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions): void {
  * Fastify plugin form of the auth middleware. Useful when composing
  * multiple plugins via `app.register`.
  */
-export const authPlugin: FastifyPluginAsync<AuthOptions> = async (app, options): Promise<void> => {
+// eslint-disable-next-line @typescript-eslint/require-await -- FastifyPluginAsync requires Promise<void> return
+export const authPlugin: FastifyPluginAsync<AuthOptions> = async (app, options) => {
   registerAuth(app, options);
-  await Promise.resolve();
 };

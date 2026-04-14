@@ -113,7 +113,19 @@ export function createIngestDocumentTool(
           };
         }
 
-        const vectors = await ctx.embeddings.embed(chunks.map((c) => c.text));
+        let vectors: number[][];
+        try {
+          vectors = await ctx.embeddings.embed(chunks.map((c) => c.text));
+        } catch (err) {
+          return {
+            content:
+              `ingest_document: embedding failed for ${input.source} (source_id: ${id}): ` +
+              `${err instanceof Error ? err.message : String(err)}. ` +
+              `Check the embedding provider configuration and API key.`,
+            is_error: true,
+          };
+        }
+
         if (vectors.length !== chunks.length) {
           return {
             content:
@@ -142,7 +154,18 @@ export function createIngestDocumentTool(
         }
 
         await ctx.store.upsert(embedded);
-        ctx.engine.index(embedded);
+
+        try {
+          ctx.engine.index(embedded);
+        } catch (err) {
+          return {
+            content:
+              `ingest_document: stored ${embedded.length} chunks but indexing failed for ${input.source} ` +
+              `(source_id: ${id}): ${err instanceof Error ? err.message : String(err)}. ` +
+              `The vector store has the data but search may not find it until re-indexed.`,
+            is_error: true,
+          };
+        }
 
         return {
           content: JSON.stringify({

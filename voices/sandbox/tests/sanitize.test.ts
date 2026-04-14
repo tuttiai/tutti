@@ -36,10 +36,15 @@ describe("truncateOutput", () => {
     );
   });
 
-  it("accepts a custom byte limit", () => {
+  it("accepts a custom byte limit and reflects it in the message", () => {
     const [text, truncated] = truncateOutput("abcdef", 3);
     expect(truncated).toBe(true);
-    expect(text).toContain("[…output truncated");
+    expect(text).toContain("[…output truncated to 3 bytes]");
+  });
+
+  it("shows KB in the truncation message for limits >= 1024", () => {
+    const [text] = truncateOutput("x".repeat(3000), 2048);
+    expect(text).toContain("[…output truncated to 2 KB]");
   });
 });
 

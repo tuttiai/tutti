@@ -4,11 +4,17 @@ export const MAX_OUTPUT_BYTES = 10_240; // 10 KB
 /**
  * Strip ANSI escape codes (colors, cursor movement, etc.) from a
  * string so that tool output is plain text.
+ *
+ * The regex uses bounded character classes (no unbounded `.*?`) to
+ * avoid ReDoS on adversarial input.
  */
 export function stripAnsi(text: string): string {
-  // Covers SGR, CSI, OSC, and common escape sequences.
   return text.replace(
-    /\x1b\[[0-9;]*[A-Za-z]|\x1b\].*?(?:\x07|\x1b\\)|\x1b[()][AB012]|\x1b[@-_]/g,
+    // SGR / CSI: \x1b[ … letter
+    // OSC:       \x1b] … BEL  or  \x1b] … ST  (bounded: [^\x07\x1b] avoids backtracking)
+    // Charset:   \x1b( or \x1b) followed by charset designator
+    // Fe:        \x1b followed by @ through _
+    /\x1b\[[0-9;]*[A-Za-z]|\x1b][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][AB012]|\x1b[@-_]/g,
     "",
   );
 }
@@ -29,7 +35,8 @@ export function truncateOutput(
   // Slice at byte boundary then decode — may cut a multi-byte char,
   // which toString("utf-8") replaces with U+FFFD. Acceptable for logs.
   const truncated = buf.subarray(0, max).toString("utf-8");
-  return [truncated + "\n[…output truncated to 10 KB]", true];
+  const label = max >= 1024 ? Math.floor(max / 1024) + " KB" : max + " bytes";
+  return [truncated + `\n[…output truncated to ${label}]`, true];
 }
 
 /**

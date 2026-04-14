@@ -7,7 +7,7 @@ import {
   PermissionError,
 } from "@tuttiai/core";
 
-import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
+import { buildTestServer, API_KEY } from "./helpers.js";
 
 describe("global error handler", () => {
   let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;

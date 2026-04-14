@@ -47,9 +47,9 @@ export function createFetchSitemapTool(): Tool<FetchSitemapInput> {
       "If the URL doesn't end in .xml, /sitemap.xml is appended.",
     parameters,
     execute: async (input): Promise<ToolResult> => {
-      const raw = input.url.endsWith(".xml")
-        ? input.url
-        : input.url.replace(/\/+$/, "") + "/sitemap.xml";
+      let base = input.url;
+      while (base.endsWith("/")) base = base.slice(0, -1);
+      const raw = input.url.endsWith(".xml") ? input.url : base + "/sitemap.xml";
 
       const key = cacheKey("sitemap", raw);
       const cached = getCached<string[]>(key);
