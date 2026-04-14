@@ -24,6 +24,9 @@ export default defineConfig({
         "src/commands/eval.ts",
         "src/commands/resume.ts",
         "src/commands/serve.ts",
+        "src/commands/replay.ts",
+        "src/commands/schedule.ts",
+        "src/commands/schedules.ts",
       ],
       thresholds: {
         lines: 70,

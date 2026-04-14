@@ -6,7 +6,7 @@ import {
   exportJSON,
   exportMarkdown,
   messageToText,
-} from "../../src/commands/replay.js";
+} from "../../src/commands/replay-render.js";
 import type { ChatMessage, Session } from "@tuttiai/types";
 
 const mockMessages: ChatMessage[] = [
