@@ -5,6 +5,7 @@
 ### Added
 - **Structured output**: `AgentConfig.outputSchema` (Zod schema) + `AgentConfig.maxRetries` (default 3). When set, the runtime appends a JSON-schema instruction to the system prompt, validates the final text output against the schema, and retries on parse failure. On success, the parsed object is attached as `AgentResult.structured`. On exhausted retries, throws `StructuredOutputError` with the last raw output.
 - **Guardrail hooks**: `AgentConfig.beforeRun` and `AgentConfig.afterRun` — input/output guardrails that can modify text, pass through, or throw `GuardrailError` to abort the run. Three built-in factories: `profanityFilter()` (word-list replacement), `piiDetector("redact" | "block")` (email, phone, SSN, credit card), `topicBlocker(topics)` (cosine-similarity topic blocking).
+- **TuttiGraph API** (types + stub): DAG-based multi-agent execution engine. Types: `GraphNode`, `GraphEdge`, `GraphConfig`, `NodeResult`, `GraphRunResult`, `RunOptions`, `GraphEvent`. Errors: `GraphValidationError`, `GraphCycleError`, `GraphStateError`, `GraphDeadEndError`. Constructor validates graph structure; `run()` and `stream()` stubs for v0.20.0 implementation.
 
 ## [0.19.0] - 2026-04-14
 

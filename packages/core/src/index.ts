@@ -102,6 +102,24 @@ export type {
   TopicBlockerOptions,
 } from "./guardrails/index.js";
 
+// Graph execution engine
+export { TuttiGraph, END } from "./graph/index.js";
+export {
+  GraphValidationError,
+  GraphCycleError,
+  GraphDeadEndError,
+  GraphStateError,
+} from "./graph/index.js";
+export type {
+  GraphConfig,
+  GraphEdge,
+  GraphEvent,
+  GraphNode,
+  GraphRunResult,
+  NodeResult,
+  RunOptions as GraphRunOptions,
+} from "./graph/index.js";
+
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";
 export type { AnthropicProviderOptions } from "./providers/anthropic.js";
