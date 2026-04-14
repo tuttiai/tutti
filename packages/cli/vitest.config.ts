@@ -27,6 +27,10 @@ export default defineConfig({
         "src/commands/replay.ts",
         "src/commands/schedule.ts",
         "src/commands/schedules.ts",
+        "src/commands/update.ts",
+        "src/commands/outdated.ts",
+        "src/commands/info.ts",
+        "src/commands/upgrade.ts",
       ],
       thresholds: {
         lines: 70,

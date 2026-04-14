@@ -231,6 +231,55 @@ Resume from turn 2? (y/n) y
   Final turn:    3
 ```
 
+### `tutti-ai update`
+
+Check all installed `@tuttiai/*` packages for newer versions and install
+updates. Auto-detects global CLI installs, npm/yarn/pnpm, and updates
+accordingly.
+
+```bash
+tutti-ai update
+```
+
+### `tutti-ai outdated`
+
+Show a table of installed `@tuttiai/*` packages with current vs latest
+versions. Does NOT install anything — just reports.
+
+```bash
+tutti-ai outdated
+```
+
+Output:
+
+```
+  PACKAGE                     CURRENT     LATEST      STATUS
+  ────────────────────────────────────────────────────────────────
+  @tuttiai/core               0.13.0      0.14.0      update available
+  @tuttiai/filesystem         0.1.0       0.1.0       up to date
+```
+
+### `tutti-ai info [score]`
+
+Show project information — agents, voices, models, package versions,
+schedule configs, and feature flags.
+
+```bash
+tutti-ai info
+tutti-ai info ./custom-score.ts
+```
+
+### `tutti-ai upgrade [voice]`
+
+Upgrade a specific voice or all installed `@tuttiai/*` packages to their
+latest versions.
+
+```bash
+tutti-ai upgrade              # upgrade all @tuttiai packages
+tutti-ai upgrade filesystem   # upgrade just @tuttiai/filesystem
+tutti-ai upgrade @tuttiai/rag # full package name also works
+```
+
 ### `tutti-ai schedule [score]`
 
 Start the scheduler daemon — reads a score file, registers all agents

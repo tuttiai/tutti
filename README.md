@@ -200,14 +200,29 @@ tutti-ai schedules trigger id  # run one immediately
 ## CLI
 
 ```bash
+# Project
 tutti-ai init [project]          # Scaffold a new project
+tutti-ai check [score]           # Validate a score
+tutti-ai info [score]            # Show agents, voices, versions
+
+# Run
 tutti-ai run [score]             # Run a score interactively
 tutti-ai serve [score]           # Start the HTTP server
+tutti-ai studio [score]          # Launch the web UI
+tutti-ai replay <session-id>     # Time-travel debug a session
+
+# Voices & packages
+tutti-ai add <voice>             # Install a voice
+tutti-ai voices                  # List official voices
+tutti-ai search <query>          # Search the voice registry
+tutti-ai upgrade [voice]         # Upgrade voices to latest
+tutti-ai update                  # Update all @tuttiai packages
+tutti-ai outdated                # Check for newer versions
+
+# Scheduling
 tutti-ai schedule [score]        # Start the scheduler daemon
 tutti-ai schedules list          # Show all schedules
 tutti-ai schedules trigger <id>  # Trigger a run immediately
-tutti-ai add <voice>             # Install a voice
-tutti-ai check [score]           # Validate a score
 ```
 
 ## Architecture

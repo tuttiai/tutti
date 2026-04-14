@@ -26,6 +26,10 @@ import { publishCommand } from "./commands/publish.js";
 import { evalCommand } from "./commands/eval.js";
 import { serveCommand, type ServeOptions } from "./commands/serve.js";
 import { scheduleCommand } from "./commands/schedule.js";
+import { updateCommand } from "./commands/update.js";
+import { outdatedCommand } from "./commands/outdated.js";
+import { infoCommand } from "./commands/info.js";
+import { upgradeCommand } from "./commands/upgrade.js";
 import { replayCommand } from "./commands/replay.js";
 import {
   schedulesListCommand,
@@ -164,6 +168,34 @@ program
   .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
   .action(async (suitePath: string, opts: { ci?: boolean; score?: string }) => {
     await evalCommand(suitePath, opts);
+  });
+
+program
+  .command("update")
+  .description("Update @tuttiai packages to their latest versions")
+  .action(() => {
+    updateCommand();
+  });
+
+program
+  .command("outdated")
+  .description("Check installed @tuttiai packages for newer versions")
+  .action(() => {
+    outdatedCommand();
+  });
+
+program
+  .command("info [score]")
+  .description("Show project info — agents, voices, models, and package versions")
+  .action(async (score?: string) => {
+    await infoCommand(score);
+  });
+
+program
+  .command("upgrade [voice]")
+  .description("Upgrade a specific voice or all @tuttiai packages to latest")
+  .action((voice?: string) => {
+    upgradeCommand(voice);
   });
 
 program
