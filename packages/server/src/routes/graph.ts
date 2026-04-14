@@ -6,7 +6,7 @@ import { graphToJSON } from "@tuttiai/core";
 /**
  * Register `GET /graph` — return the graph config as JSON.
  *
- * Condition functions are not serialisable so they are stripped; edge
+ * Condition functions are not serializable so they are stripped; edge
  * labels and structural information are preserved. Useful for external
  * visualization tools and the Tutti Studio frontend.
  *
@@ -22,7 +22,7 @@ export function registerGraphRoute(
       return reply.status(404).send({
         error: "No graph configured",
         message: "This server was started without a TuttiGraph. " +
-          "Pass a graph config to ServerConfig to enable this endpoint.",
+          "Set ServerConfig.graph to enable this endpoint.",
       });
     }
 

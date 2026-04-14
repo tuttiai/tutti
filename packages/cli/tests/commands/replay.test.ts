@@ -125,19 +125,36 @@ describe("replay — messageToText", () => {
     expect(text).toBe("The capital of France is Paris.");
   });
 
+  it("extracts text from array-based text content", () => {
+    const text = messageToText(mockMessages[1]!);
+    expect(text).toBe("The capital of France is Paris.");
+  });
+
   it("renders tool_use as bracket notation", () => {
     const text = messageToText(mockMessages[2]!);
     expect(text).toContain("[tool_use web_search]");
+  });
+
+  it("renders tool_result as bracket notation with preview text", () => {
+    const text = messageToText(mockMessages[3]!);
+    expect(text).toContain("[tool_result");
+    expect(text).toContain("68.4 million");
   });
 });
 
 describe("replay — exportJSON", () => {
   it("exports valid JSON with session metadata", () => {
     const json = exportJSON(mockSession);
-    const parsed = JSON.parse(json) as { id: string; agent_name: string; messages: unknown[] };
+    const parsed = JSON.parse(json) as {
+      id: string;
+      agent_name: string;
+      created_at: string;
+      messages: unknown[];
+    };
 
     expect(parsed.id).toBe("test-session-abc123");
     expect(parsed.agent_name).toBe("researcher");
+    expect(parsed.created_at).toBe("2026-04-14T10:00:00.000Z");
     expect(parsed.messages).toHaveLength(4);
   });
 });
