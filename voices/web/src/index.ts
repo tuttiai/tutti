@@ -1,6 +1,7 @@
 import type { Permission, Tool, Voice } from "@tuttiai/types";
 import { resolveProvider } from "./providers/index.js";
 import { createWebSearchTool } from "./tools/web-search.js";
+import { createFetchUrlTool } from "./tools/fetch-url.js";
 import type { SearchProvider } from "./types.js";
 import { DEFAULT_TIMEOUT_MS } from "./types.js";
 
@@ -8,6 +9,8 @@ export type { SearchResult, SearchProvider, ProviderOptions } from "./types.js";
 export { DEFAULT_TIMEOUT_MS } from "./types.js";
 export { resolveProvider, BraveProvider, SerperProvider, DuckDuckGoProvider } from "./providers/index.js";
 export { createWebSearchTool } from "./tools/web-search.js";
+export { createFetchUrlTool } from "./tools/fetch-url.js";
+export { cacheKey, getCached, setCached, clearCache, SEARCH_TTL_MS, FETCH_TTL_MS } from "./cache.js";
 
 /**
  * Options for {@link WebVoice}.
@@ -24,7 +27,7 @@ export interface WebVoiceOptions {
 }
 
 /**
- * Web search voice — gives agents the ability to search the internet.
+ * Web voice — gives agents web search and URL fetching.
  *
  * @example
  * ```ts
@@ -43,13 +46,16 @@ export interface WebVoiceOptions {
  */
 export class WebVoice implements Voice {
   readonly name = "web";
-  readonly description = "Search the web for current information";
+  readonly description = "Search the web and fetch page content";
   readonly required_permissions: Permission[] = ["network"];
   readonly tools: Tool[];
 
   constructor(options: WebVoiceOptions = {}) {
     const provider =
       options.provider ?? resolveProvider(options.timeout_ms ?? DEFAULT_TIMEOUT_MS);
-    this.tools = [createWebSearchTool(provider)];
+    this.tools = [
+      createWebSearchTool(provider),
+      createFetchUrlTool(),
+    ];
   }
 }

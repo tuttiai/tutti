@@ -7,6 +7,7 @@ import { DuckDuckGoProvider } from "../src/providers/duckduckgo.js";
 import { resolveProvider } from "../src/providers/index.js";
 import { createWebSearchTool } from "../src/tools/web-search.js";
 import { WebVoice } from "../src/index.js";
+import { clearCache } from "../src/cache.js";
 
 const ctx: ToolContext = {
   session_id: "test-session",
@@ -39,6 +40,7 @@ function mockFetchThrow(message: string): void {
 beforeEach(() => {
   vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
   vi.stubEnv("SERPER_API_KEY", "");
+  clearCache();
 });
 
 afterEach(() => {
@@ -307,19 +309,56 @@ describe("web_search tool", () => {
 
 // ── WebVoice class ───────────────────────────────────────────
 
+// ── Cached search ────────────────────────────────────────────
+
+describe("web_search caching", () => {
+  it("returns cached results on the second call", async () => {
+    const searchFn = vi.fn().mockResolvedValue([
+      { title: "Cached", url: "https://cached.com", snippet: "Hit" },
+    ] satisfies SearchResult[]);
+    const mock: SearchProvider = { name: "mock", search: searchFn };
+    const tool = createWebSearchTool(mock);
+
+    const input = tool.parameters.parse({ query: "cache test" });
+    const r1 = await tool.execute(input, ctx);
+    const r2 = await tool.execute(input, ctx);
+
+    // Provider called only once; second call served from cache.
+    expect(searchFn).toHaveBeenCalledTimes(1);
+    expect(r2.content).toContain("(cached)");
+    expect(r1.content).toContain("Cached");
+  });
+
+  it("does not cache empty results", async () => {
+    const searchFn = vi.fn().mockResolvedValue([]);
+    const mock: SearchProvider = { name: "mock", search: searchFn };
+    const tool = createWebSearchTool(mock);
+
+    const input = tool.parameters.parse({ query: "empty" });
+    await tool.execute(input, ctx);
+    await tool.execute(input, ctx);
+
+    expect(searchFn).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── WebVoice class ───────────────────────────────────────────
+
 describe("WebVoice", () => {
-  it("implements the Voice interface with 1 tool", () => {
+  it("implements the Voice interface with 2 tools", () => {
     const voice = new WebVoice({ provider: { name: "stub", search: async () => [] } });
     expect(voice.name).toBe("web");
     expect(voice.required_permissions).toEqual(["network"]);
-    expect(voice.tools).toHaveLength(1);
-    expect(voice.tools[0]?.name).toBe("web_search");
+    expect(voice.tools).toHaveLength(2);
+    const names = voice.tools.map((t) => t.name);
+    expect(names).toContain("web_search");
+    expect(names).toContain("fetch_url");
   });
 
   it("auto-selects provider when no explicit provider is given", () => {
     vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
     vi.stubEnv("SERPER_API_KEY", "");
     const voice = new WebVoice();
-    expect(voice.tools).toHaveLength(1);
+    expect(voice.tools).toHaveLength(2);
   });
 });

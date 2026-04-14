@@ -11,7 +11,11 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -20,8 +24,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mozilla/readability": "0.6.0",
     "@tuttiai/core": "*",
     "@tuttiai/types": "*",
+    "linkedom": "0.18.12",
+    "lru-cache": "11.3.5",
     "zod": "3.25.76"
   },
   "keywords": [

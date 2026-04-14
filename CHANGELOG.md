@@ -2,12 +2,13 @@
 
 ## [Unreleased]
 
-### Added — `@tuttiai/web@0.1.0` (web search voice)
-- New `voices/web` package — gives agents web search via `web_search` tool.
-- Three provider backends: Brave Search API (`BRAVE_SEARCH_API_KEY`), Serper.dev (`SERPER_API_KEY`), DuckDuckGo Instant Answer API (free, no key, limited results).
-- Auto-selection factory: picks the highest-priority provider whose env var is set (Brave > Serper > DuckDuckGo).
-- All providers normalise to `SearchResult[]` (`{ title, url, snippet, published_date? }`), handle HTTP errors gracefully (empty array + warn log), and respect configurable `timeout_ms` (default 5000).
-- 23 unit tests covering all three providers, the factory, the tool, and the voice class.
+### Added — `@tuttiai/web@0.1.0` (web search + fetch voice)
+- New `voices/web` package — gives agents web search and page fetching.
+- `web_search` tool: three provider backends (Brave, Serper, DuckDuckGo) with auto-selection, normalised `SearchResult[]` output, graceful error handling, configurable `timeout_ms` (default 5s).
+- `fetch_url` tool: fetches a URL with 10s timeout, detects content type from response headers. HTML extracted to readable text via `@mozilla/readability` + `linkedom` (strips nav/ads/boilerplate). JSON pretty-printed. Plain text/markdown returned as-is. Output truncated to ~8 000 tokens.
+- In-memory LRU cache (`lru-cache`): 500 entries max, SHA-256 cache keys, 10 min TTL for search, 30 min TTL for fetch. Wired into both tools — repeated queries/fetches served from cache.
+- SSRF guard (`src/utils/url-guard.ts`): rejects loopback, private-range, and non-http(s) URLs.
+- 47 unit tests across 3 files covering all providers, factory, both tools, caching, truncation, error handling, and SSRF protection.
 
 ## @tuttiai/server@0.1.0 · @tuttiai/cli@0.11.0
 
