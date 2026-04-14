@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { defineGraph, GraphBuilder } from "../../src/graph/dsl.js";
+import { defineGraph } from "../../src/graph/dsl.js";
 import { END } from "../../src/graph/types.js";
 import type { AgentConfig } from "@tuttiai/types";
 import type { NodeResult } from "../../src/graph/types.js";

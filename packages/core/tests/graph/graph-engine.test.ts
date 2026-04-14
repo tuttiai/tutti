@@ -218,7 +218,6 @@ describe("TuttiGraph — conditional branch", () => {
 describe("TuttiGraph — loop with max iterations", () => {
   it("loops a node until the exit condition is met", async () => {
     // Refine loops back to itself twice, then exits to END on the 3rd visit
-    let callCount = 0;
     const runner = createRunner([
       textResponse("draft-1"),  // refine visit 1
       textResponse("draft-2"),  // refine visit 2
