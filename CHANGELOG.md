@@ -10,6 +10,7 @@
 - **Graph DSL**: `defineGraph(entrypoint)` fluent builder — `.node()`, `.edge()`, `.state()`, `.build()` chain for constructing `GraphConfig` in score files.
 - **Graph visualization**: `renderGraph(config)` returns a self-contained HTML page with D3-force interactive SVG layout and a static `<noscript>` SVG fallback. `graphToJSON(config)` serialises a graph config (stripping non-serialisable condition functions) for API consumption.
 - **Server `GET /graph`**: new endpoint on `@tuttiai/server` that returns the graph config as JSON when `ServerConfig.graph` is provided. Studio SSE integration for real-time node highlighting.
+- **Scheduler engine**: `SchedulerEngine` with `schedule()`, `trigger()`, `start()`, `stop()`. Supports cron expressions (via `node-cron`), interval shorthand (`"1h"`, `"30m"`), and one-shot ISO datetime triggers. `max_runs` auto-disables after N runs. Store backends: `MemoryScheduleStore` (dev), `PostgresScheduleStore` (production). Events: `schedule:triggered`, `schedule:completed`, `schedule:error`. New `AgentConfig.schedule` field and `AgentScheduleConfig` type.
 
 ## [0.19.0] - 2026-04-14
 

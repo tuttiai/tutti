@@ -28,6 +28,7 @@ export type {
   AgentMemoryConfig,
   AgentCacheConfig,
   AgentDurableConfig,
+  AgentScheduleConfig,
   RunContext,
   GuardrailHook,
   AgentConfig,

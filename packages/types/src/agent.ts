@@ -66,6 +66,24 @@ export interface AgentCacheConfig {
  * Context passed to {@link AgentConfig.beforeRun} and {@link AgentConfig.afterRun}
  * guardrail hooks, giving them access to the agent name and session.
  */
+/**
+ * Schedule configuration for automatic agent execution.
+ *
+ * Exactly one of `cron`, `every`, or `at` must be provided.
+ */
+export interface AgentScheduleConfig {
+  /** Cron expression (5-field). E.g. `"0 9 * * *"` = 9 AM daily. */
+  cron?: string;
+  /** Interval shorthand. E.g. `"1h"`, `"30m"`, `"5s"`, `"2d"`. */
+  every?: string;
+  /** One-shot ISO-8601 datetime. The agent runs once at this time. */
+  at?: string;
+  /** Input string passed to the agent on each triggered run. */
+  input: string;
+  /** Auto-disable the schedule after this many runs. */
+  max_runs?: number;
+}
+
 export interface RunContext {
   agent_name: string;
   session_id: string;
@@ -133,6 +151,11 @@ export interface AgentConfig {
    * or throw `GuardrailError` to abort the run.
    */
   afterRun?: GuardrailHook;
+  /**
+   * Automatic schedule for this agent. When set, the scheduler engine
+   * triggers runs on the configured cron, interval, or one-shot datetime.
+   */
+  schedule?: AgentScheduleConfig;
 }
 
 export interface AgentResult {

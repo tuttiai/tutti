@@ -91,6 +91,22 @@ export {
 export type { InMemoryToolCacheOptions } from "./cache/in-memory-cache.js";
 export { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 
+// Scheduler
+export {
+  SchedulerEngine,
+  MemoryScheduleStore,
+  PostgresScheduleStore,
+  parseInterval,
+  validateCron,
+} from "./scheduler/index.js";
+export type {
+  ScheduleConfig,
+  ScheduledRun,
+  ScheduleRecord,
+  ScheduleStore,
+  PostgresScheduleStoreOptions,
+} from "./scheduler/index.js";
+
 // Guardrails
 export {
   profanityFilter,
@@ -158,6 +174,7 @@ export type {
   BudgetConfig,
   AgentMemoryConfig,
   AgentCacheConfig,
+  AgentScheduleConfig,
   RunContext,
   GuardrailHook,
   AgentConfig,

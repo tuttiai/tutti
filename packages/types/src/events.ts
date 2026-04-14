@@ -27,7 +27,10 @@ export type TuttiEvent =
   | { type: "hitl:answered"; agent_name: string; session_id: string; answer: string }
   | { type: "hitl:timeout"; agent_name: string; session_id: string }
   | { type: "checkpoint:saved"; session_id: string; turn: number }
-  | { type: "checkpoint:restored"; session_id: string; turn: number };
+  | { type: "checkpoint:restored"; session_id: string; turn: number }
+  | { type: "schedule:triggered"; schedule_id: string; agent_name: string }
+  | { type: "schedule:completed"; schedule_id: string; agent_name: string; duration_ms: number }
+  | { type: "schedule:error"; schedule_id: string; agent_name: string; error: Error };
 
 export type TuttiEventType = TuttiEvent["type"];
 
