@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@tuttiai/core": "*",
+    "@tuttiai/server": "*",
     "@tuttiai/types": "*",
     "chalk": "5.6.2",
     "chokidar": "5.0.0",

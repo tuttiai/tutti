@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/cli` `tutti-ai serve` command
+- New `tutti-ai serve [score]` command starts the HTTP server from a score file.
+- Options: `--port` (default 3847), `--host` (default 0.0.0.0), `--api-key`, `--agent`, `--watch`.
+- Prints startup banner with server version, score name, agent, and endpoint list.
+- `--watch` mode: ReactiveScore hot-reloads the score on file changes; the server is closed and restarted with the new config while preserving the in-memory session store.
+- Graceful shutdown on SIGINT/SIGTERM: Fastify connection draining finishes in-flight requests before exit.
+- CLI README updated with full usage guide, environment variable reference, and example curl commands for every endpoint.
+
 ### Added — Docker & deployment
 - Multi-stage `Dockerfile` (Node 20 Alpine): builder → deps → runner. Runs as non-root user `tutti` (uid 1001). HEALTHCHECK via `wget` every 30s against `/health`. ~333MB final image.
 - `packages/server/src/start.ts` — standalone entry point for Docker; reads all config from env vars (`TUTTI_PROVIDER`, `TUTTI_MODEL`, `TUTTI_SYSTEM_PROMPT`, `TUTTI_AGENT_NAME`, `TUTTI_PORT`, `TUTTI_HOST`). Built as `dist/start.js` alongside the library.

@@ -77,6 +77,100 @@ Deferred (known gaps):
   rebuilt on every change. Fast enough in practice (typically <50ms)
   but means runtime-internal caches reset.
 
+### `tutti-ai serve [score]`
+
+Start the Tutti HTTP server — exposes your score as a REST API:
+
+```bash
+tutti-ai serve                          # defaults to ./tutti.score.ts
+tutti-ai serve ./custom-score.ts        # specify a score file
+tutti-ai serve --port 8080              # custom port (default: 3847)
+tutti-ai serve --watch                  # hot-reload score on file changes
+tutti-ai serve -a researcher            # expose a specific agent
+```
+
+Options:
+
+| Flag | Default | What it does |
+|---|---|---|
+| `-p, --port <number>` | `3847` | Port to listen on. |
+| `-H, --host <address>` | `0.0.0.0` | Interface to bind to. |
+| `-k, --api-key <key>` | `TUTTI_API_KEY` env | Bearer token clients must send for auth. |
+| `-a, --agent <name>` | score entry or first agent | Which agent to expose via the API. |
+| `-w, --watch` | off | Reload the score and restart the server on file changes. |
+
+Startup output:
+
+```
+  Tutti Server v0.1.0
+  http://localhost:3847
+
+  Score:  my-project
+  Agent:  assistant
+  Agents: assistant, researcher
+  Watch:  enabled
+
+  Endpoints:
+    POST  http://localhost:3847/run
+    POST  http://localhost:3847/run/stream
+    GET   http://localhost:3847/sessions/:id
+    GET   http://localhost:3847/health
+```
+
+#### Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `TUTTI_API_KEY` | Yes | Bearer token for authenticating requests. |
+| `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key. |
+| `OPENAI_API_KEY` | If using OpenAI | OpenAI API key. |
+| `GOOGLE_API_KEY` | If using Gemini | Google AI API key. |
+| `TUTTI_ALLOWED_ORIGINS` | No | Comma-separated CORS origins (default: `*`). |
+| `DATABASE_URL` | No | PostgreSQL URL for session persistence. |
+| `TUTTI_REDIS_URL` | No | Redis URL for durable checkpoints. |
+
+#### Example curl commands
+
+```bash
+# Health check
+curl http://localhost:3847/health
+
+# Run an agent (non-streaming)
+curl -X POST http://localhost:3847/run \
+  -H "Authorization: Bearer $TUTTI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Summarize the latest AI news"}'
+
+# Run an agent (streaming via SSE)
+curl -N -X POST http://localhost:3847/run/stream \
+  -H "Authorization: Bearer $TUTTI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Write a short poem about TypeScript"}'
+
+# Continue a conversation
+curl -X POST http://localhost:3847/run \
+  -H "Authorization: Bearer $TUTTI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Tell me more", "session_id": "<session_id from previous response>"}'
+
+# Retrieve session history
+curl http://localhost:3847/sessions/<session_id> \
+  -H "Authorization: Bearer $TUTTI_API_KEY"
+```
+
+#### Graceful shutdown
+
+`SIGINT` (Ctrl+C) and `SIGTERM` close the server after in-flight requests
+complete. Fastify's built-in connection draining ensures no request is
+dropped mid-response.
+
+#### Watch mode
+
+`--watch` reloads the score on any file change in the score's directory
+tree (debounced 200ms). On reload the server is closed and restarted
+with the new config. In-flight sessions survive because the session
+store is shared across restarts.
+
 ### `tutti-ai resume <session-id>`
 
 Resume a crashed or interrupted run from its last durable checkpoint.

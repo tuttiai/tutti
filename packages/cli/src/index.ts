@@ -24,6 +24,7 @@ import { studioCommand } from "./commands/studio.js";
 import { searchCommand, voicesCommand } from "./commands/search.js";
 import { publishCommand } from "./commands/publish.js";
 import { evalCommand } from "./commands/eval.js";
+import { serveCommand, type ServeOptions } from "./commands/serve.js";
 
 const program = new Command();
 
@@ -53,6 +54,18 @@ program
   .option("-w, --watch", "Reload the score on file changes")
   .action(async (score: string | undefined, opts: { watch?: boolean }) => {
     await runCommand(score, { watch: opts.watch });
+  });
+
+program
+  .command("serve [score]")
+  .description("Start the Tutti HTTP server")
+  .option("-p, --port <number>", "Port to listen on (default: 3847)")
+  .option("-H, --host <address>", "Host to bind to (default: 0.0.0.0)")
+  .option("-k, --api-key <key>", "API key for bearer auth (or set TUTTI_API_KEY)")
+  .option("-a, --agent <name>", "Agent to expose (default: score entry or first agent)")
+  .option("-w, --watch", "Reload the score on file changes")
+  .action(async (score: string | undefined, opts: ServeOptions) => {
+    await serveCommand(score, opts);
   });
 
 program
