@@ -19,7 +19,9 @@ interface PkgJson {
 
 function readPkg(dir: string): PkgJson | undefined {
   const p = resolve(dir, "package.json");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(p)) return undefined;
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   return JSON.parse(readFileSync(p, "utf-8")) as PkgJson;
 }
 
@@ -32,7 +34,7 @@ function fail(msg: string): never {
   process.exit(1);
 }
 
-const ok = (msg: string) => console.log(chalk.green("  ✔ " + msg));
+const ok = (msg: string): void => { console.log(chalk.green("  ✔ " + msg)); };
 
 export async function publishCommand(opts: { dryRun?: boolean }): Promise<void> {
   const cwd = process.cwd();
@@ -48,6 +50,7 @@ export async function publishCommand(opts: { dryRun?: boolean }): Promise<void> 
 
   // 1a. Must be a voice directory
   if (!pkg) fail("No package.json found in the current directory.");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   if (!existsSync(resolve(cwd, "src/index.ts"))) fail("No src/index.ts found — are you inside a voice directory?");
 
   // 1b. Required fields
@@ -59,14 +62,15 @@ export async function publishCommand(opts: { dryRun?: boolean }): Promise<void> 
   if (!pkg.exports) missing.push("exports");
   if (missing.length > 0) fail("package.json is missing: " + missing.join(", "));
 
-  const name = pkg.name!;
-  const version = pkg.version!;
+  const name = pkg.name ?? "";
+  const version = pkg.version ?? "";
 
   // 1c. Name convention
   const validName = name.startsWith("@tuttiai/") || name.startsWith("tutti");
   if (!validName) fail("Package name must start with @tuttiai/ or tutti — got: " + name);
 
   // 1d. Check required_permissions is declared in source
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   const src = readFileSync(resolve(cwd, "src/index.ts"), "utf-8");
   if (!src.includes("required_permissions")) {
     fail("Voice class must declare required_permissions in src/index.ts");
@@ -123,7 +127,8 @@ export async function publishCommand(opts: { dryRun?: boolean }): Promise<void> 
   // Show files from the pack output
   const fileLines = packOutput
     .split("\n")
-    .filter((l) => l.includes("npm notice") && /\d+(\.\d+)?\s*[kM]?B\s/.test(l))
+    // eslint-disable-next-line security/detect-unsafe-regex -- simple size-matching pattern, no nested quantifiers
+    .filter((l) => l.includes("npm notice") && /\d+(?:\.\d+)?\s*[kM]?B\s/.test(l))
     .map((l) => l.replace(/npm notice\s*/, ""));
 
   if (fileLines.length > 0) {
@@ -242,12 +247,17 @@ async function openRegistryPR(
     tags: [shortName],
   };
 
+  // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
   if (!registry[section]) registry[section] = [];
+  // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
   const exists = registry[section].some((v) => v.package === packageName);
   if (exists) {
+    // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
     const idx = registry[section].findIndex((v) => v.package === packageName);
+    // eslint-disable-next-line security/detect-object-injection -- idx from findIndex on validated array, section is typed
     registry[section][idx] = { ...registry[section][idx], ...entry };
   } else {
+    // eslint-disable-next-line security/detect-object-injection -- section is typed keyof Registry ("official"|"community")
     registry[section].push(entry);
   }
 

@@ -137,6 +137,7 @@ export async function schedulesTriggerCommand(
   scorePath?: string,
 ): Promise<void> {
   const file = resolve(scorePath ?? "./tutti.score.ts");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(file)) {
     console.error(chalk.red("Score file not found: " + file));
     process.exit(1);

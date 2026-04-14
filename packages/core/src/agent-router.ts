@@ -66,6 +66,7 @@ export class AgentRouter {
       }
       const available = Object.keys(_score.agents);
       for (const id of entry.agents) {
+        // eslint-disable-next-line security/detect-object-injection -- id from validated entry.agents array
         if (!_score.agents[id]) {
           throw new Error(
             `Parallel entry agent "${id}" not found. Available: ${available.join(", ")}`,
@@ -79,6 +80,7 @@ export class AgentRouter {
 
     // Build a modified score where the entry agent has the delegate tool
     const entryId = entry ?? "orchestrator";
+    // eslint-disable-next-line security/detect-object-injection -- entryId from score.entry config
     const entryAgent = _score.agents[entryId];
 
     if (!entryAgent) {
@@ -96,6 +98,7 @@ export class AgentRouter {
 
     // Validate all delegate IDs exist
     for (const delegateId of entryAgent.delegates) {
+      // eslint-disable-next-line security/detect-object-injection -- delegateId from validated delegates array
       if (!_score.agents[delegateId]) {
         throw new Error(
           `Delegate "${delegateId}" not found in agents. Available: ${Object.keys(_score.agents).join(", ")}`,
@@ -187,6 +190,7 @@ export class AgentRouter {
     // Validate agent IDs up-front so we fail fast on typos
     const available = Object.keys(this._score.agents);
     for (const { agent_id } of inputs) {
+      // eslint-disable-next-line security/detect-object-injection -- agent_id from validated inputs array
       if (!this._score.agents[agent_id]) {
         throw new Error(
           `Parallel input references unknown agent "${agent_id}". Available: ${available.join(", ")}`,
@@ -307,8 +311,12 @@ export class AgentRouter {
     score: ScoreConfig,
     entryId: string,
   ): ScoreConfig {
+    // eslint-disable-next-line security/detect-object-injection -- entryId validated in constructor
     const entryAgent = score.agents[entryId];
-    const delegates = entryAgent.delegates!;
+    if (!entryAgent.delegates || entryAgent.delegates.length === 0) {
+      throw new Error(`Entry agent "${entryId}" has no delegates.`);
+    }
+    const delegates = entryAgent.delegates;
 
     // Build the delegate tool
     const delegateTool = this.createDelegateTool(score, delegates, entryId);
@@ -323,6 +331,7 @@ export class AgentRouter {
     // Enhance the system prompt with delegate info
     const delegateDescriptions = delegates
       .map((id) => {
+        // eslint-disable-next-line security/detect-object-injection -- id from validated delegates array
         const agent = score.agents[id];
         return `  - "${id}": ${agent.name}${agent.description ? ` — ${agent.description}` : ""}`;
       })
@@ -354,8 +363,9 @@ When the user's request matches a specialist's expertise, delegate to them with 
     delegateIds: string[],
     entryId: string,
   ): Tool<{ agent_id: string; task: string }> {
-    const runtime = () => this.runtime;
-    const events = () => this.runtime.events;
+    const runtime = (): TuttiRuntime => this.runtime;
+    const events = (): EventBus => this.runtime.events;
+    // eslint-disable-next-line security/detect-object-injection -- entryId validated in constructor
     const entryName = score.agents[entryId]?.name ?? "orchestrator";
 
     const parameters = z.object({

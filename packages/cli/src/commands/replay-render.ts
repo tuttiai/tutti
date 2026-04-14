@@ -35,6 +35,7 @@ function excerpt(text: string, max: number): string {
 export function renderList(messages: ChatMessage[]): string {
   const lines: string[] = [];
   for (let i = 0; i < messages.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection -- index from bounded loop
     const msg = messages[i];
     if (!msg) continue;
     const role = msg.role === "user"
@@ -54,6 +55,7 @@ export function renderShow(messages: ChatMessage[], index: number): string {
     return chalk.red("Index out of range. Valid: 0\u2013" + (messages.length - 1));
   }
 
+  // eslint-disable-next-line security/detect-object-injection -- index validated by bounds check above
   const msg = messages[index];
   if (!msg) return chalk.red("Index out of range.");
   const lines: string[] = [];
@@ -88,6 +90,7 @@ export function renderInspect(messages: ChatMessage[], index: number): string {
   if (index < 0 || index >= messages.length) {
     return chalk.red("Index out of range.");
   }
+  // eslint-disable-next-line security/detect-object-injection -- index validated by bounds check above
   return JSON.stringify(messages[index], null, 2);
 }
 
@@ -118,6 +121,7 @@ export function exportMarkdown(session: Session): string {
   lines.push("");
 
   for (let i = 0; i < session.messages.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection -- index from bounded loop
     const msg = session.messages[i];
     if (!msg) continue;
     lines.push("## Turn " + i + " (" + msg.role + ")");

@@ -22,6 +22,7 @@ export class SecretsManager {
   }
 
   static require(key: string): string {
+    // eslint-disable-next-line security/detect-object-injection -- key is a known env var name passed by callers
     const val = process.env[key];
     if (!val)
       throw new Error(
@@ -36,6 +37,7 @@ export class SecretsManager {
   }
 
   static optional(key: string, fallback?: string): string | undefined {
+    // eslint-disable-next-line security/detect-object-injection -- key is a known env var name passed by callers
     return process.env[key] ?? fallback;
   }
 }

@@ -39,6 +39,7 @@ export const listDirectoryTool: Tool<z.infer<typeof parameters>> = {
         for (const match of matches.sort()) {
           const fullPath = join(dirPath, match);
           try {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via join() from sanitized dir
             const info = await stat(fullPath);
             const type = info.isDirectory() ? "dir" : "file";
             const size = info.isDirectory() ? "" : ` (${formatBytes(info.size)})`;
@@ -50,6 +51,7 @@ export const listDirectoryTool: Tool<z.infer<typeof parameters>> = {
         return { content: `${dirPath}/\n${lines.join("\n")}` };
       }
 
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
       const entries = await readdir(dirPath, {
         withFileTypes: true,
         recursive: input.recursive,
@@ -70,6 +72,7 @@ export const listDirectoryTool: Tool<z.infer<typeof parameters>> = {
           lines.push(`  dir   ${rel}/`);
         } else {
           try {
+            // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via join() from sanitized dir
             const info = await stat(entryPath);
             lines.push(`  file  ${rel} (${formatBytes(info.size)})`);
           } catch {

@@ -7,7 +7,10 @@ import { cacheKey, getCached, setCached, SEARCH_TTL_MS } from "../cache.js";
  * Build the Zod schema for web_search, allowing the voice to set a
  * custom default for `limit` via {@link WebVoiceConfig.max_results}.
  */
-function buildParameters(defaultLimit: number) {
+function buildParameters(defaultLimit: number): z.ZodObject<{
+  query: z.ZodString;
+  limit: z.ZodDefault<z.ZodNumber>;
+}> {
   return z.object({
     query: z
       .string()

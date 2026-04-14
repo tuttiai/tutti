@@ -13,6 +13,7 @@ import type { ScheduleConfig, ScheduledRun, ScheduleRecord } from "./types.js";
 
 // ── Interval parser ──────────────────────────────────────────
 
+// eslint-disable-next-line security/detect-unsafe-regex -- simple regex with no nested quantifiers
 const INTERVAL_RE = /^(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)$/;
 const MULTIPLIERS: Record<string, number> = {
   ms: 1,
@@ -39,6 +40,7 @@ export function parseInterval(every: string): number {
   }
   const value = parseFloat(match[1] ?? "0");
   const unit = match[2] ?? "ms";
+  // eslint-disable-next-line security/detect-object-injection -- unit from regex match against known set (ms|s|m|h|d)
   return value * (MULTIPLIERS[unit] ?? 0);
 }
 

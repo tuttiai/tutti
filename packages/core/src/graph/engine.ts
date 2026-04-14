@@ -245,6 +245,7 @@ export async function executeGraph(
 
     totalUsage.input_tokens += usage.input_tokens;
     totalUsage.output_tokens += usage.output_tokens;
+    // eslint-disable-next-line security/detect-object-injection -- currentNodeId from validated graph nodes
     outputs[currentNodeId] = nodeResult;
     path.push(currentNodeId);
 
@@ -288,6 +289,7 @@ export async function executeGraph(
 
           totalUsage.input_tokens += branch.usage.input_tokens;
           totalUsage.output_tokens += branch.usage.output_tokens;
+          // eslint-disable-next-line security/detect-object-injection -- targetId from validated graph edges
           outputs[targetId] = branch.nodeResult;
           path.push(targetId);
 
@@ -341,6 +343,7 @@ export async function executeGraph(
 
   // ── Build result ───────────────────────────────────────────────
   const lastNodeId = path.at(-1);
+  // eslint-disable-next-line security/detect-object-injection -- lastNodeId from validated graph path
   const finalOutput = lastNodeId ? (outputs[lastNodeId]?.output ?? "") : "";
 
   const result: GraphRunResult = {

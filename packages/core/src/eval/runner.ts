@@ -116,6 +116,7 @@ export class EvalRunner {
         };
 
       case "matches_regex": {
+        // eslint-disable-next-line security/detect-non-literal-regexp -- pattern from eval assertion config, not user input
         const regex = new RegExp(String(val), "i");
         return {
           assertion,

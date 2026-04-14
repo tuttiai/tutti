@@ -21,7 +21,11 @@ const ALL_LANGUAGES: [Language, ...Language[]] = ["typescript", "python", "bash"
  * the `language` enum is narrowed so the agent cannot select a
  * disallowed runtime.
  */
-function buildParameters(allowed: Language[] | undefined) {
+function buildParameters(allowed: Language[] | undefined): z.ZodObject<{
+  code: z.ZodString;
+  language: z.ZodEnum<[string, ...string[]]>;
+  timeout_ms: z.ZodOptional<z.ZodNumber>;
+}> {
   const langs: [string, ...string[]] =
     allowed && allowed.length > 0
       ? (allowed as [string, ...string[]])

@@ -14,6 +14,7 @@ const logger = createLogger("tutti-cli");
 
 export async function evalCommand(suitePath: string, opts: { ci?: boolean; score?: string }): Promise<void> {
   const suiteFile = resolve(suitePath);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(suiteFile)) {
     logger.error({ file: suiteFile }, "Suite file not found");
     process.exit(1);
@@ -22,6 +23,7 @@ export async function evalCommand(suitePath: string, opts: { ci?: boolean; score
   // Load the eval suite JSON
   let suite: EvalSuite;
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
     suite = JSON.parse(readFileSync(suiteFile, "utf-8")) as EvalSuite;
   } catch (err) {
     logger.error({ error: err instanceof Error ? err.message : String(err) }, "Failed to parse suite file");
@@ -30,6 +32,7 @@ export async function evalCommand(suitePath: string, opts: { ci?: boolean; score
 
   // Load score
   const scoreFile = resolve(opts.score ?? "./tutti.score.ts");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(scoreFile)) {
     logger.error({ file: scoreFile }, "Score file not found");
     process.exit(1);

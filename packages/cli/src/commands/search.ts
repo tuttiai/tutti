@@ -84,6 +84,7 @@ async function fetchRegistry(): Promise<VoiceEntry[]> {
 
 function toolCount(name: string): number {
   const counts: Record<string, number> = { filesystem: 7, github: 10, playwright: 12 };
+  // eslint-disable-next-line security/detect-object-injection -- key from known static voice name
   return counts[name] ?? 0;
 }
 
@@ -97,8 +98,10 @@ function matchesQuery(voice: VoiceEntry, query: string): boolean {
 
 function isInstalled(packageName: string): boolean {
   const pkgPath = resolve(process.cwd(), "package.json");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   if (!existsSync(pkgPath)) return false;
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     const deps: Record<string, string> = { ...pkg.dependencies, ...pkg.devDependencies };
     return packageName in deps;

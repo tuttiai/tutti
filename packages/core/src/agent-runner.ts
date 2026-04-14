@@ -54,8 +54,9 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
         throw err;
       }
       if (err instanceof RateLimitError && err.retryAfter) {
-        logger.warn({ attempt, retryAfter: err.retryAfter }, "Rate limited, waiting before retry");
-        await new Promise((r) => setTimeout(r, err.retryAfter! * 1000));
+        const retryAfter = err.retryAfter;
+        logger.warn({ attempt, retryAfter }, "Rate limited, waiting before retry");
+        await new Promise((r) => setTimeout(r, retryAfter * 1000));
       } else {
         const delayMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
         logger.warn({ attempt, delayMs }, "Provider error, retrying with backoff");

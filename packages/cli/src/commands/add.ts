@@ -50,7 +50,9 @@ const OFFICIAL_VOICES: Record<string, { package: string; setup: string }> = {
 
 function resolvePackageName(input: string): string {
   // Known official voice
+  // eslint-disable-next-line security/detect-object-injection -- key from known static OFFICIAL_VOICES map
   if (OFFICIAL_VOICES[input]) {
+    // eslint-disable-next-line security/detect-object-injection -- key from known static OFFICIAL_VOICES map
     return OFFICIAL_VOICES[input].package;
   }
   // Already a scoped package
@@ -63,9 +65,11 @@ function resolvePackageName(input: string): string {
 
 function isAlreadyInstalled(packageName: string): boolean {
   const pkgPath = resolve(process.cwd(), "package.json");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   if (!existsSync(pkgPath)) return false;
 
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
     const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     const deps: Record<string, string> = { ...pkg.dependencies, ...pkg.devDependencies };
     return packageName in deps;
@@ -79,6 +83,7 @@ export function addCommand(voiceName: string): void {
 
   // Check if package.json exists in cwd
   const pkgPath = resolve(process.cwd(), "package.json");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve() from cwd
   if (!existsSync(pkgPath)) {
     logger.error("No package.json found in the current directory");
     console.error(chalk.dim('Run "tutti-ai init" to create a new project first.'));
@@ -108,6 +113,7 @@ export function addCommand(voiceName: string): void {
   }
 
   // Print setup instructions
+  // eslint-disable-next-line security/detect-object-injection -- key from user CLI arg matched against known map
   const official = OFFICIAL_VOICES[voiceName];
   if (official) {
     console.log();

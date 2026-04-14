@@ -171,6 +171,7 @@ function jsonSchemaToZod(schema: Record<string, unknown>): z.ZodTypeAny {
     if (!required.includes(key)) {
       field = field.optional();
     }
+    // eslint-disable-next-line security/detect-object-injection -- key from Object.entries of MCP schema properties
     shape[key] = field;
   }
 

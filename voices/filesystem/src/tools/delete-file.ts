@@ -27,6 +27,7 @@ export const deleteFileTool: Tool<z.infer<typeof parameters>> = {
             `Call delete_file again with require_confirmation: false to confirm.`,
         };
       }
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path sanitized via PathSanitizer
       await unlink(filePath);
       return { content: `Deleted: ${filePath}` };
     } catch (error) {

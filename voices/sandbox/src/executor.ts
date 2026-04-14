@@ -79,6 +79,7 @@ async function buildCommand(
       const dir = await mkdtemp(join(tmpdir(), "tutti-ts-"));
       // Use .mts so tsx treats the file as ESM (enables top-level await).
       const file = join(dir, randomUUID() + ".mts");
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built from mkdtemp + randomUUID
       await writeFile(file, code, "utf-8");
       const [bin, args] = resolveTsx();
       return [bin, [...args, file], file];
@@ -86,6 +87,7 @@ async function buildCommand(
     case "python": {
       const dir = await mkdtemp(join(tmpdir(), "tutti-py-"));
       const file = join(dir, randomUUID() + ".py");
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built from mkdtemp + randomUUID
       await writeFile(file, code, "utf-8");
       return ["python3", [file], file];
     }
@@ -151,6 +153,7 @@ export async function execute(
       const safeStderr = redactPaths(stderr, cwd);
 
       // Clean up temp file asynchronously — don't block the result.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- tempFile from mkdtemp + randomUUID
       if (tempFile) void unlink(tempFile).catch(() => {});
 
       resolve({
@@ -167,6 +170,7 @@ export async function execute(
     // Handle spawn failures (e.g. command not found).
     child.on("error", (err) => {
       clearTimeout(timer);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- tempFile from mkdtemp + randomUUID
       if (tempFile) void unlink(tempFile).catch(() => {});
 
       resolve({

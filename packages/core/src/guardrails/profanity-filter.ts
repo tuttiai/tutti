@@ -47,6 +47,7 @@ export interface ProfanityFilterOptions {
 export function profanityFilter(options: ProfanityFilterOptions = {}): GuardrailHook {
   const words = [...DEFAULT_WORDS, ...(options.extraWords ?? [])];
   const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  // eslint-disable-next-line security/detect-non-literal-regexp -- pattern built from sanitized word list with escaped special chars
   const pattern = new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
 
   return (text: string): Promise<string> => {

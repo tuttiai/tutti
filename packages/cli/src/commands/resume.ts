@@ -34,6 +34,7 @@ export async function resumeCommand(
 ): Promise<void> {
   // --- Score loading (same flow as `run`) -------------------------------
   const scoreFile = resolve(opts.score ?? "./tutti.score.ts");
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(scoreFile)) {
     logger.error({ file: scoreFile }, "Score file not found");
     console.error(chalk.dim('Run "tutti-ai init" to create a new project.'));
@@ -71,6 +72,7 @@ export async function resumeCommand(
 
   // --- Resolve the target agent -----------------------------------------
   const agentName = resolveAgentName(score, opts.agent);
+  // eslint-disable-next-line security/detect-object-injection -- key from resolveAgentName, validated below
   const agent = score.agents[agentName];
   if (!agent) {
     logger.error(

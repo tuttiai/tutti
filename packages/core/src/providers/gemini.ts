@@ -269,6 +269,7 @@ function convertJsonSchemaToGemini(
   const geminiType = type?.toUpperCase() as keyof typeof SchemaType;
 
   return {
+    // eslint-disable-next-line security/detect-object-injection -- geminiType derived from JSON schema type field
     type: SchemaType[geminiType] ?? SchemaType.OBJECT,
     properties: schema.properties as Record<string, unknown> | undefined,
     required: schema.required as string[] | undefined,

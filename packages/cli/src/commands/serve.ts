@@ -33,6 +33,7 @@ export async function serveCommand(
   // ── Resolve score file ──────────────────────────────────────
   const file = resolve(scorePath ?? "./tutti.score.ts");
 
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(file)) {
     logger.error({ file }, "Score file not found");
     console.error(chalk.dim('Run "tutti-ai init" to create a new project.'));
@@ -74,6 +75,7 @@ export async function serveCommand(
     (typeof score.entry === "string" ? score.entry : undefined) ??
     agentNames[0];
 
+  // eslint-disable-next-line security/detect-object-injection -- agentName from CLI option or score entry config
   if (!agentName || !score.agents[agentName]) {
     logger.error(
       { requested: agentName, available: agentNames },
@@ -108,7 +110,8 @@ export async function serveCommand(
     reactive.on("reloaded", () => {
       void (async () => {
         try {
-          const nextScore = reactive!.current;
+          const nextScore = reactive?.current;
+          if (!nextScore) return;
           const nextRuntime = buildRuntime(nextScore, sharedSessions);
           const nextApp = await buildApp(nextRuntime, agentName, port, host, options.apiKey);
 
@@ -141,7 +144,7 @@ export async function serveCommand(
   printBanner(port, host, agentName, score, file, options.watch);
 
   // ── Graceful shutdown ───────────────────────────────────────
-  const shutdown = async (signal: string) => {
+  const shutdown = async (signal: string): Promise<void> => {
     console.log(chalk.dim("\n" + signal + " received — shutting down..."));
     if (reactive) await reactive.close();
     await app.close();

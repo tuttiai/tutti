@@ -14,7 +14,8 @@ export class EventBus {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
-    const handlers = this.listeners.get(type)!;
+    const handlers = this.listeners.get(type);
+    if (!handlers) return () => {};
     const h = handler as Handler;
     handlers.add(h);
 
@@ -81,7 +82,8 @@ export class EventBus {
     if (!this.listeners.has("*")) {
       this.listeners.set("*", new Set());
     }
-    const handlers = this.listeners.get("*")!;
+    const handlers = this.listeners.get("*");
+    if (!handlers) return () => {};
     const h = handler as Handler;
     handlers.add(h);
 

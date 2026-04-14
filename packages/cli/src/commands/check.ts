@@ -12,14 +12,15 @@ import {
 
 const logger = createLogger("tutti-cli");
 
-const ok = (msg: string) => console.log(chalk.green("  \u2714 " + msg));
-const fail = (msg: string) => console.log(chalk.red("  \u2718 " + msg));
+const ok = (msg: string): void => { console.log(chalk.green("  \u2714 " + msg)); };
+const fail = (msg: string): void => { console.log(chalk.red("  \u2718 " + msg)); };
 
 export async function checkCommand(scorePath?: string): Promise<void> {
   const file = resolve(scorePath ?? "./tutti.score.ts");
 
   console.log(chalk.cyan(`\nChecking ${file}...\n`));
 
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(file)) {
     fail("Score file not found: " + file);
     process.exit(1);
@@ -83,6 +84,7 @@ export async function checkCommand(scorePath?: string): Promise<void> {
         github: "GITHUB_TOKEN",
       };
 
+      // eslint-disable-next-line security/detect-object-injection -- key from voice name, matched against known env map
       const envVar = voiceEnvMap[voiceName];
       if (envVar) {
         const key = SecretsManager.optional(envVar);

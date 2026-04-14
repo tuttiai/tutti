@@ -118,10 +118,12 @@ export function createInstallPackageTool(
  */
 function extractVersion(stdout: string, name: string): string | undefined {
   // npm: "added 1 package" or "+ lodash@4.17.21"
+  // eslint-disable-next-line security/detect-non-literal-regexp -- pattern built from escaped package name
   const npmMatch = new RegExp("\\+\\s*" + escapeRegExp(name) + "@([^\\s]+)").exec(stdout);
   if (npmMatch?.[1]) return npmMatch[1];
 
   // pip: "Successfully installed numpy-1.24.0"
+  // eslint-disable-next-line security/detect-non-literal-regexp -- pattern built from escaped package name
   const pipMatch = new RegExp("Successfully installed.*?" + escapeRegExp(name) + "-([^\\s,]+)").exec(stdout);
   if (pipMatch?.[1]) return pipMatch[1];
 

@@ -1,6 +1,6 @@
 import pino from "pino";
 
-export const createLogger = (name: string) =>
+export const createLogger = (name: string): pino.Logger =>
   pino({
     name,
     level: process.env.TUTTI_LOG_LEVEL ?? "info",

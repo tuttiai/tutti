@@ -36,6 +36,7 @@ function resolveStore(): ScheduleStore {
 export async function scheduleCommand(scorePath?: string): Promise<void> {
   const file = resolve(scorePath ?? "./tutti.score.ts");
 
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path built via resolve()
   if (!existsSync(file)) {
     console.error(chalk.red("Score file not found: " + file));
     console.error(chalk.dim('Run "tutti-ai init" to create a new project.'));
@@ -113,7 +114,7 @@ export async function scheduleCommand(scorePath?: string): Promise<void> {
   console.log("");
 
   // Graceful shutdown
-  const shutdown = () => {
+  const shutdown = (): void => {
     console.log(chalk.dim("\n  Shutting down scheduler..."));
     engine.stop();
     if ("close" in store && typeof (store as { close: () => Promise<void> }).close === "function") {

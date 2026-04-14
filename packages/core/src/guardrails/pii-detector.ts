@@ -14,6 +14,7 @@ const PII_PATTERNS: { name: string; regex: RegExp }[] = [
   { name: "credit_card", regex: /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g },
   { name: "ssn", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
   { name: "email", regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
+  // eslint-disable-next-line security/detect-unsafe-regex -- phone regex is bounded: max 15 digits, no nested quantifiers
   { name: "phone", regex: /(?<!\d)(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)/g },
 ];
 
