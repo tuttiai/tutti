@@ -3,21 +3,25 @@ import type { Tool, ToolResult } from "@tuttiai/types";
 import type { SearchProvider, SearchResult } from "../types.js";
 import { cacheKey, getCached, setCached, SEARCH_TTL_MS } from "../cache.js";
 
-const parameters = z.object({
-  query: z
-    .string()
-    .min(1)
-    .describe("Search query — use natural language or keywords"),
-  limit: z
-    .number()
-    .int()
-    .min(1)
-    .max(20)
-    .default(5)
-    .describe("Maximum number of results to return (default 5)"),
-});
-
-type WebSearchInput = z.infer<typeof parameters>;
+/**
+ * Build the Zod schema for web_search, allowing the voice to set a
+ * custom default for `limit` via {@link WebVoiceConfig.max_results}.
+ */
+function buildParameters(defaultLimit: number) {
+  return z.object({
+    query: z
+      .string()
+      .min(1)
+      .describe("Search query — use natural language or keywords"),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(defaultLimit)
+      .describe(`Maximum number of results to return (default ${defaultLimit})`),
+  });
+}
 
 /**
  * Format search results as a readable string for the LLM.
@@ -46,10 +50,14 @@ function formatResults(
  * Results are cached for {@link SEARCH_TTL_MS} (10 min) by default.
  *
  * @param provider - A resolved {@link SearchProvider} instance.
+ * @param maxResults - Default result limit exposed to the LLM (1–20, default 5).
  */
 export function createWebSearchTool(
   provider: SearchProvider,
-): Tool<WebSearchInput> {
+  maxResults: number = 5,
+): Tool<z.infer<ReturnType<typeof buildParameters>>> {
+  const parameters = buildParameters(maxResults);
+
   return {
     name: "web_search",
     description:

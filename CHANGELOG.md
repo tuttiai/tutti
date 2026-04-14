@@ -2,13 +2,16 @@
 
 ## [Unreleased]
 
-### Added — `@tuttiai/web@0.1.0` (web search + fetch voice)
-- New `voices/web` package — gives agents web search and page fetching.
+### Added — `@tuttiai/web@0.1.0` (web voice)
+- New `voices/web` package — gives agents 3 tools: `web_search`, `fetch_url`, `fetch_sitemap`.
+- `WebVoiceConfig` — `{ provider?, cache?, max_results?, rate_limit?, timeout_ms? }`. Provider accepts `"brave" | "serper" | "duckduckgo"` string or a custom `SearchProvider` instance. `max_results` sets the default result count for `web_search` (1–20, default 5).
 - `web_search` tool: three provider backends (Brave, Serper, DuckDuckGo) with auto-selection, normalised `SearchResult[]` output, graceful error handling, configurable `timeout_ms` (default 5s).
-- `fetch_url` tool: fetches a URL with 10s timeout, detects content type from response headers. HTML extracted to readable text via `@mozilla/readability` + `linkedom` (strips nav/ads/boilerplate). JSON pretty-printed. Plain text/markdown returned as-is. Output truncated to ~8 000 tokens.
-- In-memory LRU cache (`lru-cache`): 500 entries max, SHA-256 cache keys, 10 min TTL for search, 30 min TTL for fetch. Wired into both tools — repeated queries/fetches served from cache.
-- SSRF guard (`src/utils/url-guard.ts`): rejects loopback, private-range, and non-http(s) URLs.
-- 47 unit tests across 3 files covering all providers, factory, both tools, caching, truncation, error handling, and SSRF protection.
+- `fetch_url` tool: fetches a URL with 10s timeout, detects content type. HTML → readable text via `@mozilla/readability` + `linkedom`. JSON → pretty-printed. Text/markdown → as-is. Truncated to ~8 000 tokens.
+- `fetch_sitemap` tool: fetches sitemap.xml, parses `<loc>` entries from both `<urlset>` and `<sitemapindex>` formats. Appends `/sitemap.xml` to bare URLs.
+- In-memory LRU cache: 500 entries max, 10 min TTL search, 30 min TTL fetch/sitemap. All three tools cache results by SHA-256 key.
+- Per-tool rate limiting via sliding-window counter: `rate_limit: { per_minute: N }` returns `is_error: true` when budget exceeded.
+- SSRF guard: rejects loopback, private-range, non-http(s) URLs.
+- 63 unit tests across 5 files covering all providers, factory, all three tools, caching, truncation, rate limiting, error handling, and SSRF protection.
 
 ## @tuttiai/server@0.1.0 · @tuttiai/cli@0.11.0
 

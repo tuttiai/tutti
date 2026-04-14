@@ -345,20 +345,48 @@ describe("web_search caching", () => {
 // ── WebVoice class ───────────────────────────────────────────
 
 describe("WebVoice", () => {
-  it("implements the Voice interface with 2 tools", () => {
+  it("implements the Voice interface with 3 tools", () => {
     const voice = new WebVoice({ provider: { name: "stub", search: async () => [] } });
     expect(voice.name).toBe("web");
     expect(voice.required_permissions).toEqual(["network"]);
-    expect(voice.tools).toHaveLength(2);
+    expect(voice.tools).toHaveLength(3);
     const names = voice.tools.map((t) => t.name);
     expect(names).toContain("web_search");
     expect(names).toContain("fetch_url");
+    expect(names).toContain("fetch_sitemap");
   });
 
   it("auto-selects provider when no explicit provider is given", () => {
     vi.stubEnv("BRAVE_SEARCH_API_KEY", "");
     vi.stubEnv("SERPER_API_KEY", "");
     const voice = new WebVoice();
-    expect(voice.tools).toHaveLength(2);
+    expect(voice.tools).toHaveLength(3);
+  });
+
+  it("accepts a string provider name", () => {
+    vi.stubEnv("BRAVE_SEARCH_API_KEY", "bk");
+    const voice = new WebVoice({ provider: "brave" });
+    expect(voice.tools).toHaveLength(3);
+  });
+
+  it("applies rate limiting when configured", async () => {
+    const voice = new WebVoice({
+      provider: { name: "stub", search: vi.fn().mockResolvedValue([]) },
+      rate_limit: { per_minute: 1 },
+    });
+
+    const tool = voice.tools.find((t) => t.name === "web_search");
+    expect(tool).toBeDefined();
+
+    const input = tool!.parameters.parse({ query: "test" });
+
+    // First call — allowed.
+    const r1 = await tool!.execute(input, ctx);
+    expect(r1.is_error).toBeUndefined();
+
+    // Second call — rate limited.
+    const r2 = await tool!.execute(input, ctx);
+    expect(r2.is_error).toBe(true);
+    expect(r2.content).toContain("Rate limit exceeded");
   });
 });
