@@ -25,6 +25,14 @@ import { searchCommand, voicesCommand } from "./commands/search.js";
 import { publishCommand } from "./commands/publish.js";
 import { evalCommand } from "./commands/eval.js";
 import { serveCommand, type ServeOptions } from "./commands/serve.js";
+import { scheduleCommand } from "./commands/schedule.js";
+import {
+  schedulesListCommand,
+  schedulesEnableCommand,
+  schedulesDisableCommand,
+  schedulesTriggerCommand,
+  schedulesRunsCommand,
+} from "./commands/schedules.js";
 
 const program = new Command();
 
@@ -155,6 +163,53 @@ program
   .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
   .action(async (suitePath: string, opts: { ci?: boolean; score?: string }) => {
     await evalCommand(suitePath, opts);
+  });
+
+program
+  .command("schedule [score]")
+  .description("Start the scheduler daemon — runs agents on their configured schedules")
+  .action(async (score?: string) => {
+    await scheduleCommand(score);
+  });
+
+const schedulesCmd = program
+  .command("schedules")
+  .description("Manage scheduled agents");
+
+schedulesCmd
+  .command("list")
+  .description("Show all registered schedules")
+  .action(async () => {
+    await schedulesListCommand();
+  });
+
+schedulesCmd
+  .command("enable <id>")
+  .description("Enable a disabled schedule")
+  .action(async (id: string) => {
+    await schedulesEnableCommand(id);
+  });
+
+schedulesCmd
+  .command("disable <id>")
+  .description("Disable a schedule without deleting it")
+  .action(async (id: string) => {
+    await schedulesDisableCommand(id);
+  });
+
+schedulesCmd
+  .command("trigger <id>")
+  .description("Manually trigger a scheduled run immediately")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (id: string, opts: { score?: string }) => {
+    await schedulesTriggerCommand(id, opts.score);
+  });
+
+schedulesCmd
+  .command("runs <id>")
+  .description("Show run history for a schedule (last 20 runs)")
+  .action(async (id: string) => {
+    await schedulesRunsCommand(id);
   });
 
 program.parse();

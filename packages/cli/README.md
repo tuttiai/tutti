@@ -231,6 +231,96 @@ Resume from turn 2? (y/n) y
   Final turn:    3
 ```
 
+### `tutti-ai schedule [score]`
+
+Start the scheduler daemon — reads a score file, registers all agents
+that have a `schedule` config, and runs on their configured triggers
+(cron, interval, or one-shot datetime) until the process is killed.
+
+```bash
+tutti-ai schedule                     # defaults to ./tutti.score.ts
+tutti-ai schedule ./custom-score.ts   # specify a score file
+```
+
+Score file example:
+
+```ts
+const score = defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    reporter: {
+      name: "Reporter",
+      system_prompt: "Generate a daily status report.",
+      voices: [],
+      schedule: {
+        cron: "0 9 * * *",           // 9 AM daily
+        input: "Generate the daily status report",
+        max_runs: 30,                 // auto-disable after 30 runs
+      },
+    },
+  },
+});
+```
+
+Environment:
+
+| Variable | Required | Description |
+|---|---|---|
+| `TUTTI_PG_URL` | Recommended | PostgreSQL URL for durable schedule persistence. Falls back to in-memory (lost on restart). |
+
+The daemon logs `schedule:triggered`, `schedule:completed`, and
+`schedule:error` events to stdout with timestamps.
+
+### `tutti-ai schedules list`
+
+Show all registered schedules:
+
+```bash
+tutti-ai schedules list
+```
+
+Output:
+
+```
+  ID                  AGENT           TRIGGER               ENABLED   RUNS    CREATED
+  ──────────────────────────────────────────────────────────────────────────────────────
+  nightly-report      reporter        cron: 0 9 * * *       yes       12      2026-04-14
+  health-check        monitor         every 30m             yes       48/100  2026-04-14
+```
+
+### `tutti-ai schedules enable <id>`
+
+Re-enable a disabled schedule:
+
+```bash
+tutti-ai schedules enable nightly-report
+```
+
+### `tutti-ai schedules disable <id>`
+
+Disable a schedule without deleting it:
+
+```bash
+tutti-ai schedules disable nightly-report
+```
+
+### `tutti-ai schedules trigger <id>`
+
+Manually trigger a scheduled run immediately (useful for testing):
+
+```bash
+tutti-ai schedules trigger nightly-report
+tutti-ai schedules trigger nightly-report --score ./custom-score.ts
+```
+
+### `tutti-ai schedules runs <id>`
+
+Show run history for a schedule (last 20 runs):
+
+```bash
+tutti-ai schedules runs nightly-report
+```
+
 ## Links
 
 - [Tutti](https://tutti-ai.com)

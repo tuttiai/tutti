@@ -168,14 +168,46 @@ tutti.events.on("budget:warning", (e) => console.log(`Budget: ${e.tokens} tokens
 tutti.events.on("security:injection_detected", (e) => console.warn(`Injection in: ${e.tool_name}`));
 ```
 
+### Scheduled Agents
+
+Run agents on a schedule — cron expressions, fixed intervals, or one-shot datetimes:
+
+```ts
+const score = defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    reporter: {
+      name: "Reporter",
+      system_prompt: "Generate a daily status report.",
+      voices: [new WebVoice()],
+      permissions: ["network"],
+      schedule: {
+        cron: "0 9 * * *",       // 9 AM daily
+        input: "Generate the daily status report",
+        max_runs: 30,             // auto-disable after 30 runs
+      },
+    },
+  },
+});
+```
+
+```bash
+tutti-ai schedule              # start the scheduler daemon
+tutti-ai schedules list        # show all schedules
+tutti-ai schedules trigger id  # run one immediately
+```
+
 ## CLI
 
 ```bash
-tutti-ai init [project]     # Scaffold a new project
-tutti-ai run [score]        # Run a score interactively
-tutti-ai add <voice>        # Install a voice (filesystem, github, playwright, postgres)
-tutti-ai check [score]      # Validate a score without running it
-tutti-ai doctor [score]     # Alias for check
+tutti-ai init [project]          # Scaffold a new project
+tutti-ai run [score]             # Run a score interactively
+tutti-ai serve [score]           # Start the HTTP server
+tutti-ai schedule [score]        # Start the scheduler daemon
+tutti-ai schedules list          # Show all schedules
+tutti-ai schedules trigger <id>  # Trigger a run immediately
+tutti-ai add <voice>             # Install a voice
+tutti-ai check [score]           # Validate a score
 ```
 
 ## Architecture
