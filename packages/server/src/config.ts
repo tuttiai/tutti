@@ -1,4 +1,4 @@
-import type { AgentConfig } from "@tuttiai/types";
+import type { TuttiRuntime } from "@tuttiai/core";
 
 /**
  * Default HTTP port for the Tutti server.
@@ -13,6 +13,12 @@ export const DEFAULT_PORT = 3847;
  * accidentally exposed on a public interface.
  */
 export const DEFAULT_HOST = "127.0.0.1";
+
+/** Default request timeout in milliseconds for non-streaming runs. */
+export const DEFAULT_TIMEOUT_MS = 120_000;
+
+/** Package version, surfaced via the `/health` endpoint. */
+export const SERVER_VERSION = "0.1.0";
 
 /**
  * Optional per-window rate limit configuration applied to all routes.
@@ -34,9 +40,8 @@ export interface RateLimitConfig {
  * @remarks
  * `api_key` is resolved at server construction time: when omitted the value
  * of the `TUTTI_API_KEY` environment variable is used instead (via
- * `SecretsManager.optional`). If neither is set the server starts in
- * unauthenticated mode and the auth middleware rejects every request so
- * that an accidentally-exposed server cannot be used.
+ * `SecretsManager.optional`). If neither is set the auth middleware rejects
+ * every non-public request (fail-closed).
  */
 export interface ServerConfig {
   /** Port the server listens on. Defaults to {@link DEFAULT_PORT}. */
@@ -45,11 +50,15 @@ export interface ServerConfig {
   host: string;
   /**
    * Shared secret clients must present in `Authorization: Bearer <key>`.
-   * When omitted it falls back to `process.env.TUTTI_API_KEY`.
+   * Falls back to `TUTTI_API_KEY` env var when omitted.
    */
   api_key?: string;
   /** Optional rate-limit policy applied to all routes. */
   rate_limit?: RateLimitConfig;
-  /** Agent configuration used by route handlers to run agents. */
-  agent_config: AgentConfig;
+  /** Pre-built runtime that owns the provider, event bus, and sessions. */
+  runtime: TuttiRuntime;
+  /** Agent key in the score's `agents` map to expose over HTTP. */
+  agent_name: string;
+  /** Non-streaming request timeout in ms. Defaults to {@link DEFAULT_TIMEOUT_MS}. */
+  timeout_ms?: number;
 }

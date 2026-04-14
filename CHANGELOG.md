@@ -2,13 +2,17 @@
 
 ## [Unreleased]
 
-### Added — `@tuttiai/server@0.1.0` (scaffold)
+### Added — `@tuttiai/server@0.1.0` (REST API)
 - New `packages/server` package — the HTTP surface for `tutti-ai serve`.
-- `createServer(config: ServerConfig): FastifyInstance` builds a Fastify 5 app with a bearer-token auth hook and a `/health` route; routes are not implemented yet.
-- `ServerConfig` shape covers `port` (default 3847), `host` (default 127.0.0.1), optional `api_key` (falls back to `TUTTI_API_KEY` via `SecretsManager.optional`), optional `rate_limit`, and a required `agent_config`.
-- `src/middleware/auth.ts` rejects requests missing or mismatching `Authorization: Bearer <key>` with a constant-time comparison; `/health` is on the public-paths allowlist. Requests are rejected when neither config nor env supplies a key (fail-closed).
-- Pins `fastify@5.2.0` as an exact dep; depends on `@tuttiai/core` and `@tuttiai/types` via workspace.
-- 3 unit tests covering health on a configured server, health without any api_key, and bind-on-ephemeral-port startup.
+- `createServer(config: ServerConfig): FastifyInstance` builds a Fastify 5 app with bearer-token auth, four REST endpoints, and Fastify-native JSON Schema validation.
+- `ServerConfig` accepts a pre-built `TuttiRuntime` + `agent_name` (was `agent_config`), plus `port` (default 3847), `host` (127.0.0.1), optional `api_key` (falls back to `TUTTI_API_KEY`), optional `rate_limit`, and `timeout_ms` (default 120s).
+- **`POST /run`** — run agent to completion; returns `{ output, session_id, turns, usage, cost_usd, duration_ms }`. Returns 504 with partial output on timeout.
+- **`POST /run/stream`** — SSE endpoint emitting `turn_start`, `tool_call`, `tool_result`, `content_delta`, `turn_end`, `run_complete`, and `error` events. Uses PassThrough stream for inject()-compatible testing.
+- **`GET /sessions/:id`** — returns session conversation history with timestamps.
+- **`GET /health`** — returns `{ status, version, uptime_s }`.
+- `src/middleware/auth.ts` — constant-time bearer-token verification; `/health` on public-paths allowlist; fail-closed when no key is configured.
+- `src/cost.ts` — Sonnet-class fallback cost estimator matching `agent-router.ts`.
+- 20 integration tests across 4 files covering all endpoints, auth, validation, timeout, SSE parsing, session continuity, and error paths.
 
 ## [0.18.0] - 2026-04-13
 

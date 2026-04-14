@@ -1,13 +1,19 @@
 import type { FastifyInstance } from "fastify";
 
+import { SERVER_VERSION } from "../config.js";
+
+const startedAt = Date.now();
+
 /**
  * Register the `/health` liveness endpoint.
  *
- * @remarks
- * This route is intentionally trivial and never hits any dependency so
- * that orchestrators can use it to detect process-up state without
- * causing side effects or spurious failures during startup.
+ * Returns server status, package version, and process uptime.
+ * This route is on the public-paths allowlist so it never requires auth.
  */
 export function registerHealthRoute(app: FastifyInstance): void {
-  app.get("/health", async () => ({ status: "ok" }));
+  app.get("/health", async () => ({
+    status: "ok",
+    version: SERVER_VERSION,
+    uptime_s: Math.floor((Date.now() - startedAt) / 1000),
+  }));
 }
