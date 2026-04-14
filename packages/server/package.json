@@ -26,9 +26,11 @@
   "dependencies": {
     "@fastify/cors": "11.2.0",
     "@fastify/rate-limit": "10.3.0",
-    "@tuttiai/core": "*",
-    "@tuttiai/types": "*",
     "fastify": "5.2.0"
+  },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.7.0"
   },
   "keywords": [
     "tutti",
@@ -37,7 +39,9 @@
     "orchestration",
     "server",
     "http",
-    "fastify"
+    "fastify",
+    "rest",
+    "sse"
   ],
   "license": "MIT",
   "repository": {

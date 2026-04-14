@@ -2,7 +2,9 @@
 
 ## [Unreleased]
 
-### Added — `@tuttiai/cli` `tutti-ai serve` command
+## @tuttiai/server@0.1.0 · @tuttiai/cli@0.11.0
+
+### Added — `@tuttiai/cli@0.11.0` `tutti-ai serve` command
 - New `tutti-ai serve [score]` command starts the HTTP server from a score file.
 - Options: `--port` (default 3847), `--host` (default 0.0.0.0), `--api-key`, `--agent`, `--watch`.
 - Prints startup banner with server version, score name, agent, and endpoint list.
