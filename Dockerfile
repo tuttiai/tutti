@@ -1,5 +1,5 @@
 # ── Stage 1: install + build ─────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -38,7 +38,7 @@ COPY packages/server/tsup.config.ts  packages/server/
 RUN npx turbo run build --filter=@tuttiai/server...
 
 # ── Stage 2: production dependencies ────────────────────────
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
@@ -59,7 +59,7 @@ COPY voices/rag/package.json          voices/rag/
 RUN npm ci --omit=dev --ignore-scripts
 
 # ── Stage 3: runner ─────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 RUN addgroup -g 1001 -S tutti && \
     adduser  -u 1001 -S tutti -G tutti

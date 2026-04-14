@@ -13,7 +13,7 @@ Welcome, Composer. Every voice you add makes the orchestra richer.
 
 ### Prerequisites
 
-- Node.js >= 20
+- Node.js >= 24
 - npm >= 10
 
 ### Clone and Install
