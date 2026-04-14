@@ -50,7 +50,7 @@ export interface GraphEdge {
   /** Source node ID. */
   from: string;
   /** Target node ID, or {@link END} (`"__end__"`) to terminate the graph. */
-  to: string | typeof END;
+  to: string;
   /**
    * Optional predicate evaluated against the source node's result.
    * When omitted the edge is unconditional (always taken).

@@ -30,19 +30,21 @@ const PII_PATTERNS: { name: string; regex: RegExp }[] = [
  * };
  */
 export function piiDetector(action: "redact" | "block"): GuardrailHook {
-  return async (text: string): Promise<string> => {
+  return (text: string): Promise<string> => {
     if (action === "block") {
       for (const { name, regex } of PII_PATTERNS) {
         // Reset lastIndex for stateful regexes
         regex.lastIndex = 0;
         if (regex.test(text)) {
-          throw new GuardrailError(
-            `PII detected in output (${name}). The response has been blocked to protect sensitive information.`,
-            { guardrail: "pii_detector", pii_type: name },
+          return Promise.reject(
+            new GuardrailError(
+              `PII detected in output (${name}). The response has been blocked to protect sensitive information.`,
+              { guardrail: "pii_detector", pii_type: name },
+            ),
           );
         }
       }
-      return text;
+      return Promise.resolve(text);
     }
 
     // Redact mode — replace all matches with [PII]
@@ -51,6 +53,6 @@ export function piiDetector(action: "redact" | "block"): GuardrailHook {
       regex.lastIndex = 0;
       result = result.replace(regex, "[PII]");
     }
-    return result;
+    return Promise.resolve(result);
   };
 }

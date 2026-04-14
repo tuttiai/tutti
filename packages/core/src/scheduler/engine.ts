@@ -37,8 +37,8 @@ export function parseInterval(every: string): number {
         `where unit is ms, s, m, h, or d. Examples: "30m", "1h", "500ms".`,
     );
   }
-  const value = parseFloat(match[1] as string);
-  const unit = match[2] as string;
+  const value = parseFloat(match[1] ?? "0");
+  const unit = match[2] ?? "ms";
   return value * (MULTIPLIERS[unit] ?? 0);
 }
 

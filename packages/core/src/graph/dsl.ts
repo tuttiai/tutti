@@ -23,7 +23,6 @@
 import type { AgentConfig } from "@tuttiai/types";
 import type { ZodType } from "zod";
 import type { GraphConfig, GraphEdge, GraphNode, NodeResult } from "./types.js";
-import { END } from "./types.js";
 
 /** Options accepted by {@link GraphBuilder.edge}. */
 export interface EdgeOptions {
@@ -69,8 +68,8 @@ export class GraphBuilder {
     return this;
   }
 
-  /** Add a directed edge between two nodes (or to {@link END}). */
-  edge(from: string, to: string | typeof END, options: EdgeOptions = {}): this {
+  /** Add a directed edge between two nodes (or to `END`). */
+  edge(from: string, to: string, options: EdgeOptions = {}): this {
     this.edges.push({
       from,
       to,

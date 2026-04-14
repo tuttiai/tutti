@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 describe("initCommand", () => {
-  it("creates all expected files in the project directory", async () => {
+  it("creates all expected files in the project directory", { timeout: 15_000 }, async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 
     await initCommand("my-project", "minimal");

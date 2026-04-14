@@ -217,7 +217,7 @@ export async function executeGraph(
   emit({ type: "graph:start", entrypoint: config.entrypoint });
 
   // ── Main loop ──────────────────────────────────────────────────
-  let currentNodeId: string | typeof END = config.entrypoint;
+  let currentNodeId: string = config.entrypoint;
   let currentInput = input;
 
   while (currentNodeId !== END) {

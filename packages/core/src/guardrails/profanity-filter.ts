@@ -49,7 +49,7 @@ export function profanityFilter(options: ProfanityFilterOptions = {}): Guardrail
   const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const pattern = new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
 
-  return async (text: string): Promise<string> => {
-    return text.replace(pattern, "[filtered]");
+  return (text: string): Promise<string> => {
+    return Promise.resolve(text.replace(pattern, "[filtered]"));
   };
 }

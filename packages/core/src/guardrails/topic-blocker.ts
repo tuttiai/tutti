@@ -79,19 +79,21 @@ export function topicBlocker(
     tf: termFrequency(tokenize(topic)),
   }));
 
-  return async (text: string): Promise<string> => {
+  return (text: string): Promise<string> => {
     const textTf = termFrequency(tokenize(text));
 
     for (const { topic, tf } of topicVectors) {
       const score = cosineSimilarity(textTf, tf);
       if (score > threshold) {
-        throw new GuardrailError(
-          `Output blocked: content is too similar to forbidden topic "${topic}" (score: ${score.toFixed(2)}).`,
-          { guardrail: "topic_blocker", topic, score },
+        return Promise.reject(
+          new GuardrailError(
+            `Output blocked: content is too similar to forbidden topic "${topic}" (score: ${score.toFixed(2)}).`,
+            { guardrail: "topic_blocker", topic, score },
+          ),
         );
       }
     }
 
-    return text;
+    return Promise.resolve(text);
   };
 }

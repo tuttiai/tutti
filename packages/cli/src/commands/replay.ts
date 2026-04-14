@@ -52,7 +52,8 @@ function excerpt(text: string, max: number): string {
 export function renderList(messages: ChatMessage[]): string {
   const lines: string[] = [];
   for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]!;
+    const msg = messages[i];
+    if (!msg) continue;
     const role = msg.role === "user"
       ? chalk.blue("user     ")
       : chalk.green("assistant");
@@ -70,7 +71,8 @@ export function renderShow(messages: ChatMessage[], index: number): string {
     return chalk.red("Index out of range. Valid: 0–" + (messages.length - 1));
   }
 
-  const msg = messages[index]!;
+  const msg = messages[index];
+  if (!msg) return chalk.red("Index out of range.");
   const lines: string[] = [];
 
   lines.push(chalk.cyan.bold("Turn " + index) + "  " + chalk.dim("[" + msg.role + "]"));
@@ -133,7 +135,8 @@ export function exportMarkdown(session: Session): string {
   lines.push("");
 
   for (let i = 0; i < session.messages.length; i++) {
-    const msg = session.messages[i]!;
+    const msg = session.messages[i];
+    if (!msg) continue;
     lines.push("## Turn " + i + " (" + msg.role + ")");
     lines.push("");
     if (typeof msg.content === "string") {
