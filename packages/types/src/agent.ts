@@ -62,6 +62,21 @@ export interface AgentCacheConfig {
   excluded_tools?: string[];
 }
 
+/**
+ * Context passed to {@link AgentConfig.beforeRun} and {@link AgentConfig.afterRun}
+ * guardrail hooks, giving them access to the agent name and session.
+ */
+export interface RunContext {
+  agent_name: string;
+  session_id: string;
+}
+
+/**
+ * Guardrail hook signature. Returns a replacement string, void for no change,
+ * or throws a `GuardrailError` to abort the run.
+ */
+export type GuardrailHook = (text: string, context: RunContext) => Promise<string | void>;
+
 export interface AgentConfig {
   name: string;
   description?: string;
@@ -106,6 +121,18 @@ export interface AgentConfig {
    * Only used when {@link outputSchema} is set.
    */
   maxRetries?: number;
+  /**
+   * Input guardrail — called on the raw user input before any turn.
+   * Return a replacement string to modify, void to pass through,
+   * or throw `GuardrailError` to abort the run.
+   */
+  beforeRun?: GuardrailHook;
+  /**
+   * Output guardrail — called on the final text output after the last turn.
+   * Return a replacement string to modify, void to pass through,
+   * or throw `GuardrailError` to abort the run.
+   */
+  afterRun?: GuardrailHook;
 }
 
 export interface AgentResult {

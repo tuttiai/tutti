@@ -10,6 +10,7 @@ export {
   AuthenticationError,
   RateLimitError,
   ContextWindowError,
+  GuardrailError,
   StructuredOutputError,
   VoiceError,
   PathTraversalError,
@@ -90,6 +91,17 @@ export {
 export type { InMemoryToolCacheOptions } from "./cache/in-memory-cache.js";
 export { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 
+// Guardrails
+export {
+  profanityFilter,
+  piiDetector,
+  topicBlocker,
+} from "./guardrails/index.js";
+export type {
+  ProfanityFilterOptions,
+  TopicBlockerOptions,
+} from "./guardrails/index.js";
+
 // Providers
 export { AnthropicProvider } from "./providers/anthropic.js";
 export type { AnthropicProviderOptions } from "./providers/anthropic.js";
@@ -125,6 +137,8 @@ export type {
   BudgetConfig,
   AgentMemoryConfig,
   AgentCacheConfig,
+  RunContext,
+  GuardrailHook,
   AgentConfig,
   AgentResult,
   ParallelAgentResult,

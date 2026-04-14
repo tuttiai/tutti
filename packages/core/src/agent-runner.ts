@@ -9,6 +9,7 @@ import type {
   ContentBlock,
   HookContext,
   LLMProvider,
+  RunContext,
   SessionStore,
   StopReason,
   Tool,
@@ -153,6 +154,16 @@ export class AgentRunner {
 
       const toolDefs = allTools.map(toolToDefinition);
 
+      // Input guardrail — may modify or block the input before any turn.
+      const runCtx: RunContext = { agent_name: agent.name, session_id: session.id };
+      let guardedInput = input;
+      if (agent.beforeRun) {
+        const result = await agent.beforeRun(guardedInput, runCtx);
+        if (typeof result === "string") {
+          guardedInput = result;
+        }
+      }
+
       // Durable-checkpoint resume: if the agent opted in and a checkpoint
       // exists for this session, splice its state back in before we build
       // the message list. Only `awaiting_tool_results=true` checkpoints are
@@ -169,7 +180,7 @@ export class AgentRunner {
 
       const messages: ChatMessage[] = resuming && checkpoint
         ? [...checkpoint.messages]
-        : [...session.messages, { role: "user", content: input }];
+        : [...session.messages, { role: "user", content: guardedInput }];
 
       const maxTurns = agent.max_turns ?? DEFAULT_MAX_TURNS;
       const maxToolCalls = agent.max_tool_calls ?? DEFAULT_MAX_TOOL_CALLS;
@@ -524,6 +535,14 @@ export class AgentRunner {
 
             output = extractText(retryResponse.content);
           }
+        }
+      }
+
+      // Output guardrail — may modify or block the output after the last turn.
+      if (agent.afterRun) {
+        const result = await agent.afterRun(output, runCtx);
+        if (typeof result === "string") {
+          output = result;
         }
       }
 

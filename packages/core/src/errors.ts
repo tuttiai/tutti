@@ -126,6 +126,14 @@ export class ContextWindowError extends ProviderError {
   }
 }
 
+// ── Guardrails ────────────────────────────────────────────────
+
+export class GuardrailError extends TuttiError {
+  constructor(message: string, context: { guardrail: string } & Record<string, unknown> = { guardrail: "unknown" }) {
+    super("GUARDRAIL_BLOCKED", message, context);
+  }
+}
+
 // ── Structured Output ─────────────────────────────────────────
 
 export class StructuredOutputError extends TuttiError {
