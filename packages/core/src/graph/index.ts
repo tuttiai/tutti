@@ -31,6 +31,7 @@
  * ```
  */
 
+import type { AgentRunner } from "../agent-runner.js";
 import type {
   GraphConfig,
   GraphEvent,
@@ -38,6 +39,7 @@ import type {
   RunOptions,
 } from "./types.js";
 import { GraphValidationError } from "./errors.js";
+import { executeGraph } from "./engine.js";
 
 /** @internal Default loop cap — used by run()/stream() implementation. */
 export const DEFAULT_MAX_NODE_VISITS = 10;
@@ -56,15 +58,19 @@ export class TuttiGraph {
   /** @internal Retained for implementation — the validated graph config. */
   readonly config: GraphConfig;
 
+  private readonly runner: AgentRunner;
+
   /**
    * Create a new graph. Validates the config and throws
    * {@link GraphValidationError} on structural problems.
    *
    * @param config - Graph definition: nodes, edges, optional state schema, entrypoint.
+   * @param runner - AgentRunner used to execute each node's agent.
    * @throws {GraphValidationError} When the config is invalid.
    */
-  constructor(config: GraphConfig) {
+  constructor(config: GraphConfig, runner: AgentRunner) {
     this.config = config;
+    this.runner = runner;
     this.validate();
   }
 
@@ -81,13 +87,11 @@ export class TuttiGraph {
    * @returns Aggregate result with per-node outputs, execution path, and final output.
    *
    * @throws {GraphCycleError}   When a node is visited more than `max_node_visits` times.
-   * @throws {GraphDeadEndError} When a node has no satisfied outgoing edge.
    * @throws {GraphStateError}   When state mutation fails Zod validation.
    * @throws {GuardrailError}    When a node's guardrail hook aborts the run.
    */
-  async run(_input: string, _options?: RunOptions): Promise<GraphRunResult> {
-    // TODO(chihab): implement — tracked in v0.20.0 milestone
-    throw new Error("TuttiGraph.run() is not yet implemented");
+  async run(input: string, options?: RunOptions): Promise<GraphRunResult> {
+    return executeGraph(this.config, this.runner, input, options);
   }
 
   /**
@@ -102,9 +106,25 @@ export class TuttiGraph {
    * @param options - Optional session, initial state, timeout, and loop cap.
    * @yields {GraphEvent} Events in execution order.
    */
-  async *stream(_input: string, _options?: RunOptions): AsyncIterable<GraphEvent> {
-    // TODO(chihab): implement — tracked in v0.20.0 milestone
-    throw new Error("TuttiGraph.stream() is not yet implemented");
+  async *stream(input: string, options?: RunOptions): AsyncIterable<GraphEvent> {
+    const events: GraphEvent[] = [];
+    const result = await executeGraph(
+      this.config,
+      this.runner,
+      input,
+      options,
+      (event) => events.push(event),
+    );
+
+    for (const event of events) {
+      yield event;
+    }
+
+    // Ensure graph:end is always the last event
+    const hasEnd = events.some((e) => e.type === "graph:end");
+    if (!hasEnd) {
+      yield { type: "graph:end", result };
+    }
   }
 
   /**

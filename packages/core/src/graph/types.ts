@@ -28,6 +28,12 @@ export interface GraphNode {
   agent: AgentConfig;
   /** Human-readable description for visualization and debugging. */
   description?: string;
+  /**
+   * When `true`, this node is a merge point for parallel branches.
+   * It waits for all parallel predecessors to complete and receives
+   * their concatenated outputs as input.
+   */
+  merge?: boolean;
 }
 
 /**
@@ -53,6 +59,13 @@ export interface GraphEdge {
   condition?: (result: NodeResult) => boolean | Promise<boolean>;
   /** Human-readable label for visualization and debugging. */
   label?: string;
+  /**
+   * When `true`, this edge participates in a parallel fork.
+   * All `parallel` edges from the same source node run their targets
+   * concurrently. Results merge at the first downstream node with
+   * {@link GraphNode.merge} set.
+   */
+  parallel?: boolean;
 }
 
 // ── Config ────────────────────────────────────────────────────
