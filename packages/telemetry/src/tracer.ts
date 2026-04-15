@@ -199,3 +199,20 @@ export class TuttiTracer {
     }
   }
 }
+
+let _singleton: TuttiTracer | undefined;
+
+/**
+ * Return the process-wide {@link TuttiTracer} singleton. Same instance is
+ * shared across every caller in the process, so external observers
+ * (Studio, exporters, log sinks) and helpers like
+ * {@link getRunCost} that look up trace history all see the same spans.
+ *
+ * The singleton is created lazily on first access.
+ */
+export function getTuttiTracer(): TuttiTracer {
+  if (!_singleton) {
+    _singleton = new TuttiTracer();
+  }
+  return _singleton;
+}
