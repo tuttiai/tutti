@@ -1,0 +1,37 @@
+# Tutti golden eval regression check.
+#
+# Runs every case in `.tutti/golden/` on every pull request, uploads the
+# JUnit XML artifact for the GitHub Actions test reporter, and fails the
+# build if any scorer regresses.
+#
+# Prerequisites in your repo:
+#   1. Commit your pinned cases:      `git add -f .tutti/golden/`
+#   2. Configure repo secrets:
+#        - TUTTI_PG_URL     (optional — only if `eval record` sessions
+#                            came from a shared Postgres store; tests
+#                            themselves don't need it).
+#        - OPENAI_API_KEY   (optional — the similarity scorer skips
+#                            cleanly without it, but similarity-based
+#                            cases will no-op.)
+#
+# The `upload-artifact` step runs on `if: always()` so a failed run
+# still publishes the XML for reviewers to download.
+name: Eval regression check
+on: [pull_request]
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm ci
+      - run: npx tutti-ai eval run --ci
+        env:
+          TUTTI_PG_URL: ${{ secrets.TUTTI_PG_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: .tutti/eval-results.xml

@@ -26,6 +26,7 @@ import { publishCommand } from "./commands/publish.js";
 import { evalCommand } from "./commands/eval.js";
 import { evalRecordCommand } from "./commands/eval-record.js";
 import { evalListCommand } from "./commands/eval-list.js";
+import { evalRunCommand, type EvalRunOptions } from "./commands/eval-run.js";
 import { serveCommand, type ServeOptions } from "./commands/serve.js";
 import { scheduleCommand } from "./commands/schedule.js";
 import { updateCommand } from "./commands/update.js";
@@ -216,6 +217,23 @@ evalCmd
   .description("Show every golden case + latest-run status")
   .action(async () => {
     await evalListCommand();
+  });
+
+evalCmd
+  .command("run")
+  .description("Run every golden case (optionally filtered) and report pass/fail")
+  .option("--case <id>", "Run only the case with this id (full or 8-char prefix)")
+  .option("--tag <tag>", "Run only cases carrying this tag")
+  .option("--ci", "Write JUnit XML + exit 1 on failure + drop colors")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (opts: { case?: string; tag?: string; ci?: boolean; score?: string }) => {
+    const resolved: EvalRunOptions = {
+      ...(opts.case !== undefined ? { case: opts.case } : {}),
+      ...(opts.tag !== undefined ? { tag: opts.tag } : {}),
+      ...(opts.ci !== undefined ? { ci: opts.ci } : {}),
+      ...(opts.score !== undefined ? { score: opts.score } : {}),
+    };
+    await evalRunCommand(resolved);
   });
 
 program
