@@ -22,6 +22,8 @@ export default defineConfig({
         "src/commands/search.ts",
         "src/commands/add.ts",
         "src/commands/eval.ts",
+        "src/commands/eval-record.ts",
+        "src/commands/eval-list.ts",
         "src/commands/resume.ts",
         "src/commands/serve.ts",
         "src/commands/replay.ts",
