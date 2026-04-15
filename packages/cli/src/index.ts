@@ -44,6 +44,14 @@ import {
   tracesTailCommand,
   type TracesOptions,
 } from "./commands/traces.js";
+import {
+  memoryAddCommand,
+  memoryClearCommand,
+  memoryDeleteCommand,
+  memoryExportCommand,
+  memoryListCommand,
+  memorySearchCommand,
+} from "./commands/memory.js";
 
 const program = new Command();
 
@@ -300,6 +308,68 @@ tracesCmd
       ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
     };
     await tracesTailCommand(resolved);
+  });
+
+const memoryCmd = program
+  .command("memory")
+  .description("Manage per-user memories (uses TUTTI_PG_URL like the runtime)");
+
+memoryCmd
+  .command("list")
+  .description("Show every memory for a user, sorted by importance + recency")
+  .requiredOption("--user <user-id>", "End-user identifier")
+  .action(async (opts: { user: string }) => {
+    await memoryListCommand({ user: opts.user });
+  });
+
+memoryCmd
+  .command("search <query>")
+  .description("Search a user's memories by relevance")
+  .requiredOption("--user <user-id>", "End-user identifier")
+  .action(async (query: string, opts: { user: string }) => {
+    await memorySearchCommand(query, { user: opts.user });
+  });
+
+memoryCmd
+  .command("add <content>")
+  .description("Manually store a memory for a user")
+  .requiredOption("--user <user-id>", "End-user identifier")
+  .option("--importance <n>", "Importance: 1 (low), 2 (normal), 3 (high)", "2")
+  .action(async (content: string, opts: { user: string; importance?: string }) => {
+    await memoryAddCommand(content, {
+      user: opts.user,
+      ...(opts.importance !== undefined ? { importance: opts.importance } : {}),
+    });
+  });
+
+memoryCmd
+  .command("delete <memory-id>")
+  .description("Delete a specific memory by id")
+  .requiredOption("--user <user-id>", "End-user identifier")
+  .action(async (memoryId: string, opts: { user: string }) => {
+    await memoryDeleteCommand(memoryId, { user: opts.user });
+  });
+
+memoryCmd
+  .command("clear")
+  .description("Delete every memory for a user (prompts for confirmation)")
+  .requiredOption("--user <user-id>", "End-user identifier")
+  .action(async (opts: { user: string }) => {
+    await memoryClearCommand({ user: opts.user });
+  });
+
+memoryCmd
+  .command("export")
+  .description("Export every memory for a user as JSON or CSV")
+  .requiredOption("--user <user-id>", "End-user identifier")
+  .option("--format <fmt>", "Output format: json | csv", "json")
+  .option("-o, --out <path>", "Write to file instead of stdout")
+  .action(async (opts: { user: string; format?: string; out?: string }) => {
+    await memoryExportCommand({
+      user: opts.user,
+      ...(opts.format !== undefined ? { format: opts.format } : {}),
+      ...(opts.out !== undefined ? { out: opts.out } : {}),
+    });
   });
 
 program.parse();

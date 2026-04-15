@@ -32,6 +32,7 @@ export default defineConfig({
         "src/commands/info.ts",
         "src/commands/upgrade.ts",
         "src/commands/traces.ts",
+        "src/commands/memory.ts",
       ],
       thresholds: {
         lines: 70,

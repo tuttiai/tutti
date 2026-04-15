@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added — `tutti-ai memory` CLI commands
+- `tutti-ai memory list --user <id>` — table of every memory for a user, sorted by `(importance DESC, created_at DESC)`. Columns: id (8-char prefix), content (truncated to 60 chars), source (green=explicit / yellow=inferred), importance (★☆☆ / ★★☆ / ★★★), created.
+- `tutti-ai memory search --user <id> <query>` — query the user's memories; preserves the store's relevance ranking; header reproduces the query and pluralised result count.
+- `tutti-ai memory add --user <id> <content> [--importance 1|2|3]` — manually store a memory with `source: "explicit"`. Default importance is 2.
+- `tutti-ai memory delete --user <id> <memory-id>` — delete a single memory. `--user` is required for symmetry / accident-prevention even though the store keys on id alone.
+- `tutti-ai memory clear --user <id>` — counts first, then prompts via Enquirer ("Delete all N memories for user <id>?"); cancels on no.
+- `tutti-ai memory export --user <id> [--format json|csv] [-o <path>]` — JSON (pretty-printed) or RFC-4180-ish CSV (tags joined with `;`). Streams to stdout when `--out` is omitted so output can be piped to `jq` / `xsv`.
+- All commands resolve the store the same way as the runtime: `TUTTI_PG_URL` → `PostgresUserMemoryStore`; otherwise warn loudly ("memories are ephemeral; this command will appear to do nothing useful") and fall back to `MemoryUserMemoryStore`.
+- Pure rendering logic split into `memory-render.ts` (under coverage); orchestration in `memory.ts` (excluded from coverage like other I/O-heavy commands).
+- 21 unit tests cover star bars, list table (header / empty state / sort order / truncation / source colours / star bars), search rendering (query header / pluralisation / order preservation / empty state), confirmation lines, JSON export, and CSV export (RFC-4180 escaping / tag joining / empty fields / header-only).
+
 ### Added — User memory wired into the agent runtime
 - `AgentRunner.run()` and `TuttiRuntime.run()` accept a 4th `options?: AgentRunOptions` argument carrying `user_id` (and `session_id` as the design-time migration target). Positional `session_id` still accepted for back-compat; positional wins on conflict.
 - **Injection:** when `user_id` is set AND the agent has `memory.user_memory` configured, `UserMemoryStore.search(user_id, input, inject_limit)` runs once before the first turn and the results are appended to the system prompt as a `What I remember about you:\n- ... [importance: high|normal|low]` section. Search failures are logged and non-fatal — the run continues with no injected memories.
