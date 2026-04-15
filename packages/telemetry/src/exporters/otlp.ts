@@ -86,13 +86,16 @@ function toAttributeValue(v: unknown): AttributeValue | undefined {
     return v;
   }
   // Arrays of primitives are accepted; everything else gets stringified.
-  if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v as string[];
-  if (Array.isArray(v) && v.every((x) => typeof x === "number")) return v as number[];
-  if (Array.isArray(v) && v.every((x) => typeof x === "boolean")) return v as boolean[];
+  if (Array.isArray(v) && v.every((x): x is string => typeof x === "string")) return v;
+  if (Array.isArray(v) && v.every((x): x is number => typeof x === "number")) return v;
+  if (Array.isArray(v) && v.every((x): x is boolean => typeof x === "boolean")) return v;
   try {
     return JSON.stringify(v);
   } catch {
-    return String(v);
+    // Fallback when JSON.stringify throws (circular refs, BigInts); avoid
+    // the default "[object Object]" from String(v) which the linter — and
+    // a human looking at a span attribute — would find equally useless.
+    return Object.prototype.toString.call(v);
   }
 }
 

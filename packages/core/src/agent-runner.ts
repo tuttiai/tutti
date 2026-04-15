@@ -1219,7 +1219,7 @@ function parseInferredMemories(text: string): string[] {
   let body = text.trim();
   const fence = /^```(?:json)?\n?([\s\S]*?)\n?```$/;
   const match = fence.exec(body);
-  if (match) body = match[1]!.trim();
+  if (match) body = match[1].trim();
 
   // Find the first '[' and the matching last ']' — robust to leading prose.
   const first = body.indexOf("[");

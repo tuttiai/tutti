@@ -116,7 +116,7 @@ export class PostgresUserMemoryStore implements UserMemoryStore {
     void this.sweepExpired();
     void this.enforceCap(user_id);
 
-    return rowToMemory(result.rows[0]!);
+    return rowToMemory(result.rows[0]);
   }
 
   async search(
@@ -201,7 +201,7 @@ export class PostgresUserMemoryStore implements UserMemoryStore {
       "UPDATE " + this.table + " SET last_accessed_at = NOW() WHERE id = $1",
       [id],
     );
-    return rowToMemory(result.rows[0]!);
+    return rowToMemory(result.rows[0]);
   }
 
   /** Close the connection pool. Call on shutdown. */

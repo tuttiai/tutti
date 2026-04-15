@@ -323,7 +323,7 @@ export async function interruptsTUICommand(
 
       const digit = parseInt(key, 10);
       if (!Number.isNaN(digit) && digit >= 1 && digit <= indexed.length) {
-        const chosen = indexed[digit - 1]!;
+        const chosen = indexed[digit - 1];
         const shouldContinue = await runDetailView(opts, chosen);
         if (!shouldContinue) return;
       }

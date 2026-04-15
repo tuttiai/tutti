@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import type { AgentUserMemoryConfig } from "@tuttiai/types";
-
 import type {
   StoreOptions,
   UserMemory,
@@ -10,7 +8,7 @@ import type {
   UserMemoryStore,
 } from "./types.js";
 
-/** Default per-user cap when {@link AgentUserMemoryConfig.max_memories_per_user} is unset. */
+/** Default per-user cap when `AgentUserMemoryConfig.max_memories_per_user` is unset. */
 export const DEFAULT_MAX_MEMORIES_PER_USER = 200;
 /** Default `source` applied to {@link UserMemoryStore.store} calls. */
 const DEFAULT_SOURCE: UserMemorySource = "explicit";

@@ -89,7 +89,7 @@ export class PostgresInterruptStore implements InterruptStore {
         "requested_at, resolved_at, resolved_by, denial_reason",
       [id, input.session_id, input.tool_name, JSON.stringify(input.tool_args)],
     );
-    return rowToRequest(result.rows[0]!);
+    return rowToRequest(result.rows[0]);
   }
 
   async get(interrupt_id: string): Promise<InterruptRequest | null> {
@@ -101,7 +101,7 @@ export class PostgresInterruptStore implements InterruptStore {
       [interrupt_id],
     );
     if (result.rows.length === 0) return null;
-    return rowToRequest(result.rows[0]!);
+    return rowToRequest(result.rows[0]);
   }
 
   async resolve(
@@ -123,7 +123,7 @@ export class PostgresInterruptStore implements InterruptStore {
     );
 
     if (update.rows.length > 0) {
-      return rowToRequest(update.rows[0]!);
+      return rowToRequest(update.rows[0]);
     }
 
     // Either the row doesn't exist or it was already resolved. Read it
