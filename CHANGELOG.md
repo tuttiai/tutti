@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added — Golden dataset storage layer in `@tuttiai/core` (eval v2)
+- New `packages/core/src/eval/golden/` module — the persistence layer that eval v2 regression checks will build on. Lets teams pin production-like cases and record a scored run history so CI can detect when an agent's behaviour drifts.
+- `GoldenCase` captures the input, optional `expected_output` / `expected_tool_sequence` / `expected_structured` targets, the list of `ScorerRef`s to apply, free-form `tags`, and the session the case was `promoted_from_session` (when applicable).
+- `GoldenRun` captures one recorded execution of a case: `output`, `tool_sequence`, `tokens`, optional `cost_usd`, a map of per-scorer `ScoreResult` verdicts, overall `passed`, and an optional text `diff` vs `expected_output`.
+- `ScorerRef` supports the built-in `exact`, `similarity`, `tool-sequence` scorer kinds plus `custom` (with a module `path`); `threshold` is interpreted per scorer.
+- `GoldenStore` interface — `saveCase` / `getCase` / `listCases` / `deleteCase` + `saveRun` / `getRun` / `listRuns(case_id)` / `latestRun(case_id)`. `saveCase` and `saveRun` assign a fresh id when the caller leaves it blank; `saveCase` preserves the original `created_at` across updates; `deleteCase` cascades to the case's recorded runs. Ids follow the existing `randomUUID` convention (the spec mentioned nanoid; docstring calls out the deviation like the interrupt store does).
+- `JsonFileGoldenStore` — default on-disk driver. Layout: `<basePath>/cases.json` + `<basePath>/runs/<case-id>.json`. Default `basePath` is `.tutti/golden` (resolved against CWD). Writes are atomic (staged `*.tmp` + `rename`), dates are ISO-serialised and revived on read, and a missing file reads as an empty list (no uninitialised-directory error).
+- Re-exports from `@tuttiai/core`: `JsonFileGoldenStore`, `DEFAULT_GOLDEN_BASE_PATH`, and the `GoldenCase` / `GoldenRun` / `ScorerRef` / `ScoreResult` / `GoldenStore` types.
+- `.gitignore` now excludes `.tutti/` by default, with an inline note that teams wanting CI regression detection must force-add `.tutti/golden/` (or un-ignore the subtree) so the pinned dataset is versioned.
+- 17 unit tests cover id assignment, update-in-place, date revival across a fresh-store read, `listCases` oldest-first ordering, cascade delete, optional-field round-trips (`expected_output` / `expected_tool_sequence` / `tags` / `promoted_from_session`), `getRun` cross-case lookup, `listRuns` ordering, `latestRun` tie-breaking, and `scores` + `diff` persistence.
+
 ### Added — `tutti-ai interrupts` CLI commands
 - `tutti-ai interrupts` (with no subcommand) — interactive approval TUI. Clears the screen and prints the pending table, then races keypresses against a 2-second poll timer: digit keys (1-9) open the detail view for that row, `r` forces a refresh, `q` or Ctrl+C quit. Detail view shows full metadata + pretty-printed `tool_args` and accepts `a` (approve), `d` (deny with optional enquirer-prompted reason), or `q` to go back. Raw mode is restored on every exit path including SIGINT so the user's shell is never left in a broken state. Non-TTY invocations (piped / redirected / captured in tests) fall through to the one-shot `list` view automatically.
 - `tutti-ai interrupts list` — one-shot table print for scripting / CI. Columns: id (8-char prefix), session (12-char prefix), tool (cyan), args (JSON-truncated to 50 chars), age (relative time). Empty state renders "No pending interrupts.".

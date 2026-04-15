@@ -42,6 +42,19 @@ export type {
   EvalSummary,
 } from "./eval/index.js";
 
+// Golden dataset storage (eval v2 regression layer)
+export {
+  DEFAULT_GOLDEN_BASE_PATH,
+  JsonFileGoldenStore,
+} from "./eval/index.js";
+export type {
+  GoldenCase,
+  GoldenRun,
+  ScorerRef,
+  ScoreResult,
+  GoldenStore,
+} from "./eval/index.js";
+
 // Logger
 export { createLogger, logger } from "./logger.js";
 

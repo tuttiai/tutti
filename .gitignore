@@ -7,3 +7,11 @@ dist
 .DS_Store
 coverage
 .claude/
+
+# Tutti local data — commit golden/ if you want CI regression detection
+# The `.tutti/golden/` subtree is the pinned eval dataset. To include it
+# in version control so CI can catch regressions, force-add it explicitly:
+#     git add -f .tutti/golden/
+# or un-ignore it by uncommenting the negation line below:
+# !.tutti/golden/
+.tutti/
