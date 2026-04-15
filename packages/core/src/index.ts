@@ -49,8 +49,12 @@ export { getTuttiTracer, getCurrentTraceId, getCurrentSpanId } from "./telemetry
 export {
   TuttiTracer,
   MODEL_PRICES,
+  JsonFileExporter,
+  OTLPExporter,
   buildTraceSummaries,
+  configureExporter,
   estimateCost,
+  getActiveExporter,
   getRunCost,
   registerModelPrice,
 } from "@tuttiai/telemetry";
@@ -62,8 +66,11 @@ export type {
   SpanStatus,
   SpanSubscriber,
   GuardrailAction,
+  JsonFileExporterOptions,
   ModelPrice,
+  OTLPExporterOptions,
   RunCost,
+  SpanExporter,
   TraceSummary,
 } from "@tuttiai/telemetry";
 export { initTelemetry, shutdownTelemetry } from "./telemetry-setup.js";

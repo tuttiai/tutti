@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added — Span exporter pipeline in `@tuttiai/telemetry`
+- New `packages/telemetry/src/exporters/` module — pluggable `SpanExporter` interface (`export(span)` / `flush()` / `shutdown()`). Contract: never throws, fire-and-forget; concrete exporters buffer + flush asynchronously.
+- `OTLPExporter` — buffered, retry-aware OTLP/HTTP JSON exporter for Jaeger, Datadog, Honeycomb, and any OTLP collector. Flushes on size (default 100 spans) or interval (default 5 s); 3 retries with 1s/2s/4s exponential backoff on network errors and 5xx; 4xx is permanent and dropped. Concurrent flush coalescing prevents double-POST. `unref()` on the timer so the exporter never keeps the process alive. Uses `JsonTraceSerializer` from `@opentelemetry/otlp-transformer` via a `TuttiSpan → ReadableSpan` adapter (UUID → 32-char trace id, first 16 hex chars → span id).
+- `JsonFileExporter` — newline-delimited JSON file exporter. Single append-mode `WriteStream` opened lazily on first write; one JSON object per line with `Date` fields serialised as ISO strings. Useful for offline analysis (`jq`, DuckDB) and CI eval artefacts.
+- `configureExporter(exporter | undefined)` — hooks the singleton tracer's subscribe API and forwards every emitted span. Returns a teardown function. Calling with a new exporter when one is attached shuts the prior one down cleanly. `getActiveExporter()` for diagnostics.
+- New deps in `@tuttiai/telemetry`: `@opentelemetry/api`, `@opentelemetry/core`, `@opentelemetry/resources`, `@opentelemetry/sdk-trace-base`, `@opentelemetry/otlp-transformer`. Previously zero-dep.
+
+### Added — Score-level exporter configuration
+- `TelemetryConfig.otlp?: { endpoint: string; headers?: Record<string,string> }` — auto-installs an `OTLPExporter` at runtime construction.
+- `TelemetryConfig.jsonFile?: string` — auto-installs a `JsonFileExporter` writing to the given path.
+- `TelemetryConfig.disabled?: boolean` — short-circuits the exporter pipeline entirely; wins over score-file `otlp` / `jsonFile` and the env vars below.
+- `TUTTI_OTLP_ENDPOINT` env var → installs `OTLPExporter`. Beats score-file config so operators can override without editing the score.
+- `TUTTI_TRACE_FILE` env var → installs `JsonFileExporter`. Same precedence rules.
+- `TuttiRuntime.shutdown()` — drains buffered spans before process exit. Long-running processes (servers, schedulers) should call this on SIGTERM.
+- The new fields are independent of the existing `enabled`/`endpoint`/`headers` (those still gate the OpenTelemetry SDK auto-instrumentation; the new fields gate the in-process `TuttiSpan` exporter pipeline).
+
 ### Added — `tutti-ai traces` CLI commands
 - `tutti-ai traces list` — table of the last 20 traces (most recent first) with columns: trace id (8-char prefix), agent id, started at, duration, status, total tokens, cost.
 - `tutti-ai traces show <trace-id>` — full span tree as an indented hierarchy with kind icons (▶ agent, ◆ llm, ⚙ tool, 🛡 guardrail, 💾 checkpoint), chalk colors (green=ok, red=error, yellow=running), and a summary footer (token total, cost, root-span wall time).

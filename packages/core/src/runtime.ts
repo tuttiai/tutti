@@ -1,4 +1,10 @@
-import type { AgentResult, ScoreConfig, Session, SessionStore } from "@tuttiai/types";
+import type { AgentResult, ScoreConfig, Session, SessionStore, TelemetryConfig } from "@tuttiai/types";
+import {
+  JsonFileExporter,
+  OTLPExporter,
+  configureExporter,
+  type SpanExporter,
+} from "@tuttiai/telemetry";
 import { AgentRunner } from "./agent-runner.js";
 import type { CheckpointStore } from "./checkpoint/index.js";
 import { EventBus } from "./event-bus.js";
@@ -9,9 +15,59 @@ import type { SemanticMemoryStore } from "./memory/semantic.js";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { InMemoryToolCache } from "./cache/in-memory-cache.js";
 import { PermissionGuard } from "./permission-guard.js";
+import { SecretsManager } from "./secrets.js";
 import { logger } from "./logger.js";
 import { AgentNotFoundError, ScoreValidationError } from "./errors.js";
 import { initTelemetry } from "./telemetry-setup.js";
+
+/**
+ * Resolve the exporter pipeline from (in order of precedence):
+ *   1. `TUTTI_OTLP_ENDPOINT` / `TUTTI_TRACE_FILE` environment variables
+ *   2. `score.telemetry.otlp` / `score.telemetry.jsonFile`
+ *
+ * Both sources may produce up to one OTLP exporter and one JSON-file
+ * exporter. When both are present we prefer OTLP (single exporter slot;
+ * users wanting both can subscribe a second listener directly).
+ *
+ * `score.telemetry.disabled` short-circuits the whole resolution.
+ */
+function resolveExporter(score: TelemetryConfig | undefined): SpanExporter | undefined {
+  if (score?.disabled) return undefined;
+
+  // Env vars win — they're the operator's "override the score" lever.
+  const envOtlpEndpoint = SecretsManager.optional("TUTTI_OTLP_ENDPOINT");
+  const envTraceFile = SecretsManager.optional("TUTTI_TRACE_FILE");
+
+  const otlpEndpoint = envOtlpEndpoint ?? score?.otlp?.endpoint;
+  const jsonFilePath = envTraceFile ?? score?.jsonFile;
+
+  if (otlpEndpoint) {
+    return new OTLPExporter({
+      endpoint: otlpEndpoint,
+      // Headers can only come from the score — env-var-encoded headers
+      // would be an injection footgun.
+      ...(score?.otlp?.headers ? { headers: score.otlp.headers } : {}),
+      onError: (err) => {
+        logger.warn(
+          { error: err instanceof Error ? err.message : String(err) },
+          "OTLP export failed",
+        );
+      },
+    });
+  }
+  if (jsonFilePath) {
+    return new JsonFileExporter({
+      path: jsonFilePath,
+      onError: (err) => {
+        logger.warn(
+          { error: err instanceof Error ? err.message : String(err) },
+          "JSON file export failed",
+        );
+      },
+    });
+  }
+  return undefined;
+}
 
 /** Optional runtime overrides that don't belong in the score. */
 export interface TuttiRuntimeOptions {
@@ -36,6 +92,8 @@ export class TuttiRuntime {
   private _sessions: SessionStore;
   private _runner: AgentRunner;
   private _score: ScoreConfig;
+  /** Teardown for any exporter installed during construction. */
+  private _stopExporter: (() => Promise<void>) | undefined;
 
   constructor(score: ScoreConfig, options: TuttiRuntimeOptions = {}) {
     this._score = score;
@@ -57,7 +115,31 @@ export class TuttiRuntime {
       initTelemetry(score.telemetry);
     }
 
+    // Install a TuttiSpan exporter from env vars or score config, so all
+    // spans the runtime emits get forwarded to the configured sink.
+    const exporter = resolveExporter(score.telemetry);
+    if (exporter) {
+      this._stopExporter = configureExporter(exporter);
+      logger.info(
+        { exporter: exporter.constructor.name },
+        "Span exporter configured",
+      );
+    }
+
     logger.info({ score: score.name, agents: Object.keys(score.agents) }, "Runtime initialized");
+  }
+
+  /**
+   * Detach and shut down any installed span exporter. Idempotent. Call
+   * this from long-running processes (servers, schedulers) before exit
+   * so buffered spans get flushed.
+   */
+  async shutdown(): Promise<void> {
+    if (this._stopExporter) {
+      const stop = this._stopExporter;
+      this._stopExporter = undefined;
+      await stop();
+    }
   }
 
   /**
