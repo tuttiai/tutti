@@ -52,6 +52,13 @@ import {
   memoryListCommand,
   memorySearchCommand,
 } from "./commands/memory.js";
+import {
+  interruptsApproveCommand,
+  interruptsDenyCommand,
+  interruptsListCommand,
+  interruptsTUICommand,
+  type InterruptsOptions,
+} from "./commands/interrupts.js";
 
 const program = new Command();
 
@@ -370,6 +377,78 @@ memoryCmd
       ...(opts.format !== undefined ? { format: opts.format } : {}),
       ...(opts.out !== undefined ? { out: opts.out } : {}),
     });
+  });
+
+// Shared builder for the server-URL + api-key flags used by every
+// interrupt subcommand. Keeps the option wiring DRY across commander
+// definitions.
+function toInterruptsOptions(raw: { url?: string; apiKey?: string }): InterruptsOptions {
+  return {
+    ...(raw.url !== undefined ? { url: raw.url } : {}),
+    ...(raw.apiKey !== undefined ? { apiKey: raw.apiKey } : {}),
+  };
+}
+
+const interruptsCmd = program
+  .command("interrupts")
+  .description("Review and resolve approval-gated tool calls");
+
+// `tutti-ai interrupts` with no subcommand opens the interactive TUI.
+interruptsCmd
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (opts: { url?: string; apiKey?: string }) => {
+    await interruptsTUICommand(toInterruptsOptions(opts));
+  });
+
+interruptsCmd
+  .command("list")
+  .description("Print pending interrupts as a table and exit (script-friendly)")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (opts: { url?: string; apiKey?: string }) => {
+    await interruptsListCommand(toInterruptsOptions(opts));
+  });
+
+interruptsCmd
+  .command("approve <interrupt-id>")
+  .description("Approve an interrupt directly")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .option("--by <name>", "Reviewer identifier (resolved_by field)")
+  .action(async (id: string, opts: { url?: string; apiKey?: string; by?: string }) => {
+    await interruptsApproveCommand(id, {
+      ...toInterruptsOptions(opts),
+      ...(opts.by !== undefined ? { resolvedBy: opts.by } : {}),
+    });
+  });
+
+interruptsCmd
+  .command("deny <interrupt-id>")
+  .description("Deny an interrupt directly")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .option("--reason <text>", "Free-text denial reason")
+  .option("--by <name>", "Reviewer identifier (resolved_by field)")
+  .action(async (
+    id: string,
+    opts: { url?: string; apiKey?: string; reason?: string; by?: string },
+  ) => {
+    await interruptsDenyCommand(id, {
+      ...toInterruptsOptions(opts),
+      ...(opts.reason !== undefined ? { reason: opts.reason } : {}),
+      ...(opts.by !== undefined ? { resolvedBy: opts.by } : {}),
+    });
+  });
+
+// Alias: `tutti-ai approve` → same as `tutti-ai interrupts`.
+program
+  .command("approve")
+  .description("Alias for `tutti-ai interrupts` — interactive approval TUI")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (opts: { url?: string; apiKey?: string }) => {
+    await interruptsTUICommand(toInterruptsOptions(opts));
   });
 
 program.parse();

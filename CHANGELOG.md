@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added — `tutti-ai interrupts` CLI commands
+- `tutti-ai interrupts` (with no subcommand) — interactive approval TUI. Clears the screen and prints the pending table, then races keypresses against a 2-second poll timer: digit keys (1-9) open the detail view for that row, `r` forces a refresh, `q` or Ctrl+C quit. Detail view shows full metadata + pretty-printed `tool_args` and accepts `a` (approve), `d` (deny with optional enquirer-prompted reason), or `q` to go back. Raw mode is restored on every exit path including SIGINT so the user's shell is never left in a broken state. Non-TTY invocations (piped / redirected / captured in tests) fall through to the one-shot `list` view automatically.
+- `tutti-ai interrupts list` — one-shot table print for scripting / CI. Columns: id (8-char prefix), session (12-char prefix), tool (cyan), args (JSON-truncated to 50 chars), age (relative time). Empty state renders "No pending interrupts.".
+- `tutti-ai interrupts approve <id> [--by <name>]` — direct approve by id. 404 / 409 / 401 produce specific error messages and exit 1.
+- `tutti-ai interrupts deny <id> [--reason <text>] [--by <name>]` — direct deny. Same error handling.
+- `tutti-ai approve` — alias for `tutti-ai interrupts` (interactive TUI).
+- All commands accept `-u, --url` (default `http://127.0.0.1:3847`, falls back to `TUTTI_SERVER_URL` env) and `-k, --api-key` (falls back to `TUTTI_API_KEY` env). Matches the existing `tutti-ai traces` CLI convention.
+- Pure rendering logic split into `interrupts-render.ts` (under coverage; 98.51% lines); orchestration in `interrupts.ts` (excluded from coverage like other I/O-heavy commands).
+- 27 unit tests cover the render functions plus the `list` command end-to-end against a mocked `fetch` (correct URL / method, bearer auth when `--api-key` is set, empty-state, ISO→Date revival for `requested_at`, 401 / 503 error paths).
+
 ### Added — Interrupt approval endpoints in `@tuttiai/server`
 - `GET /sessions/:sessionId/interrupts` — every interrupt request for a session regardless of status, oldest first.
 - `GET /interrupts/pending` — every pending request across every session. Powers monitoring dashboards.

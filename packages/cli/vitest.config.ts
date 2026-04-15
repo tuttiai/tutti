@@ -33,6 +33,7 @@ export default defineConfig({
         "src/commands/upgrade.ts",
         "src/commands/traces.ts",
         "src/commands/memory.ts",
+        "src/commands/interrupts.ts",
       ],
       thresholds: {
         lines: 70,
