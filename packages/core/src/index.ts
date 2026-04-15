@@ -46,6 +46,19 @@ export type {
 export {
   DEFAULT_GOLDEN_BASE_PATH,
   JsonFileGoldenStore,
+  GoldenRunner,
+  computeDiff,
+  runGoldenCase,
+  ExactScorer,
+  SimilarityScorer,
+  ToolSequenceScorer,
+  CustomScorer,
+  resolveScorer,
+  normalizeForExactMatch,
+  cosineSimilarity,
+  countOrderedMatches,
+  DEFAULT_SIMILARITY_THRESHOLD,
+  DEFAULT_EMBEDDING_MODEL,
 } from "./eval/index.js";
 export type {
   GoldenCase,
@@ -53,6 +66,13 @@ export type {
   ScorerRef,
   ScoreResult,
   GoldenStore,
+  GoldenRunnerOptions,
+  Scorer,
+  ScorerInput,
+  SimilarityScorerOptions,
+  EmbeddingsClient,
+  CustomScorerFn,
+  ScorerRegistryOptions,
 } from "./eval/index.js";
 
 // Logger
