@@ -35,6 +35,11 @@ export default defineConfig({
         "src/checkpoint/types.ts",
         // Scheduler Postgres store — requires a live PostgreSQL instance.
         "src/scheduler/postgres.ts",
+        // Interrupt Postgres store — requires a live PostgreSQL instance.
+        "src/interrupt/postgres-store.ts",
+        // Interrupt store interface + types module (no runtime code).
+        "src/interrupt/store.ts",
+        "src/interrupt/types.ts",
       ],
       thresholds: {
         lines: 85,

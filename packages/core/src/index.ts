@@ -15,6 +15,7 @@ export {
   VoiceError,
   PathTraversalError,
   UrlValidationError,
+  InterruptDeniedError,
 } from "./errors.js";
 
 // Hooks
@@ -90,6 +91,21 @@ export {
   PostgresUserMemoryStore,
   createUserMemoryStore,
 } from "./memory/user/index.js";
+
+// Human-in-the-loop interrupts
+export {
+  MemoryInterruptStore,
+  PostgresInterruptStore,
+  globMatch,
+  matchesAny,
+  needsApproval,
+  type InterruptCreateInput,
+  type InterruptRequest,
+  type InterruptStatus,
+  type InterruptStore,
+  type PostgresInterruptStoreOptions,
+  type ResolveOptions,
+} from "./interrupt/index.js";
 export type {
   AgentRunOptions,
   MemoryUserMemoryStoreOptions,

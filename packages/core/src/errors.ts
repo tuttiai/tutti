@@ -180,3 +180,25 @@ export class UrlValidationError extends VoiceError {
     Object.defineProperty(this, "code", { value: "URL_BLOCKED" });
   }
 }
+
+// ── Human-in-the-loop interrupts ──────────────────────────────
+
+/**
+ * Thrown when a human reviewer denies an approval-gated tool call. The
+ * agent runner catches this, aborts the run, and surfaces the reason
+ * to the caller so they can decide whether to retry with different
+ * input or escalate.
+ */
+export class InterruptDeniedError extends TuttiError {
+  constructor(
+    public readonly tool_name: string,
+    public readonly reason: string,
+    public readonly interrupt_id: string,
+  ) {
+    super(
+      "INTERRUPT_DENIED",
+      `Tool "${tool_name}" denied by human reviewer: ${reason}`,
+      { tool_name, reason, interrupt_id },
+    );
+  }
+}
