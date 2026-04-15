@@ -1,4 +1,5 @@
 import { getTuttiTracer, type TuttiTracer } from "./tracer.js";
+import type { SpanStatus, TuttiSpan } from "./types.js";
 
 /**
  * Per-million-token USD pricing for one model. Both rates are quoted on
@@ -133,4 +134,90 @@ export function getRunCost(traceId: string, tracer: TuttiTracer = getTuttiTracer
     total_tokens,
     cost_usd: anyCost ? cost_usd : null,
   };
+}
+
+/**
+ * One row in a "recent traces" listing. Captures the data needed to
+ * render a single line of the `tutti-ai traces list` table without
+ * shipping every span over the wire.
+ *
+ * `started_at` is an ISO-8601 string (not a `Date`) so the type round-trips
+ * cleanly through JSON without callers having to revive dates.
+ */
+export interface TraceSummary {
+  trace_id: string;
+  /** Agent that produced the trace, when the root span recorded it. */
+  agent_id?: string;
+  /** ISO-8601 timestamp of the root span. */
+  started_at: string;
+  /** Duration of the root span. `null` while the run is still in flight. */
+  duration_ms: number | null;
+  /** Status of the root span — drives the colour in the CLI table. */
+  status: SpanStatus;
+  /** Sum of `total_tokens` across every `llm.completion` span in the trace. */
+  total_tokens: number;
+  /**
+   * Aggregated USD cost. `null` only when no `llm.completion` span had a
+   * known cost — see {@link getRunCost} for the same semantics.
+   */
+  cost_usd: number | null;
+}
+
+/**
+ * Group spans by `trace_id`, derive a per-trace summary from the root
+ * span, and return the most-recent-first list trimmed to `limit`.
+ *
+ * Traces with no root span (every span in the group has a parent that is
+ * absent from the input) are skipped — they're partial fragments left
+ * over from ring-buffer eviction and have no meaningful start time.
+ *
+ * @param spans - Raw spans, typically from {@link TuttiTracer.getAllSpans}.
+ * @param limit - Maximum number of summaries to return. Defaults to 20.
+ */
+export function buildTraceSummaries(
+  spans: readonly TuttiSpan[],
+  limit = 20,
+): TraceSummary[] {
+  const groups = new Map<string, TuttiSpan[]>();
+  for (const span of spans) {
+    const arr = groups.get(span.trace_id) ?? [];
+    arr.push(span);
+    groups.set(span.trace_id, arr);
+  }
+
+  const summaries: TraceSummary[] = [];
+  for (const [trace_id, traceSpans] of groups) {
+    // The root is the only span in the group with no parent. If eviction
+    // dropped it we cannot build a meaningful summary — skip silently.
+    const root = traceSpans.find((s) => s.parent_span_id === undefined);
+    if (!root) continue;
+
+    let total_tokens = 0;
+    let cost_usd = 0;
+    let anyCost = false;
+    for (const s of traceSpans) {
+      if (s.name !== "llm.completion") continue;
+      total_tokens += s.attributes.total_tokens ?? 0;
+      if (s.attributes.cost_usd !== undefined) {
+        cost_usd += s.attributes.cost_usd;
+        anyCost = true;
+      }
+    }
+
+    summaries.push({
+      trace_id,
+      ...(root.attributes.agent_id !== undefined
+        ? { agent_id: root.attributes.agent_id }
+        : {}),
+      started_at: root.started_at.toISOString(),
+      duration_ms: root.duration_ms ?? null,
+      status: root.status,
+      total_tokens,
+      cost_usd: anyCost ? cost_usd : null,
+    });
+  }
+
+  // Most recent first — ISO-8601 strings sort lexicographically.
+  summaries.sort((a, b) => (a.started_at < b.started_at ? 1 : -1));
+  return summaries.slice(0, limit);
 }

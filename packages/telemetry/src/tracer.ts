@@ -157,6 +157,18 @@ export class TuttiTracer {
   }
 
   /**
+   * Return every span currently held in the ring buffer, in insertion
+   * order. The returned array is a defensive copy — the caller is free to
+   * sort or filter it without affecting the tracer's internal state.
+   *
+   * Useful for exporters and UIs that want to render a list of recent
+   * traces grouped by `trace_id`.
+   */
+  getAllSpans(): TuttiSpan[] {
+    return [...this.spans];
+  }
+
+  /**
    * Subscribe to span lifecycle events for live tailing (Studio, log
    * exporter, OTel bridge). The callback fires once on `startSpan` and
    * once on `endSpan` for every span produced after subscription.

@@ -49,6 +49,7 @@ export { getTuttiTracer, getCurrentTraceId, getCurrentSpanId } from "./telemetry
 export {
   TuttiTracer,
   MODEL_PRICES,
+  buildTraceSummaries,
   estimateCost,
   getRunCost,
   registerModelPrice,
@@ -63,6 +64,7 @@ export type {
   GuardrailAction,
   ModelPrice,
   RunCost,
+  TraceSummary,
 } from "@tuttiai/telemetry";
 export { initTelemetry, shutdownTelemetry } from "./telemetry-setup.js";
 

@@ -17,9 +17,11 @@ export {
 
 export {
   MODEL_PRICES,
+  buildTraceSummaries,
   estimateCost,
   getRunCost,
   registerModelPrice,
   type ModelPrice,
   type RunCost,
+  type TraceSummary,
 } from "./cost.js";

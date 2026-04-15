@@ -2,11 +2,13 @@ import { describe, it, expect } from "vitest";
 
 import {
   MODEL_PRICES,
+  buildTraceSummaries,
   estimateCost,
   getRunCost,
   registerModelPrice,
 } from "../src/cost.js";
 import { TuttiTracer, getTuttiTracer } from "../src/tracer.js";
+import type { TuttiSpan } from "../src/types.js";
 
 describe("estimateCost", () => {
   it("computes USD cost for built-in models with known token counts", () => {
@@ -202,5 +204,159 @@ describe("getRunCost", () => {
 describe("getTuttiTracer singleton", () => {
   it("returns the same instance across calls", () => {
     expect(getTuttiTracer()).toBe(getTuttiTracer());
+  });
+});
+
+describe("TuttiTracer.getAllSpans", () => {
+  it("returns a defensive copy of every span in the buffer", () => {
+    const tracer = new TuttiTracer();
+    const a = tracer.startSpan("agent.run", "agent");
+    const b = tracer.startSpan("tool.call", "tool", {}, a.span_id);
+    tracer.endSpan(b.span_id, "ok");
+    tracer.endSpan(a.span_id, "ok");
+
+    const snapshot = tracer.getAllSpans();
+    expect(snapshot).toHaveLength(2);
+    // Mutating the snapshot must not affect subsequent calls.
+    snapshot.length = 0;
+    expect(tracer.getAllSpans()).toHaveLength(2);
+  });
+});
+
+describe("buildTraceSummaries", () => {
+  function buildSimpleTrace(
+    tracer: TuttiTracer,
+    opts: {
+      agent?: string;
+      tokens?: number;
+      cost?: number;
+      startedAt?: Date;
+      status?: "ok" | "error";
+    } = {},
+  ): string {
+    const root = tracer.startSpan(
+      "agent.run",
+      "agent",
+      opts.agent !== undefined ? { agent_id: opts.agent } : {},
+    );
+    if (opts.startedAt) (root as TuttiSpan).started_at = opts.startedAt;
+
+    const llm = tracer.startSpan(
+      "llm.completion",
+      "llm",
+      { model: "gpt-4o" },
+      root.span_id,
+    );
+    tracer.endSpan(llm.span_id, "ok", {
+      prompt_tokens: 10,
+      completion_tokens: 5,
+      total_tokens: opts.tokens ?? 15,
+      ...(opts.cost !== undefined ? { cost_usd: opts.cost } : {}),
+    });
+    if (opts.status === "error") {
+      tracer.endSpan(root.span_id, "error", undefined, { message: "boom" });
+    } else {
+      tracer.endSpan(root.span_id, "ok");
+    }
+    return root.trace_id;
+  }
+
+  it("returns one summary per trace with root-derived metadata", () => {
+    const tracer = new TuttiTracer();
+    const traceId = buildSimpleTrace(tracer, { agent: "researcher", cost: 0.001 });
+
+    const summaries = buildTraceSummaries(tracer.getAllSpans());
+    expect(summaries).toHaveLength(1);
+    const s = summaries[0]!;
+    expect(s.trace_id).toBe(traceId);
+    expect(s.agent_id).toBe("researcher");
+    expect(s.status).toBe("ok");
+    expect(s.total_tokens).toBe(15);
+    expect(s.cost_usd).toBeCloseTo(0.001, 10);
+    expect(s.duration_ms).toBeGreaterThanOrEqual(0);
+    // started_at should be a parseable ISO string.
+    expect(() => new Date(s.started_at).toISOString()).not.toThrow();
+  });
+
+  it("orders summaries most-recent-first", () => {
+    const tracer = new TuttiTracer();
+    buildSimpleTrace(tracer, {
+      agent: "old",
+      startedAt: new Date("2026-04-15T10:00:00.000Z"),
+    });
+    buildSimpleTrace(tracer, {
+      agent: "new",
+      startedAt: new Date("2026-04-15T11:00:00.000Z"),
+    });
+
+    const summaries = buildTraceSummaries(tracer.getAllSpans());
+    expect(summaries.map((s) => s.agent_id)).toEqual(["new", "old"]);
+  });
+
+  it("respects the limit argument", () => {
+    const tracer = new TuttiTracer();
+    for (let i = 0; i < 5; i++) {
+      buildSimpleTrace(tracer, {
+        agent: "a" + i,
+        startedAt: new Date(`2026-04-15T10:0${i}:00.000Z`),
+      });
+    }
+    expect(buildTraceSummaries(tracer.getAllSpans(), 3)).toHaveLength(3);
+    expect(buildTraceSummaries(tracer.getAllSpans(), 5)).toHaveLength(5);
+    expect(buildTraceSummaries(tracer.getAllSpans(), 100)).toHaveLength(5);
+  });
+
+  it("returns null cost_usd when no llm.completion span had a known cost", () => {
+    const tracer = new TuttiTracer();
+    buildSimpleTrace(tracer, { agent: "x" }); // no cost arg → no cost_usd attr
+
+    const [summary] = buildTraceSummaries(tracer.getAllSpans());
+    expect(summary!.cost_usd).toBeNull();
+  });
+
+  it("propagates the root span's status (error)", () => {
+    const tracer = new TuttiTracer();
+    buildSimpleTrace(tracer, { agent: "x", status: "error", cost: 0.001 });
+
+    const [summary] = buildTraceSummaries(tracer.getAllSpans());
+    expect(summary!.status).toBe("error");
+  });
+
+  it("reports duration_ms = null while a root span is still running", () => {
+    const tracer = new TuttiTracer();
+    tracer.startSpan("agent.run", "agent", { agent_id: "x" }); // not ended
+
+    const [summary] = buildTraceSummaries(tracer.getAllSpans());
+    expect(summary!.duration_ms).toBeNull();
+    expect(summary!.status).toBe("running");
+  });
+
+  it("skips orphan trace fragments whose root span was evicted", () => {
+    // Simulate: a child span exists but its parent is missing from input.
+    const tracer = new TuttiTracer();
+    const root = tracer.startSpan("agent.run", "agent");
+    const child = tracer.startSpan("llm.completion", "llm", { model: "gpt-4o" }, root.span_id);
+    tracer.endSpan(child.span_id, "ok", { total_tokens: 50, cost_usd: 0.01 });
+    tracer.endSpan(root.span_id, "ok");
+
+    // Strip the root from the input — the orphan child becomes a fragment.
+    const allSpans = tracer.getAllSpans();
+    const orphanInput = allSpans.filter((s) => s.span_id !== root.span_id);
+
+    const summaries = buildTraceSummaries(orphanInput);
+    expect(summaries).toEqual([]); // no root → no summary
+  });
+
+  it("returns an empty array when given no spans", () => {
+    expect(buildTraceSummaries([])).toEqual([]);
+  });
+
+  it("omits agent_id when the root span did not record one", () => {
+    const tracer = new TuttiTracer();
+    const root = tracer.startSpan("agent.run", "agent"); // no agent_id attr
+    tracer.endSpan(root.span_id, "ok");
+
+    const [summary] = buildTraceSummaries(tracer.getAllSpans());
+    expect(summary!.agent_id).toBeUndefined();
   });
 });
