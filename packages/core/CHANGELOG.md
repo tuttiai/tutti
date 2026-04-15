@@ -1,5 +1,11 @@
 # @tuttiai/core
 
+## 0.17.0
+
+### Minor Changes
+
+- Add requireApproval config for human-in-the-loop: glob-pattern tool gating, interrupt/approve/deny lifecycle, Postgres and in-memory interrupt stores
+
 ## 0.16.0
 
 ### Minor Changes
