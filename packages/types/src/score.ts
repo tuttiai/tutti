@@ -26,6 +26,28 @@ export interface TelemetryConfig {
   endpoint?: string;
   /** Extra headers sent with OTLP requests (e.g. auth tokens). */
   headers?: Record<string, string>;
+  /**
+   * Configures the `@tuttiai/telemetry` exporter pipeline, which forwards
+   * in-process `TuttiSpan` events to OTLP-compatible backends. Independent
+   * of the OpenTelemetry SDK setup gated by `enabled` above.
+   */
+  otlp?: {
+    /** Full URL of the OTLP/HTTP traces endpoint (e.g. `http://localhost:4318/v1/traces`). */
+    endpoint: string;
+    /** Optional headers — vendor auth tokens, tenant ids, etc. */
+    headers?: Record<string, string>;
+  };
+  /**
+   * Append every closed span as newline-delimited JSON to this path.
+   * Useful for offline analysis and CI eval artefacts.
+   */
+  jsonFile?: string;
+  /**
+   * Disable the `@tuttiai/telemetry` exporter pipeline entirely. Wins over
+   * both score-file `otlp` / `jsonFile` settings and the `TUTTI_OTLP_ENDPOINT`
+   * / `TUTTI_TRACE_FILE` environment variables.
+   */
+  disabled?: boolean;
 }
 
 /**
