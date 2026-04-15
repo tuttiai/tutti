@@ -38,7 +38,15 @@ import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { getRunCost } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId } from "./telemetry.js";
-import { ToolTimeoutError, ProviderError, RateLimitError, StructuredOutputError } from "./errors.js";
+import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
+import { needsApproval } from "./interrupt/index.js";
+import {
+  InterruptDeniedError,
+  ToolTimeoutError,
+  ProviderError,
+  RateLimitError,
+  StructuredOutputError,
+} from "./errors.js";
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
@@ -82,6 +90,16 @@ export class AgentRunner {
    * pre-populate via {@link setUserMemoryStore} to inject mocks.
    */
   private userMemoryStores = new Map<string, UserMemoryStore>();
+  /**
+   * In-memory resolvers for interrupts waiting on operator approval.
+   * Keyed by `interrupt_id`. Populated in {@link awaitApproval} before
+   * the `interrupt:requested` event fires so `resolveInterrupt` calls
+   * that arrive synchronously still land on a registered resolver.
+   */
+  private pendingInterrupts = new Map<
+    string,
+    { resolve: (r: InterruptRequest) => void; reject: (err: Error) => void }
+  >();
 
   constructor(
     private provider: LLMProvider,
@@ -91,7 +109,107 @@ export class AgentRunner {
     private globalHooks?: TuttiHooks,
     private toolCache?: ToolCache,
     private checkpointStore?: CheckpointStore,
+    private interruptStore?: InterruptStore,
   ) {}
+
+  /**
+   * Approve or deny a pending interrupt. Updates the
+   * {@link InterruptStore} and, if the run that raised the interrupt
+   * is still waiting in this process, resolves the pending tool call
+   * (approval) or rejects it with {@link InterruptDeniedError} (denial).
+   *
+   * Idempotent: resolving an already-resolved interrupt returns the
+   * existing record without disturbing anything in-memory.
+   */
+  async resolveInterrupt(
+    interrupt_id: string,
+    status: "approved" | "denied",
+    options: { resolved_by?: string; denial_reason?: string } = {},
+  ): Promise<InterruptRequest> {
+    if (!this.interruptStore) {
+      throw new Error(
+        "AgentRunner.resolveInterrupt: no InterruptStore is configured. " +
+          "Construct AgentRunner / TuttiRuntime with one to use requireApproval.",
+      );
+    }
+    const resolved = await this.interruptStore.resolve(interrupt_id, status, options);
+
+    const pending = this.pendingInterrupts.get(interrupt_id);
+    if (pending) {
+      this.pendingInterrupts.delete(interrupt_id);
+      if (resolved.status === "approved") {
+        pending.resolve(resolved);
+      } else {
+        pending.reject(
+          new InterruptDeniedError(
+            resolved.tool_name,
+            resolved.denial_reason ?? "denied",
+            resolved.interrupt_id,
+          ),
+        );
+      }
+    }
+
+    this.events.emit({
+      type: "interrupt:resolved",
+      session_id: resolved.session_id,
+      tool_name: resolved.tool_name,
+      interrupt_id: resolved.interrupt_id,
+      status: resolved.status as "approved" | "denied",
+      ...(resolved.denial_reason !== undefined
+        ? { denial_reason: resolved.denial_reason }
+        : {}),
+      ...(resolved.resolved_by !== undefined
+        ? { resolved_by: resolved.resolved_by }
+        : {}),
+    });
+
+    return resolved;
+  }
+
+  /**
+   * Suspend the calling tool call until an operator calls
+   * {@link resolveInterrupt}. Throws when no {@link InterruptStore} is
+   * configured — a `requireApproval` pattern that fires with no store
+   * is almost certainly a misconfiguration.
+   */
+  private async awaitApproval(
+    session_id: string,
+    tool_name: string,
+    tool_args: unknown,
+  ): Promise<InterruptRequest> {
+    if (!this.interruptStore) {
+      throw new Error(
+        `Tool "${tool_name}" matches requireApproval but no InterruptStore is configured.\n` +
+          `Pass one to AgentRunner / TuttiRuntime so interrupts can be persisted.`,
+      );
+    }
+
+    const request = await this.interruptStore.create({
+      session_id,
+      tool_name,
+      tool_args,
+    });
+
+    return new Promise<InterruptRequest>((resolve, reject) => {
+      // Register the resolver BEFORE emitting so a synchronous handler
+      // that calls resolveInterrupt() immediately still finds a waiter.
+      this.pendingInterrupts.set(request.interrupt_id, { resolve, reject });
+
+      this.events.emit({
+        type: "interrupt:requested",
+        session_id,
+        tool_name,
+        interrupt_id: request.interrupt_id,
+        tool_args,
+      });
+
+      logger.info(
+        { interrupt_id: request.interrupt_id, tool: tool_name, session: session_id },
+        "Tool call paused for human approval",
+      );
+    });
+  }
 
   /**
    * Test seam — pre-register a user-memory store for an agent so tests
@@ -514,6 +632,7 @@ export class AgentRunner {
               hookCtx,
               agentHooks,
               agent.cache,
+              agent.requireApproval,
             ),
           ),
         );
@@ -884,6 +1003,7 @@ export class AgentRunner {
     hookCtx?: HookContext,
     agentHooks?: TuttiHooks,
     cacheCfg?: { enabled: boolean; ttl_ms?: number; excluded_tools?: string[] },
+    requireApproval?: AgentConfig["requireApproval"],
   ): Promise<ToolResultBlock> {
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
@@ -939,6 +1059,15 @@ export class AgentRunner {
       try {
         // Validate input with Zod
         const parsed = tool.parameters.parse(block.input);
+
+        // Human-in-the-loop approval gate. Runs AFTER Zod validation
+        // (so the stored tool_args are the parsed shape reviewers will
+        // see) and BEFORE cache lookup (so a cached result doesn't
+        // bypass review). Denial throws InterruptDeniedError which
+        // propagates up and aborts the run.
+        if (needsApproval(requireApproval, block.name)) {
+          await this.awaitApproval(context.session_id, block.name, parsed);
+        }
 
         // Cache lookup on the parsed input so semantically-equal inputs hit.
         if (cacheable && this.toolCache) {
@@ -1025,6 +1154,11 @@ export class AgentRunner {
           is_error: result.is_error,
         };
       } catch (error) {
+        // Approval denials are intentional, operator-driven signals to
+        // abort the run — they must propagate rather than be swallowed
+        // into a tool_result error that the LLM could silently ignore.
+        if (error instanceof InterruptDeniedError) throw error;
+
         const message = error instanceof Error ? error.message : String(error);
 
         logger.error({ error: message, tool: block.name }, "Tool failed");

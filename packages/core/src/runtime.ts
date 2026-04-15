@@ -11,6 +11,7 @@ import type {
   UserMemoryStore,
 } from "./memory/user/types.js";
 import type { CheckpointStore } from "./checkpoint/index.js";
+import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { EventBus } from "./event-bus.js";
 import { InMemorySessionStore } from "./session-store.js";
 import { PostgresSessionStore } from "./memory/postgres.js";
@@ -87,6 +88,12 @@ export interface TuttiRuntimeOptions {
    * Overrides the score's `memory` config when supplied.
    */
   sessionStore?: SessionStore;
+  /**
+   * Attach an {@link InterruptStore} so agents with `requireApproval`
+   * configured can pause tool calls for human review. Required whenever
+   * any agent in the score sets `requireApproval`.
+   */
+  interruptStore?: InterruptStore;
 }
 
 export class TuttiRuntime {
@@ -113,6 +120,7 @@ export class TuttiRuntime {
       score.hooks,
       this.toolCache,
       options.checkpointStore,
+      options.interruptStore,
     );
 
     if (score.telemetry) {
@@ -241,6 +249,28 @@ export class TuttiRuntime {
    */
   setUserMemoryStore(agent_name: string, store: UserMemoryStore): void {
     this._runner.setUserMemoryStore(agent_name, store);
+  }
+
+  /**
+   * Approve or deny a pending interrupt. Forwards to the underlying
+   * {@link AgentRunner.resolveInterrupt}. Requires that the runtime was
+   * constructed with `options.interruptStore`.
+   *
+   * Idempotent: resolving an already-resolved interrupt returns the
+   * existing record without side-effects.
+   *
+   * @param interrupt_id - Id from the `interrupt:requested` event payload.
+   * @param status - `"approved"` resumes the tool call; `"denied"`
+   *   throws {@link InterruptDeniedError} into the run.
+   * @param options - Optional metadata: `resolved_by` (reviewer id),
+   *   `denial_reason` (free-text, appears in the thrown error message).
+   */
+  resolveInterrupt(
+    interrupt_id: string,
+    status: "approved" | "denied",
+    options?: { resolved_by?: string; denial_reason?: string },
+  ): Promise<InterruptRequest> {
+    return this._runner.resolveInterrupt(interrupt_id, status, options);
   }
 
   /**

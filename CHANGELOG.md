@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added — Human-in-the-loop interrupt system in `@tuttiai/core`
+- `AgentConfig.requireApproval?: string[] | "all" | false` — gate specific tool calls behind operator approval. Glob patterns (`*` is the only wildcard), `"all"` to gate every call, or `false` (default) to opt out.
+- New `InterruptStore` interface with `create` / `get` / `resolve` / `listPending`. `resolve` is idempotent on already-resolved ids; `listPending` is oldest-first and optionally filtered by `session_id`.
+- `MemoryInterruptStore` for dev / tests; `PostgresInterruptStore` for production on the `tutti_interrupts` table (auto-created; partial index on the pending set keeps review-queue polls fast).
+- Runtime integration: when a tool call matches an agent's `requireApproval` patterns, `AgentRunner` creates an `InterruptRequest`, emits `interrupt:requested`, and suspends execution until `TuttiRuntime.resolveInterrupt(id, "approved" | "denied", options?)` is called. Approval resumes the call with the validated args (bypasses the tool-result cache so repeat calls still prompt); denial throws `InterruptDeniedError` which aborts the run with the operator's `denial_reason`.
+- Approval check runs *after* Zod validation (so stored `tool_args` are the parsed shape reviewers see) and *before* cache lookup. The resolver is registered synchronously before the `interrupt:requested` event fires, so a handler that calls `resolveInterrupt` immediately still lands on a waiter.
+- New `interrupt:requested` and `interrupt:resolved` events.
+- New `InterruptDeniedError` in the error hierarchy (code `INTERRUPT_DENIED`; `tool_name` / `reason` / `interrupt_id` as public fields).
+- 32 new tests: 13 for glob matching, 11 for `MemoryInterruptStore`, 8 end-to-end through `AgentRunner` (approval + denial + `"all"` + non-matching pass-through + `false` + missing-store error + idempotent resolve), plus 10 Postgres integration tests gated by `TUTTI_PG_URL`.
+
 ### Added — `tutti-ai memory` CLI commands
 - `tutti-ai memory list --user <id>` — table of every memory for a user, sorted by `(importance DESC, created_at DESC)`. Columns: id (8-char prefix), content (truncated to 60 chars), source (green=explicit / yellow=inferred), importance (★☆☆ / ★★☆ / ★★★), created.
 - `tutti-ai memory search --user <id> <query>` — query the user's memories; preserves the store's relevance ranking; header reproduces the query and pluralised result count.
