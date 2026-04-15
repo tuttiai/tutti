@@ -31,6 +31,7 @@ export default defineConfig({
         "src/commands/outdated.ts",
         "src/commands/info.ts",
         "src/commands/upgrade.ts",
+        "src/commands/traces.ts",
       ],
       thresholds: {
         lines: 70,

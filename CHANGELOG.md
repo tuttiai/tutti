@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added — `tutti-ai traces` CLI commands
+- `tutti-ai traces list` — table of the last 20 traces (most recent first) with columns: trace id (8-char prefix), agent id, started at, duration, status, total tokens, cost.
+- `tutti-ai traces show <trace-id>` — full span tree as an indented hierarchy with kind icons (▶ agent, ◆ llm, ⚙ tool, 🛡 guardrail, 💾 checkpoint), chalk colors (green=ok, red=error, yellow=running), and a summary footer (token total, cost, root-span wall time).
+- `tutti-ai traces tail` — live SSE tail; each span prints as it opens and as it closes. Ctrl+C to exit.
+- All three subcommands accept `--url` (default `http://127.0.0.1:3847`, falls back to `TUTTI_SERVER_URL`) and `--api-key` (falls back to `TUTTI_API_KEY`). Friendly errors on 401, 404, and connection failures.
+- Pure rendering logic split into `traces-render.ts` (under coverage); orchestration in `traces.ts` (excluded from coverage like other I/O-heavy commands).
+- 13 unit tests covering empty state, table headers, ordering, 20-row limit, status colors, em-dashes for missing fields, indented tree, transitive nesting, footer summary, error surfacing, running-state rendering, span-kind icons, indent math.
+
+### Added — `/traces` route family in `@tuttiai/server`
+- `GET /traces` — last 20 trace summaries from the in-process `getTuttiTracer()` singleton.
+- `GET /traces/:id` — every span belonging to one trace; 404 when unknown. `Date` fields serialise as ISO strings for stable JSON round-trips.
+- `GET /traces/stream` — Server-Sent Events; subscribes to `getTuttiTracer().subscribe()` on connect, unsubscribes on socket close. Each span pushed twice (once on open with `status: "running"`, once on close with `ok` / `error`).
+- All three endpoints inherit the existing bearer-token auth middleware.
+
+### Added — Span retrieval helpers in `@tuttiai/telemetry`
+- `TuttiTracer.getAllSpans(): TuttiSpan[]` — defensive copy of every span in the ring buffer, in insertion order. Lets exporters / UIs render a list of recent traces without having to know trace ids in advance.
+- `buildTraceSummaries(spans, limit?): TraceSummary[]` — groups raw spans by `trace_id`, derives root-span metadata (agent id, status, duration, started_at), aggregates `llm.completion` token + cost data. Skips orphan fragments where the root has been evicted from the ring buffer. Sorts most-recent-first; trims to `limit` (default 20).
+- `TraceSummary` type re-exported from `@tuttiai/core`.
+
 ### Added — Per-run cost estimation in `@tuttiai/telemetry`
 - `MODEL_PRICES` table seeded with public USD-per-1M-token rates for `gpt-4o`, `gpt-4o-mini`, `claude-opus-4`, `claude-sonnet-4`, `claude-haiku-3-5`, `gemini-2-0-flash`. Frozen — mutate via `registerModelPrice(model, inputPer1M, outputPer1M)`.
 - `estimateCost(model, promptTokens, completionTokens): number | null` — model-aware cost calculator. Returns `null` for unregistered models so callers can detect missing pricing rather than silently falling back to zero.

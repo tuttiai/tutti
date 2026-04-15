@@ -38,6 +38,12 @@ import {
   schedulesTriggerCommand,
   schedulesRunsCommand,
 } from "./commands/schedules.js";
+import {
+  tracesListCommand,
+  tracesShowCommand,
+  tracesTailCommand,
+  type TracesOptions,
+} from "./commands/traces.js";
 
 const program = new Command();
 
@@ -251,6 +257,49 @@ schedulesCmd
   .description("Show run history for a schedule (last 20 runs)")
   .action(async (id: string) => {
     await schedulesRunsCommand(id);
+  });
+
+const tracesCmd = program
+  .command("traces")
+  .description("Inspect spans emitted by a running tutti-ai serve process");
+
+tracesCmd
+  .command("list")
+  .description("Show the last 20 traces (most recent first)")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (opts: { url?: string; apiKey?: string }) => {
+    const resolved: TracesOptions = {
+      ...(opts.url !== undefined ? { url: opts.url } : {}),
+      ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
+    };
+    await tracesListCommand(resolved);
+  });
+
+tracesCmd
+  .command("show <trace-id>")
+  .description("Render every span in a trace as an indented tree")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (traceId: string, opts: { url?: string; apiKey?: string }) => {
+    const resolved: TracesOptions = {
+      ...(opts.url !== undefined ? { url: opts.url } : {}),
+      ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
+    };
+    await tracesShowCommand(traceId, resolved);
+  });
+
+tracesCmd
+  .command("tail")
+  .description("Live-tail spans as they are emitted (Ctrl+C to exit)")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (opts: { url?: string; apiKey?: string }) => {
+    const resolved: TracesOptions = {
+      ...(opts.url !== undefined ? { url: opts.url } : {}),
+      ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
+    };
+    await tracesTailCommand(resolved);
   });
 
 program.parse();
