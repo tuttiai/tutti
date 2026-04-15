@@ -1,0 +1,43 @@
+{
+  "name": "@tuttiai/telemetry",
+  "version": "0.1.0",
+  "description": "Tutti telemetry — span-based tracing for agent runs, tool calls, and LLM completions",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "orchestration",
+    "telemetry",
+    "tracing",
+    "spans",
+    "observability"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "packages/telemetry"
+  },
+  "homepage": "https://tutti-ai.com"
+}
