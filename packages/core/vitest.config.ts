@@ -18,8 +18,11 @@ export default defineConfig({
         "src/providers/**",
         // Database store requires a running PostgreSQL instance
         "src/memory/postgres.ts",
+        "src/memory/user/postgres-store.ts",
         // Semantic memory interface (no implementation code)
         "src/memory/semantic.ts",
+        // User memory types module — types only, no runtime code.
+        "src/memory/user/types.ts",
         // OTel SDK setup requires a running collector
         "src/telemetry-setup.ts",
         // Checkpoint backends — same reasoning as memory/postgres.ts:

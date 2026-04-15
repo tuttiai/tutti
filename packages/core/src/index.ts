@@ -84,6 +84,22 @@ export { InMemorySessionStore } from "./session-store.js";
 export { PostgresSessionStore } from "./memory/postgres.js";
 export { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
 export type { MemoryEntry, SemanticMemoryStore } from "./memory/semantic.js";
+export {
+  DEFAULT_MAX_MEMORIES_PER_USER,
+  MemoryUserMemoryStore,
+  PostgresUserMemoryStore,
+  createUserMemoryStore,
+} from "./memory/user/index.js";
+export type {
+  AgentRunOptions,
+  MemoryUserMemoryStoreOptions,
+  PostgresUserMemoryStoreOptions,
+  StoreOptions,
+  UserMemory,
+  UserMemoryImportance,
+  UserMemorySource,
+  UserMemoryStore,
+} from "./memory/user/index.js";
 export { ScoreLoader } from "./score-loader.js";
 export { defineScore } from "./define-score.js";
 export { SecretsManager } from "./secrets.js";

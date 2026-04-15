@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added — User memory backends in `@tuttiai/core`
+- `MemoryUserMemoryStore` — `Map<user_id, UserMemory[]>` backend for dev / tests / ephemeral demos. Substring search ranked by `importance DESC, created_at DESC`; bumps `last_accessed_at` on every hit; per-user cap (default 200) evicts the worst memories first (lowest `importance`, then oldest within that band — including just-stored memories that rank lowest). **Documented as dev-only — no encryption, no persistence, no access control beyond `user_id` keying.**
+- `PostgresUserMemoryStore` — production backend on the `tutti_user_memories` table (created on first use, idempotent, table name validated against `^[a-z_][a-z0-9_]*$`). Trigram detection runs once at bootstrap via `pg_extension WHERE extname = 'pg_trgm'`; if available, search uses the `%` operator + `similarity()` ranking; falls back to `ILIKE`. Every `store()` call fires (and does not await) a sweep that deletes globally-expired rows + an `enforceCap` pass that trims back to `max_memories_per_user`. In-band expiry filtering on `search` / `list` / `get` so reads stay correct even when sweeps lag.
+- `createUserMemoryStore(config)` factory dispatches on `config.store` (`"memory"` / `"postgres"`); reads `TUTTI_PG_URL` for the Postgres backend with a friendly error when missing.
+- New exports from `@tuttiai/core`: `MemoryUserMemoryStore`, `PostgresUserMemoryStore`, `createUserMemoryStore`, `DEFAULT_MAX_MEMORIES_PER_USER`, plus the option types and the design types from the previous commit.
+- 28 unit tests cover the in-memory backend end-to-end. 16 integration tests cover the Postgres backend, gated by `TUTTI_PG_URL` (skip cleanly without it, exactly like the existing checkpoint integration suite).
+
 ### Added — Span exporter pipeline in `@tuttiai/telemetry`
 - New `packages/telemetry/src/exporters/` module — pluggable `SpanExporter` interface (`export(span)` / `flush()` / `shutdown()`). Contract: never throws, fire-and-forget; concrete exporters buffer + flush asynchronously.
 - `OTLPExporter` — buffered, retry-aware OTLP/HTTP JSON exporter for Jaeger, Datadog, Honeycomb, and any OTLP collector. Flushes on size (default 100 spans) or interval (default 5 s); 3 retries with 1s/2s/4s exponential backoff on network errors and 5xx; 4xx is permanent and dropped. Concurrent flush coalescing prevents double-POST. `unref()` on the timer so the exporter never keeps the process alive. Uses `JsonTraceSerializer` from `@opentelemetry/otlp-transformer` via a `TuttiSpan → ReadableSpan` adapter (UUID → 32-char trace id, first 16 hex chars → span id).
