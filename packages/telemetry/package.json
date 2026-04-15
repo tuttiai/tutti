@@ -39,5 +39,12 @@
     "url": "https://github.com/tuttiai/tutti",
     "directory": "packages/telemetry"
   },
-  "homepage": "https://tutti-ai.com"
+  "homepage": "https://tutti-ai.com",
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.6.1",
+    "@opentelemetry/otlp-transformer": "^0.214.0",
+    "@opentelemetry/resources": "^2.6.1",
+    "@opentelemetry/sdk-trace-base": "^2.6.1"
+  }
 }

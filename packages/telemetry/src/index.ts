@@ -25,3 +25,13 @@ export {
   type RunCost,
   type TraceSummary,
 } from "./cost.js";
+
+export {
+  JsonFileExporter,
+  OTLPExporter,
+  configureExporter,
+  getActiveExporter,
+  type JsonFileExporterOptions,
+  type OTLPExporterOptions,
+  type SpanExporter,
+} from "./exporters/index.js";
