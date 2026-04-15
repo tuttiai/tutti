@@ -166,6 +166,11 @@ export interface AgentResult {
   usage: TokenUsage;
   /** Parsed structured output — present when {@link AgentConfig.outputSchema} is set and validation succeeds. */
   structured?: unknown;
+  /**
+   * Trace identifier for the spans produced by this run. Pair with
+   * `getTuttiTracer().getTrace(trace_id)` to retrieve the full span tree.
+   */
+  trace_id?: string;
 }
 
 /**

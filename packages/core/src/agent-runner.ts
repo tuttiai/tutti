@@ -29,7 +29,7 @@ import type { SemanticMemoryStore } from "./memory/semantic.js";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { logger } from "./logger.js";
-import { TuttiTracer } from "./telemetry.js";
+import { Tracing, getCurrentTraceId } from "./telemetry.js";
 import { ToolTimeoutError, ProviderError, RateLimitError, StructuredOutputError } from "./errors.js";
 
 const DEFAULT_MAX_TURNS = 10;
@@ -116,7 +116,7 @@ export class AgentRunner {
       );
     }
 
-    return TuttiTracer.agentRun(agent.name, session.id, async () => {
+    return Tracing.agentRun(agent.name, session.id, agent.model, async () => {
       const agentHooks = agent.hooks;
       const hookCtx: HookContext = {
         agent_name: agent.name,
@@ -159,7 +159,12 @@ export class AgentRunner {
       const runCtx: RunContext = { agent_name: agent.name, session_id: session.id };
       let guardedInput = input;
       if (agent.beforeRun) {
-        const result = await agent.beforeRun(guardedInput, runCtx);
+        const beforeRun = agent.beforeRun;
+        const result = await Tracing.guardrail(
+          "beforeRun",
+          () => Promise.resolve(beforeRun(guardedInput, runCtx)),
+          (r) => (typeof r === "string" ? "redact" : "pass"),
+        );
         if (typeof result === "string") {
           guardedInput = result;
         }
@@ -173,9 +178,12 @@ export class AgentRunner {
       // in the message list. End-of-turn checkpoints aren't saved (the
       // run exits cleanly), so we don't need to handle that branch.
       const durableEnabled = agent.durable !== undefined && agent.durable !== false;
+      const checkpointStore = this.checkpointStore;
       const checkpoint =
-        durableEnabled && this.checkpointStore
-          ? await this.checkpointStore.loadLatest(session.id)
+        durableEnabled && checkpointStore
+          ? await Tracing.checkpoint(session.id, 0, () =>
+              checkpointStore.loadLatest(session.id),
+            )
           : null;
       const resuming = !!checkpoint && checkpoint.state.awaiting_tool_results === true;
 
@@ -287,7 +295,7 @@ export class AgentRunner {
           request,
         });
 
-        const response = await TuttiTracer.llmCall(
+        const response = await Tracing.llmCall(
           agent.model ?? "unknown",
           () => withRetry(() =>
             agent.streaming
@@ -443,7 +451,8 @@ export class AgentRunner {
             saved_at: new Date(),
           };
           try {
-            await this.checkpointStore.save(cp);
+            const store = this.checkpointStore;
+            await Tracing.checkpoint(session.id, turns, () => store.save(cp));
             lastCheckpointedTurn = turns;
             this.events.emit({
               type: "checkpoint:saved",
@@ -541,7 +550,12 @@ export class AgentRunner {
 
       // Output guardrail — may modify or block the output after the last turn.
       if (agent.afterRun) {
-        const result = await agent.afterRun(output, runCtx);
+        const afterRun = agent.afterRun;
+        const result = await Tracing.guardrail(
+          "afterRun",
+          () => Promise.resolve(afterRun(output, runCtx)),
+          (r) => (typeof r === "string" ? "redact" : "pass"),
+        );
         if (typeof result === "string") {
           output = result;
         }
@@ -561,6 +575,7 @@ export class AgentRunner {
         session_id: session.id,
       });
 
+      const trace_id = getCurrentTraceId();
       const agentResult: AgentResult = {
         session_id: session.id,
         output,
@@ -568,6 +583,7 @@ export class AgentRunner {
         turns,
         usage: totalUsage,
         ...(structuredResult !== undefined ? { structured: structuredResult } : {}),
+        ...(trace_id !== undefined ? { trace_id } : {}),
       };
 
       // afterAgentRun hooks
@@ -705,7 +721,7 @@ export class AgentRunner {
 
     // Cache lookup happens inside the tracer span so cache hits still show
     // up in traces as zero-cost tool calls.
-    return TuttiTracer.toolCall(block.name, async () => {
+    return Tracing.toolCall(block.name, block.input, async () => {
       // beforeToolCall hooks — return false to block, or modified input
       if (hookCtx) {
         const globalResult = await this.safeHook(() => this.globalHooks?.beforeToolCall?.(hookCtx, block.name, block.input));

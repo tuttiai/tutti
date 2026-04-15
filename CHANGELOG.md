@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/telemetry@0.1.0` (in-process span tracer)
+- New `packages/telemetry` package — zero runtime deps beyond Node built-ins. Exports `TuttiTracer`, `TuttiSpan`, `TuttiSpanAttributes`, `SpanKind`, `SpanStatus`, `GuardrailAction`.
+- `TuttiTracer` class: `startSpan(name, kind, attributes?, parent_span_id?)`, `endSpan(span_id, status, extra_attributes?, error?)`, `getTrace(trace_id)`, `subscribe(cb)`. Bounded ring buffer (default 1000 spans, configurable via `max_spans`).
+- Span tree: child spans inherit `trace_id` from a known parent; orphan parents get a fresh trace id. Subscriber exceptions are isolated so a noisy listener can't break the agent loop.
+- 19 unit tests, 100% coverage on `tracer.ts`.
+
+### Added — Automatic agent runtime tracing in `@tuttiai/core`
+- New `@tuttiai/telemetry` workspace dep. Every agent run now emits a span tree with zero user configuration.
+- Spans emitted: `agent.run` (root, with `agent_id` / `session_id` / `model`), `llm.completion` (per provider call, with `prompt_tokens` / `completion_tokens` / `total_tokens`), `tool.call` (with `tool_name` / `tool_input` / `tool_output`), `guardrail` (around `beforeRun` and `afterRun` with `guardrail_action`: `pass` / `redact` / `block`), `checkpoint` (around durable save/restore).
+- Parent span propagation via `AsyncLocalStorage` — concurrent runs stay isolated, every nested span has the correct `parent_span_id`.
+- Existing OpenTelemetry spans are preserved alongside the new in-process tracer (dual emission for back-compat).
+- New exports: `getTuttiTracer()` (singleton accessor), `getCurrentTraceId()`, `getCurrentSpanId()`. The canonical `TuttiTracer` class and span types are re-exported from `@tuttiai/telemetry`.
+- `AgentResult.trace_id` (optional) — set on every successful run, lets callers retrieve the full trace via `getTuttiTracer().getTrace(trace_id)`.
+- 12 new integration tests covering span emission, nesting, attributes, trace propagation, guardrail action recording, concurrent-run isolation, and subscriber error isolation.
+
+### Breaking
+- The `TuttiTracer` re-export from `@tuttiai/core` is now the `TuttiTracer` *class* from `@tuttiai/telemetry`, not the previous OpenTelemetry-wrapper *object*. Callers using `TuttiTracer.agentRun(...)` / `.llmCall(...)` / `.toolCall(...)` directly should switch to `getTuttiTracer()` for the singleton instance, or rely on the automatic tracing now built into `AgentRunner`.
+
 ## [0.20.0] - 2026-04-14
 
 Four major features: graph-based routing, input/output guardrails, native scheduling, and time-travel debugging. 398 tests across the monorepo.

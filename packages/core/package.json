@@ -30,6 +30,7 @@
     "@opentelemetry/auto-instrumentations-node": "^0.72.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
     "@opentelemetry/sdk-node": "^0.214.0",
+    "@tuttiai/telemetry": "*",
     "@tuttiai/types": "*",
     "ioredis": "5.10.1",
     "openai": "4.104.0",
