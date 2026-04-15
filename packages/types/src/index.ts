@@ -19,6 +19,7 @@ export type {
   ToolMemoryHelpers,
   ToolContext,
   Tool,
+  UserMemoryToolHelpers,
   VoiceContext,
   Voice,
 } from "./voice.js";
