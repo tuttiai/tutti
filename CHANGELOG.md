@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added — Interrupt approval endpoints in `@tuttiai/server`
+- `GET /sessions/:sessionId/interrupts` — every interrupt request for a session regardless of status, oldest first.
+- `GET /interrupts/pending` — every pending request across every session. Powers monitoring dashboards.
+- `POST /interrupts/:interruptId/approve` — body `{ resolved_by?: string }`. 404 on unknown id; 409 with current record in body on already-resolved; 200 with the resolved request on success. Wakes the suspended tool call in the runtime.
+- `POST /interrupts/:interruptId/deny` — body `{ reason?: string; resolved_by?: string }`. Same 404/409 handling. Throws `InterruptDeniedError` into the waiting run, which the server's error handler maps to a 4xx/5xx on the original `/run` request with the denial reason in the body.
+- `GET /interrupts/stream` — Server-Sent Events. Forwards every `interrupt:requested` and `interrupt:resolved` event as a JSON frame of `{ type, data: InterruptRequest }`. Fetches the full record from the store on each event so the wire shape is authoritative and matches the REST endpoints. (SSE chosen over WebSocket to match the existing `/run/stream` + `/traces/stream` transport — no new dep.)
+- Every non-stream route returns 503 with a clear `interrupt_store_not_configured` error when the runtime has no store, rather than silently 404-ing forever.
+- `TuttiRuntime.interruptStore` exposed as a readonly public getter so server routes and dashboards can reach it without a second injection surface.
+- `InterruptStore.listBySession(session_id)` added to the interface — returns every request for a session regardless of status. Implemented by both `MemoryInterruptStore` and `PostgresInterruptStore`.
+- 13 server integration tests (cross-session listing, per-session listing with mixed statuses, full end-to-end approval + denial through a real agent loop, 404 / 409 / 503 / 401 error paths, empty-body deny) plus 4 new core tests for `listBySession`.
+
 ### Added — Human-in-the-loop interrupt system in `@tuttiai/core`
 - `AgentConfig.requireApproval?: string[] | "all" | false` — gate specific tool calls behind operator approval. Glob patterns (`*` is the only wildcard), `"all"` to gate every call, or `false` (default) to opt out.
 - New `InterruptStore` interface with `create` / `get` / `resolve` / `listPending`. `resolve` is idempotent on already-resolved ids; `listPending` is oldest-first and optionally filtered by `session_id`.
