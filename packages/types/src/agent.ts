@@ -167,6 +167,24 @@ export interface AgentConfig {
   streaming?: boolean;
   /** Allow the agent to pause and ask the human for input (default: false). */
   allow_human_input?: boolean;
+  /**
+   * Gate tool calls behind human approval. A tool call matching one of
+   * the configured patterns creates an {@link InterruptRequest} in the
+   * runtime's {@link InterruptStore} and pauses execution until an
+   * operator approves or denies it.
+   *
+   * - `string[]` — glob patterns matching tool names (e.g.
+   *   `['send_*', 'delete_*', 'payment_*']`). Only `*` is special
+   *   (matches any sequence); everything else is literal.
+   * - `'all'` — require approval for every tool call. Useful during
+   *   rollout of an untrusted agent or in compliance contexts.
+   * - `false` (default when omitted) — no approval required.
+   *
+   * Approval-gated calls bypass the tool-result cache — every run
+   * reaches the interrupt store, so repeat calls still prompt the
+   * operator even if the inputs match a cached call.
+   */
+  requireApproval?: string[] | "all" | false;
   /** Agent IDs this agent can delegate to via the orchestrator. */
   delegates?: string[];
   /** Role in the orchestration — orchestrator receives input first. */

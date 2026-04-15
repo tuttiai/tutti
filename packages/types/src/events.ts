@@ -30,7 +30,23 @@ export type TuttiEvent =
   | { type: "checkpoint:restored"; session_id: string; turn: number }
   | { type: "schedule:triggered"; schedule_id: string; agent_name: string }
   | { type: "schedule:completed"; schedule_id: string; agent_name: string; duration_ms: number }
-  | { type: "schedule:error"; schedule_id: string; agent_name: string; error: Error };
+  | { type: "schedule:error"; schedule_id: string; agent_name: string; error: Error }
+  | {
+      type: "interrupt:requested";
+      session_id: string;
+      tool_name: string;
+      interrupt_id: string;
+      tool_args: unknown;
+    }
+  | {
+      type: "interrupt:resolved";
+      session_id: string;
+      tool_name: string;
+      interrupt_id: string;
+      status: "approved" | "denied";
+      denial_reason?: string;
+      resolved_by?: string;
+    };
 
 export type TuttiEventType = TuttiEvent["type"];
 
