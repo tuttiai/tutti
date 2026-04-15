@@ -23,6 +23,46 @@ export interface AgentMemoryConfig {
 }
 
 /**
+ * Per-agent **user memory** configuration — facts the agent retains *about
+ * an end user* (preferences, prior context, profile data) that survive
+ * across sessions and get injected at run start when {@link AgentRunOptions.user_id}
+ * is set.
+ *
+ * Distinct from {@link AgentMemoryConfig} (semantic memory): semantic
+ * memory is keyed by `agent_name` and shared across all users; user
+ * memory is keyed by `user_id` and isolated per end-user.
+ *
+ * Design-only — no implementation yet. The runtime does not currently
+ * read this field.
+ */
+export interface AgentUserMemoryConfig {
+  /**
+   * Backend store. `"memory"` = ephemeral in-process; `"postgres"` =
+   * persistent. The runtime constructs the store via the same factory
+   * pattern used for {@link MemoryConfig}.
+   */
+  store: "memory" | "postgres";
+  /**
+   * Cap per user. When exceeded the store evicts the oldest /
+   * lowest-importance memory first. Default 200.
+   */
+  max_memories_per_user?: number;
+  /**
+   * How many memories the runtime injects into the system prompt at the
+   * start of every run with a `user_id`. Higher values give the agent
+   * more context but inflate token cost. Default 10.
+   */
+  inject_limit?: number;
+  /**
+   * When true, the runtime asks the LLM to extract new memories from
+   * the conversation after each run and writes them with
+   * `source: "inferred"`. Default false — explicit-only is the safer
+   * starting point.
+   */
+  auto_infer?: boolean;
+}
+
+/**
  * Per-agent durable-checkpoint configuration.
  *
  * When enabled, the runtime persists a {@link Checkpoint} at every turn
@@ -108,6 +148,21 @@ export interface AgentConfig {
   budget?: BudgetConfig;
   /** Semantic (long-term) memory configuration. */
   semantic_memory?: AgentMemoryConfig;
+  /**
+   * Memory configuration umbrella. Currently houses **user memory** —
+   * cross-session facts about an end user that get injected at run start
+   * when {@link AgentRunOptions.user_id} is provided.
+   *
+   * The existing {@link AgentConfig.semantic_memory} field is kept at the
+   * top level for backwards compatibility; a future revision may move it
+   * to `memory.semantic` under this same umbrella.
+   *
+   * Design-only — no implementation yet. The runtime does not currently
+   * read this field.
+   */
+  memory?: {
+    user_memory?: AgentUserMemoryConfig;
+  };
   /** Enable token-by-token streaming (default: false). */
   streaming?: boolean;
   /** Allow the agent to pause and ask the human for input (default: false). */

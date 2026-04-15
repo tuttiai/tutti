@@ -26,6 +26,7 @@ export type {
 export type {
   BudgetConfig,
   AgentMemoryConfig,
+  AgentUserMemoryConfig,
   AgentCacheConfig,
   AgentDurableConfig,
   AgentScheduleConfig,
