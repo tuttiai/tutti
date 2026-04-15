@@ -6,6 +6,10 @@ import {
   type SpanExporter,
 } from "@tuttiai/telemetry";
 import { AgentRunner } from "./agent-runner.js";
+import type {
+  AgentRunOptions,
+  UserMemoryStore,
+} from "./memory/user/types.js";
 import type { CheckpointStore } from "./checkpoint/index.js";
 import { EventBus } from "./event-bus.js";
 import { InMemorySessionStore } from "./session-store.js";
@@ -193,12 +197,20 @@ export class TuttiRuntime {
 
   /**
    * Run an agent by name with the given user input.
-   * Optionally pass a session_id to continue a conversation.
+   *
+   * @param agent_name - Agent key from the score's `agents` map.
+   * @param input - End-user message / prompt.
+   * @param session_id - Optional session to continue. Same semantics as
+   *   `options.session_id` (positional arg wins on conflict, kept for
+   *   back-compat).
+   * @param options - Additional run-level options, including `user_id`
+   *   which triggers user-memory fetch + inject at run start.
    */
   async run(
     agent_name: string,
     input: string,
     session_id?: string,
+    options?: AgentRunOptions,
   ): Promise<AgentResult> {
     const agentMap = new Map(Object.entries(this._score.agents));
     const agent = agentMap.get(agent_name);
@@ -218,7 +230,17 @@ export class TuttiRuntime {
       ? agent
       : { ...agent, model: this._score.default_model ?? "claude-sonnet-4-20250514" };
 
-    return this._runner.run(resolvedAgent, input, session_id);
+    return this._runner.run(resolvedAgent, input, session_id, options);
+  }
+
+  /**
+   * Pre-register a user-memory store for an agent so callers can inject
+   * a custom store (e.g. a wrapper that adds metrics) without going
+   * through the per-agent `createUserMemoryStore` factory. Forwards to
+   * the underlying {@link AgentRunner.setUserMemoryStore}.
+   */
+  setUserMemoryStore(agent_name: string, store: UserMemoryStore): void {
+    this._runner.setUserMemoryStore(agent_name, store);
   }
 
   /**

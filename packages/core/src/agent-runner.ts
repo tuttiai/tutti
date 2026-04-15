@@ -26,6 +26,13 @@ import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
+import { createUserMemoryStore } from "./memory/user/index.js";
+import type {
+  AgentRunOptions,
+  StoreOptions,
+  UserMemory,
+  UserMemoryStore,
+} from "./memory/user/types.js";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { getRunCost } from "@tuttiai/telemetry";
@@ -69,6 +76,12 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 
 export class AgentRunner {
   private pendingHitl = new Map<string, (answer: string) => void>();
+  /**
+   * Lazily-constructed user-memory stores keyed by agent name. One store
+   * per agent so different agents can pick different backends. Tests
+   * pre-populate via {@link setUserMemoryStore} to inject mocks.
+   */
+  private userMemoryStores = new Map<string, UserMemoryStore>();
 
   constructor(
     private provider: LLMProvider,
@@ -79,6 +92,31 @@ export class AgentRunner {
     private toolCache?: ToolCache,
     private checkpointStore?: CheckpointStore,
   ) {}
+
+  /**
+   * Test seam — pre-register a user-memory store for an agent so tests
+   * can inject mocks without going through `createUserMemoryStore`. Also
+   * useful for callers who want to share one store across multiple agents.
+   */
+  setUserMemoryStore(agent_name: string, store: UserMemoryStore): void {
+    this.userMemoryStores.set(agent_name, store);
+  }
+
+  /**
+   * Resolve the user-memory store for an agent, constructing it lazily
+   * from `agent.memory.user_memory` config on first use. Returns
+   * `undefined` when the agent has no user-memory configuration.
+   */
+  private getUserMemoryStore(agent: AgentConfig): UserMemoryStore | undefined {
+    const cfg = agent.memory?.user_memory;
+    if (!cfg) return undefined;
+    let store = this.userMemoryStores.get(agent.name);
+    if (!store) {
+      store = createUserMemoryStore(cfg);
+      this.userMemoryStores.set(agent.name, store);
+    }
+    return store;
+  }
 
   private async safeHook<T>(fn: (() => Promise<T> | T | undefined) | undefined): Promise<T | undefined> {
     if (!fn) return undefined;
@@ -103,15 +141,21 @@ export class AgentRunner {
     agent: AgentConfig,
     input: string,
     session_id?: string,
+    options?: AgentRunOptions,
   ): Promise<AgentResult> {
+    // session_id can come either from the positional arg (legacy) or the
+    // options bag (new). Positional wins on conflict for back-compat.
+    const resolvedSessionId = session_id ?? options?.session_id;
+    const userId = options?.user_id;
+
     // Resolve or create session
-    const session = session_id
-      ? this.sessions.get(session_id)
+    const session = resolvedSessionId
+      ? this.sessions.get(resolvedSessionId)
       : this.sessions.create(agent.name);
 
     if (!session) {
       throw new Error(
-        `Session not found: ${session_id}\n` +
+        `Session not found: ${resolvedSessionId}\n` +
         `The session may have expired or the ID is incorrect.\n` +
         `Omit session_id to start a new conversation.`,
       );
@@ -232,6 +276,33 @@ export class AgentRunner {
           "\n\nYou must respond with a valid JSON object matching this schema: " +
           JSON.stringify(outputJsonSchema) +
           ". No other text.";
+      }
+
+      // Inject user memories ONCE before the first turn, into the base
+      // prompt so they persist for every subsequent turn. Search uses the
+      // raw input so the most contextually relevant memories surface.
+      // No-op when either user_id or per-agent user_memory config is absent.
+      const userMemoryStore = this.getUserMemoryStore(agent);
+      let injectedUserMemories: UserMemory[] = [];
+      if (userId && userMemoryStore) {
+        const cfg = agent.memory!.user_memory!;
+        const limit = cfg.inject_limit ?? 10;
+        try {
+          injectedUserMemories = await userMemoryStore.search(userId, guardedInput, limit);
+        } catch (err) {
+          // User-memory failures are non-fatal — log and continue with
+          // an empty memory set rather than aborting the whole run.
+          logger.warn(
+            { error: err instanceof Error ? err.message : String(err), agent: agent.name, user_id: userId },
+            "User-memory search failed — continuing without injected memories",
+          );
+        }
+        if (injectedUserMemories.length > 0) {
+          baseSystemPrompt += "\n\nWhat I remember about you:\n" +
+            injectedUserMemories
+              .map((m) => "- " + m.content + " [importance: " + importanceLabel(m.importance) + "]")
+              .join("\n");
+        }
       }
 
       // Agentic loop. The try/catch around it only exists to surface the
@@ -392,7 +463,28 @@ export class AgentRunner {
         const toolContext: ToolContext = {
           session_id: session.id,
           agent_name: agent.name,
+          ...(userId !== undefined ? { user_id: userId } : {}),
         };
+
+        // Attach user-memory helpers when both the agent has user_memory
+        // configured and the run was started with a user_id. The bound
+        // userId is implicit — tool code does not pass it on every call.
+        // Defaults to importance: 3 (high) since explicit `remember()`
+        // calls from tool code reflect deliberate intent.
+        if (userId && userMemoryStore) {
+          const store = userMemoryStore;
+          toolContext.user_memory = {
+            remember: async (content, options) => {
+              const stored = await store.store(userId, content, {
+                source: "explicit",
+                importance: options?.importance ?? 3,
+                ...(options?.tags !== undefined ? { tags: options.tags } : {}),
+                ...(options?.expires_at !== undefined ? { expires_at: options.expires_at } : {}),
+              });
+              return { id: stored.id };
+            },
+          };
+        }
 
         // Attach memory helpers if semantic memory is enabled
         if (memCfg?.enabled && this.semanticMemory) {
@@ -599,8 +691,84 @@ export class AgentRunner {
       await this.safeHook(() => this.globalHooks?.afterAgentRun?.(hookCtx, agentResult));
       await this.safeHook(() => agentHooks?.afterAgentRun?.(hookCtx, agentResult));
 
+      // Auto-infer user memories from the conversation when enabled. Best
+      // effort — failures are logged and swallowed so a flaky inference
+      // pass never breaks the run for the caller.
+      if (
+        userId &&
+        userMemoryStore &&
+        agent.memory?.user_memory?.auto_infer === true
+      ) {
+        await this.inferAndStoreUserMemories(
+          agent,
+          userId,
+          messages,
+          userMemoryStore,
+        );
+      }
+
       return agentResult;
     });
+  }
+
+  /**
+   * Send the last few turns of the conversation to the LLM with an
+   * extraction prompt and store any returned facts as `inferred` memories.
+   *
+   * Best-effort: parsing failures, malformed responses, and provider
+   * errors are all logged and swallowed. Auto-infer must never abort
+   * the wider run.
+   */
+  private async inferAndStoreUserMemories(
+    agent: AgentConfig,
+    userId: string,
+    messages: ChatMessage[],
+    store: UserMemoryStore,
+  ): Promise<void> {
+    // Last 5 turns ≈ last 10 messages (one user + one assistant per turn).
+    // We don't try to be precise — the LLM does not need exact framing.
+    const recent = messages.slice(-10);
+    if (recent.length === 0) return;
+
+    const extractionPrompt =
+      "Extract 0–3 new factual memories about the user from this conversation. " +
+      "Return a JSON array of strings. Each string must be a single sentence " +
+      "starting with 'User'. Return [] if nothing new was learned.";
+
+    let response: ChatResponse;
+    try {
+      response = await this.provider.chat({
+        model: agent.model,
+        system: extractionPrompt,
+        messages: recent,
+      });
+    } catch (err) {
+      logger.warn(
+        { error: err instanceof Error ? err.message : String(err), agent: agent.name },
+        "User-memory auto-infer LLM call failed — skipping inference",
+      );
+      return;
+    }
+
+    const text = extractText(response.content).trim();
+    const facts = parseInferredMemories(text);
+    if (facts.length === 0) return;
+
+    for (const content of facts) {
+      try {
+        const opts: StoreOptions = { source: "inferred", importance: 2 };
+        await store.store(userId, content, opts);
+      } catch (err) {
+        logger.warn(
+          {
+            error: err instanceof Error ? err.message : String(err),
+            agent: agent.name,
+            user_id: userId,
+          },
+          "User-memory auto-infer store failed for one fact",
+        );
+      }
+    }
   }
 
   private async executeWithTimeout<T>(
@@ -896,4 +1064,44 @@ function extractText(content: string | ContentBlock[] | undefined): string {
     .filter((b) => b.type === "text")
     .map((b) => (b as { text: string }).text)
     .join("\n");
+}
+
+/** Render a UserMemoryImportance literal as a human-readable label. */
+function importanceLabel(importance: 1 | 2 | 3): string {
+  if (importance === 3) return "high";
+  if (importance === 1) return "low";
+  return "normal";
+}
+
+/**
+ * Parse the LLM's auto-infer response. Tolerates code-fenced JSON, prose
+ * around the array, and accidentally-doubled wrappers — the LLM does not
+ * always cooperate. Returns an empty array on any parse error rather
+ * than throwing; auto-infer is best-effort.
+ */
+function parseInferredMemories(text: string): string[] {
+  if (text === "") return [];
+  // Strip a single leading/trailing code fence if present.
+  let body = text.trim();
+  const fence = /^```(?:json)?\n?([\s\S]*?)\n?```$/;
+  const match = fence.exec(body);
+  if (match) body = match[1]!.trim();
+
+  // Find the first '[' and the matching last ']' — robust to leading prose.
+  const first = body.indexOf("[");
+  const last = body.lastIndexOf("]");
+  if (first === -1 || last === -1 || last < first) return [];
+  const sliced = body.slice(first, last + 1);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(sliced);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((x): x is string => typeof x === "string")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
