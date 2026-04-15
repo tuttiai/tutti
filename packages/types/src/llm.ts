@@ -54,6 +54,13 @@ export interface ChatResponse {
 export interface TokenUsage {
   input_tokens: number;
   output_tokens: number;
+  /**
+   * Estimated USD cost for these tokens. Populated by `@tuttiai/telemetry`
+   * on `AgentResult.usage` when the run's model is in the price table.
+   * Left unset on per-call `ChatResponse.usage` (LLM providers don't
+   * return cost).
+   */
+  cost_usd?: number;
 }
 
 export interface StreamChunk {

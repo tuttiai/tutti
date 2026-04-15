@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
 import type { TuttiSpan } from "@tuttiai/telemetry";
+import { getRunCost, registerModelPrice } from "@tuttiai/telemetry";
 
 import { AgentRunner } from "../src/agent-runner.js";
 import { EventBus } from "../src/event-bus.js";
@@ -309,6 +310,67 @@ describe("AgentRunner telemetry integration", () => {
     } finally {
       stop();
     }
+  });
+
+  it("records cost_usd on llm.completion spans for known models, surfaces it on result.usage and via getRunCost", async () => {
+    const provider = createMockProvider([textResponse("Hello!")]);
+    const runner = new AgentRunner(provider, new EventBus(), new InMemorySessionStore());
+
+    const { spans, stop } = captureClosedSpans();
+    try {
+      // gpt-4o: $5 / 1M input, $15 / 1M output. textResponse() returns
+      // input_tokens=10, output_tokens=5 — so expected cost is
+      // 10 × 5/1M + 5 × 15/1M = 0.00005 + 0.000075 = 0.000125.
+      const result = await runner.run({ ...simpleAgent, model: "gpt-4o" }, "Hi");
+
+      const llmSpan = spans.find((s) => s.name === "llm.completion");
+      expect(llmSpan?.attributes.cost_usd).toBeCloseTo(0.000125, 10);
+
+      // Per-run aggregate is attached to result.usage.cost_usd (consumers
+      // get cost without importing @tuttiai/telemetry directly).
+      expect(result.usage.cost_usd).toBeCloseTo(0.000125, 10);
+
+      // getRunCost reads the same data back from the singleton tracer.
+      expect(result.trace_id).toBeDefined();
+      const runCost = getRunCost(result.trace_id!);
+      expect(runCost.cost_usd).not.toBeNull();
+      expect(runCost.cost_usd!).toBeGreaterThan(0);
+      expect(runCost.cost_usd!).toBeCloseTo(0.000125, 10);
+      expect(runCost.prompt_tokens).toBe(10);
+      expect(runCost.completion_tokens).toBe(5);
+      expect(runCost.total_tokens).toBe(15);
+    } finally {
+      stop();
+    }
+  });
+
+  it("leaves cost_usd unset on result.usage when the model is not in the price table", async () => {
+    const provider = createMockProvider([textResponse("Hello!")]);
+    const runner = new AgentRunner(provider, new EventBus(), new InMemorySessionStore());
+
+    const result = await runner.run(
+      { ...simpleAgent, model: "totally-made-up-model" },
+      "Hi",
+    );
+
+    expect(result.usage.cost_usd).toBeUndefined();
+    expect(result.trace_id).toBeDefined();
+    expect(getRunCost(result.trace_id!).cost_usd).toBeNull();
+  });
+
+  it("picks up custom prices registered via registerModelPrice", async () => {
+    registerModelPrice("test-fine-tuned-model", 100, 200);
+
+    const provider = createMockProvider([textResponse("Hello!")]);
+    const runner = new AgentRunner(provider, new EventBus(), new InMemorySessionStore());
+
+    // 10 × 100/1M + 5 × 200/1M = 0.001 + 0.001 = 0.002
+    const result = await runner.run(
+      { ...simpleAgent, model: "test-fine-tuned-model" },
+      "Hi",
+    );
+
+    expect(result.usage.cost_usd).toBeCloseTo(0.002, 10);
   });
 
   it("subscriber callback exceptions never break the run", async () => {

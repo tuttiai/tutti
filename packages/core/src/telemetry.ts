@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 import {
-  TuttiTracer,
+  estimateCost,
+  getTuttiTracer,
   type GuardrailAction,
   type SpanKind,
   type TuttiSpanAttributes,
@@ -9,17 +10,11 @@ import {
 import type { ChatResponse, ToolResultBlock } from "@tuttiai/types";
 
 const otel = trace.getTracer("tutti", "1.0.0");
-const tracer = new TuttiTracer();
+const tracer = getTuttiTracer();
 const spanCtx = new AsyncLocalStorage<{ spanId: string; traceId: string }>();
 
-/**
- * Return the in-process span tracer singleton. Same instance is shared
- * across every agent run in this process, so external observers (Studio,
- * exporters, log sinks) can subscribe once and receive everything.
- */
-export function getTuttiTracer(): TuttiTracer {
-  return tracer;
-}
+// Re-export so consumers can import directly from @tuttiai/core.
+export { getTuttiTracer } from "@tuttiai/telemetry";
 
 /**
  * Trace id of the currently executing async context, or `undefined` when
@@ -167,11 +162,17 @@ export const Tracing = {
         otel: { name: "llm.call", attributes: { "llm.model": model } },
       },
       fn,
-      (response) => ({
-        prompt_tokens: response.usage.input_tokens,
-        completion_tokens: response.usage.output_tokens,
-        total_tokens: response.usage.input_tokens + response.usage.output_tokens,
-      }),
+      (response) => {
+        const prompt_tokens = response.usage.input_tokens;
+        const completion_tokens = response.usage.output_tokens;
+        const cost = estimateCost(model, prompt_tokens, completion_tokens);
+        return {
+          prompt_tokens,
+          completion_tokens,
+          total_tokens: prompt_tokens + completion_tokens,
+          ...(cost !== null ? { cost_usd: cost } : {}),
+        };
+      },
     );
   },
 

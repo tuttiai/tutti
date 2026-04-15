@@ -28,6 +28,7 @@ import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
+import { getRunCost } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId } from "./telemetry.js";
 import { ToolTimeoutError, ProviderError, RateLimitError, StructuredOutputError } from "./errors.js";
@@ -576,12 +577,20 @@ export class AgentRunner {
       });
 
       const trace_id = getCurrentTraceId();
+      // Aggregate per-call cost recorded on llm.completion spans into a
+      // single per-run figure. Null when no span had a known model price
+      // (e.g. fully custom model with no registerModelPrice call).
+      const runCost = trace_id !== undefined ? getRunCost(trace_id).cost_usd : null;
+      const usage: TokenUsage = {
+        ...totalUsage,
+        ...(runCost !== null ? { cost_usd: runCost } : {}),
+      };
       const agentResult: AgentResult = {
         session_id: session.id,
         output,
         messages,
         turns,
-        usage: totalUsage,
+        usage,
         ...(structuredResult !== undefined ? { structured: structuredResult } : {}),
         ...(trace_id !== undefined ? { trace_id } : {}),
       };

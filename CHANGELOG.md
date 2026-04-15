@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added — Per-run cost estimation in `@tuttiai/telemetry`
+- `MODEL_PRICES` table seeded with public USD-per-1M-token rates for `gpt-4o`, `gpt-4o-mini`, `claude-opus-4`, `claude-sonnet-4`, `claude-haiku-3-5`, `gemini-2-0-flash`. Frozen — mutate via `registerModelPrice(model, inputPer1M, outputPer1M)`.
+- `estimateCost(model, promptTokens, completionTokens): number | null` — model-aware cost calculator. Returns `null` for unregistered models so callers can detect missing pricing rather than silently falling back to zero.
+- `getRunCost(traceId, tracer?): RunCost` — aggregates every `llm.completion` span in a trace. Returns `{ prompt_tokens, completion_tokens, total_tokens, cost_usd }`. `cost_usd` is `null` only when *no* span had a known cost; mixed runs return the partial sum of known costs. Defaults to the singleton tracer.
+- `getTuttiTracer()` singleton accessor moved into `@tuttiai/telemetry` (was in core). Core now re-exports — same instance is shared across packages.
+- Per-call `cost_usd` is automatically recorded on every `llm.completion` span by the runtime's instrumentation.
+- Per-run `cost_usd` is automatically attached to `AgentResult.usage` so consumers get cost data without importing `@tuttiai/telemetry` directly.
+- `TokenUsage.cost_usd?: number` (optional addition, non-breaking).
+- `MODEL_PRICES`, `estimateCost`, `getRunCost`, `registerModelPrice`, `ModelPrice`, `RunCost` re-exported from `@tuttiai/core`.
+- 15 new unit tests in `cost.test.ts`, 3 new integration tests in `telemetry-integration.test.ts`.
+
 ### Added — `@tuttiai/telemetry@0.1.0` (in-process span tracer)
 - New `packages/telemetry` package — zero runtime deps beyond Node built-ins. Exports `TuttiTracer`, `TuttiSpan`, `TuttiSpanAttributes`, `SpanKind`, `SpanStatus`, `GuardrailAction`.
 - `TuttiTracer` class: `startSpan(name, kind, attributes?, parent_span_id?)`, `endSpan(span_id, status, extra_attributes?, error?)`, `getTrace(trace_id)`, `subscribe(cb)`. Bounded ring buffer (default 1000 spans, configurable via `max_spans`).

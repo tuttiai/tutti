@@ -46,7 +46,13 @@ export { createLogger, logger } from "./logger.js";
 
 // Telemetry
 export { getTuttiTracer, getCurrentTraceId, getCurrentSpanId } from "./telemetry.js";
-export { TuttiTracer } from "@tuttiai/telemetry";
+export {
+  TuttiTracer,
+  MODEL_PRICES,
+  estimateCost,
+  getRunCost,
+  registerModelPrice,
+} from "@tuttiai/telemetry";
 export type {
   TuttiSpan,
   TuttiSpanAttributes,
@@ -55,6 +61,8 @@ export type {
   SpanStatus,
   SpanSubscriber,
   GuardrailAction,
+  ModelPrice,
+  RunCost,
 } from "@tuttiai/telemetry";
 export { initTelemetry, shutdownTelemetry } from "./telemetry-setup.js";
 
