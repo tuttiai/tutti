@@ -11,6 +11,7 @@ import { registerRunRoute } from "./routes/run.js";
 import { registerStreamRoute } from "./routes/stream.js";
 import { registerSessionsRoute } from "./routes/sessions.js";
 import { registerGraphRoute } from "./routes/graph.js";
+import { registerTracesRoutes } from "./routes/traces.js";
 
 export {
   DEFAULT_HOST,
@@ -74,6 +75,7 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
   registerStreamRoute(app, config.runtime, config.agent_name);
   registerSessionsRoute(app, config.runtime);
   registerGraphRoute(app, config.graph);
+  registerTracesRoutes(app);
 
   return app;
 }
