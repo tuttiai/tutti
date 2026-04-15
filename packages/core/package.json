@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/core",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Tutti runtime — multi-agent orchestration for TypeScript",
   "type": "module",
   "exports": {

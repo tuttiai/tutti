@@ -1,5 +1,16 @@
 # @tuttiai/cli
 
+## 0.17.0
+
+### Minor Changes
+
+- Add `tutti-ai eval record/list/run` commands with CI mode, JUnit XML output, and diff display
+
+### Patch Changes
+
+- Updated dependencies
+  - @tuttiai/core@0.18.0
+
 ## 0.16.0
 
 ### Minor Changes

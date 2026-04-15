@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-04-15
+
+Four major features landed in this milestone — each one closes a specific gap Tutti had versus the broader agent-framework ecosystem:
+
+1. **Built-in OpenTelemetry tracing + local TUI** — every agent run, LLM call, and tool invocation is traced out of the box (no setup required), with a `tutti-ai traces` CLI and a `/traces` SSE stream for live tailing. Closes the observability gap against LangSmith / Langfuse without requiring a hosted backend.
+2. **User-scoped persistent memory** — `AgentConfig.memory.user_memory` gives agents cross-session facts about an end user, auto-injected into the system prompt and optionally auto-extracted from conversation. Backed by Postgres or in-memory with a `tutti-ai memory` CLI. Unique in the TypeScript agent ecosystem.
+3. **Human-in-the-loop approval flows** — `AgentConfig.requireApproval` gates specific tool calls behind operator approval via an `InterruptStore`. Server endpoints + SSE stream + `tutti-ai interrupts` TUI unblock enterprise rollouts where every outbound action must be reviewed.
+4. **Golden-dataset CI regression detection (eval v2)** — `tutti-ai eval record` promotes a production session to a pinned case; `tutti-ai eval run --ci` replays every case through the agent, scores with built-in or custom scorers (exact / similarity via OpenAI embeddings / tool-sequence / custom modules), emits JUnit XML, and fails the build on drift. Unique across every agent framework we're aware of.
+
+675 tests across the monorepo, 0 high-severity vulnerabilities, zero lint errors.
+
 ### Added — `tutti-ai eval run` CLI + CI integration
 - `tutti-ai eval run [--case <id>] [--tag <tag>] [--ci] [-s <path>]` — drives every golden case through `GoldenRunner`, prints per-case verdicts, and emits a summary footer (`N passed, M failed out of X cases | avg tokens: N | total cost: $X.XX`). Subcommand of the existing `eval` group (coexists with `eval record` / `eval list` / the positional suite runner).
 - `--case <id>` — filter by full id or any prefix (8-char prefixes from `eval list` work); `--tag <tag>` — filter by tag membership. Both ANDed when combined.
@@ -163,6 +174,13 @@
 
 ### Breaking
 - The `TuttiTracer` re-export from `@tuttiai/core` is now the `TuttiTracer` *class* from `@tuttiai/telemetry`, not the previous OpenTelemetry-wrapper *object*. Callers using `TuttiTracer.agentRun(...)` / `.llmCall(...)` / `.toolCall(...)` directly should switch to `getTuttiTracer()` for the singleton instance, or rely on the automatic tracing now built into `AgentRunner`.
+
+### Package versions
+- `@tuttiai/types` 0.9.0
+- `@tuttiai/telemetry` 0.2.0
+- `@tuttiai/core` 0.18.0
+- `@tuttiai/server` 0.2.0
+- `@tuttiai/cli` 0.17.0
 
 ## [0.20.0] - 2026-04-14
 

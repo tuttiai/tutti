@@ -1,5 +1,11 @@
 # @tuttiai/core
 
+## 0.18.0
+
+### Minor Changes
+
+- Add golden dataset eval system: GoldenStore, ExactScorer, SimilarityScorer, ToolSequenceScorer, CustomScorer, and GoldenRun runner
+
 ## 0.17.0
 
 ### Minor Changes
