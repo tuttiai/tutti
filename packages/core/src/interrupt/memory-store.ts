@@ -77,4 +77,14 @@ export class MemoryInterruptStore implements InterruptStore {
     pending.sort((a, b) => a.requested_at.getTime() - b.requested_at.getTime());
     return Promise.resolve(pending);
   }
+
+  listBySession(session_id: string): Promise<InterruptRequest[]> {
+    const rows: InterruptRequest[] = [];
+    for (const r of this.byId.values()) {
+      if (r.session_id !== session_id) continue;
+      rows.push(r);
+    }
+    rows.sort((a, b) => a.requested_at.getTime() - b.requested_at.getTime());
+    return Promise.resolve(rows);
+  }
 }

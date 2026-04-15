@@ -100,6 +100,13 @@ export class TuttiRuntime {
   readonly events: EventBus;
   readonly semanticMemory: SemanticMemoryStore;
   readonly toolCache: ToolCache;
+  /**
+   * The interrupt store injected via {@link TuttiRuntimeOptions.interruptStore},
+   * exposed so consumers (HTTP routes, dashboards, CLI tools) can list
+   * and inspect interrupts without reaching into the runner. Undefined
+   * when no store was configured.
+   */
+  readonly interruptStore: InterruptStore | undefined;
   private _sessions: SessionStore;
   private _runner: AgentRunner;
   private _score: ScoreConfig;
@@ -112,6 +119,7 @@ export class TuttiRuntime {
     this._sessions = options.sessionStore ?? TuttiRuntime.createStore(score);
     this.semanticMemory = new InMemorySemanticStore();
     this.toolCache = new InMemoryToolCache();
+    this.interruptStore = options.interruptStore;
     this._runner = new AgentRunner(
       score.provider,
       this.events,

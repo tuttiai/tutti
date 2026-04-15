@@ -125,3 +125,40 @@ describe("MemoryInterruptStore — listPending", () => {
     expect(await store.listPending("any-session")).toEqual([]);
   });
 });
+
+describe("MemoryInterruptStore — listBySession", () => {
+  let store: MemoryInterruptStore;
+  beforeEach(() => {
+    store = new MemoryInterruptStore();
+  });
+
+  it("returns every request for the session regardless of status, oldest first", async () => {
+    const a = await store.create({ session_id: SESSION, tool_name: "a", tool_args: {} });
+    await new Promise((r) => setTimeout(r, 5));
+    const b = await store.create({ session_id: SESSION, tool_name: "b", tool_args: {} });
+    await new Promise((r) => setTimeout(r, 5));
+    const c = await store.create({ session_id: SESSION, tool_name: "c", tool_args: {} });
+
+    await store.resolve(a.interrupt_id, "approved", { resolved_by: "alex" });
+    await store.resolve(b.interrupt_id, "denied", { denial_reason: "no" });
+    // c stays pending
+
+    const rows = await store.listBySession(SESSION);
+    expect(rows.map((r) => r.tool_name)).toEqual(["a", "b", "c"]);
+    expect(rows.map((r) => r.status)).toEqual(["approved", "denied", "pending"]);
+    expect(rows[0]!.interrupt_id).toBe(a.interrupt_id);
+    expect(rows[2]!.interrupt_id).toBe(c.interrupt_id);
+  });
+
+  it("isolates results by session_id", async () => {
+    await store.create({ session_id: "sess-a", tool_name: "x", tool_args: {} });
+    await store.create({ session_id: "sess-b", tool_name: "y", tool_args: {} });
+    const onlyA = await store.listBySession("sess-a");
+    expect(onlyA).toHaveLength(1);
+    expect(onlyA[0]!.tool_name).toBe("x");
+  });
+
+  it("returns an empty array for an unknown session", async () => {
+    expect(await store.listBySession("never-created")).toEqual([]);
+  });
+});

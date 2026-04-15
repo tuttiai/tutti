@@ -24,6 +24,9 @@ import type {
  * - `listPending` — every request currently in the `"pending"` state,
  *   ordered oldest-first. Optionally filtered by `session_id` for UIs
  *   that show a per-run review queue.
+ * - `listBySession` — every request for one session regardless of
+ *   status, oldest-first. Used by per-session review views that need
+ *   to show approved / denied history alongside pending items.
  */
 export interface InterruptStore {
   create(input: InterruptCreateInput): Promise<InterruptRequest>;
@@ -34,4 +37,5 @@ export interface InterruptStore {
     options?: ResolveOptions,
   ): Promise<InterruptRequest>;
   listPending(session_id?: string): Promise<InterruptRequest[]>;
+  listBySession(session_id: string): Promise<InterruptRequest[]>;
 }

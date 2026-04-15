@@ -155,6 +155,19 @@ export class PostgresInterruptStore implements InterruptStore {
     return result.rows.map(rowToRequest);
   }
 
+  async listBySession(session_id: string): Promise<InterruptRequest[]> {
+    await this.ensureSchema();
+    const result = await this.pool.query<InterruptRow>(
+      "SELECT id, session_id, tool_name, tool_args, status, " +
+        "requested_at, resolved_at, resolved_by, denial_reason " +
+        "FROM " + this.table + " " +
+        "WHERE session_id = $1 " +
+        "ORDER BY requested_at ASC",
+      [session_id],
+    );
+    return result.rows.map(rowToRequest);
+  }
+
   /** Close the connection pool. Call on shutdown. */
   async close(): Promise<void> {
     await this.pool.end();

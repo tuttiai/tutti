@@ -140,6 +140,26 @@ suite("PostgresInterruptStore (integration)", () => {
     expect(onlyB.some((p) => p.tool_name === "y")).toBe(true);
   });
 
+  it("listBySession returns every status for the session, oldest first", async () => {
+    const sess = SESSION_A + "-by-session";
+    const a = await store.create({ session_id: sess, tool_name: "a", tool_args: {} });
+    await new Promise((r) => setTimeout(r, 20));
+    const b = await store.create({ session_id: sess, tool_name: "b", tool_args: {} });
+    await new Promise((r) => setTimeout(r, 20));
+    const c = await store.create({ session_id: sess, tool_name: "c", tool_args: {} });
+
+    await store.resolve(a.interrupt_id, "approved");
+    await store.resolve(b.interrupt_id, "denied", { denial_reason: "no" });
+
+    const rows = await store.listBySession(sess);
+    expect(rows.map((r) => r.interrupt_id)).toEqual([
+      a.interrupt_id,
+      b.interrupt_id,
+      c.interrupt_id,
+    ]);
+    expect(rows.map((r) => r.status)).toEqual(["approved", "denied", "pending"]);
+  });
+
   it("rejects invalid table identifiers in the constructor", () => {
     expect(
       () =>
