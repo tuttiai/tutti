@@ -2,11 +2,9 @@ import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import Enquirer from "enquirer";
-import { createLogger } from "@tuttiai/core";
 import { TEMPLATES, getTemplate } from "../templates/index.js";
 import type { Template } from "../templates/index.js";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 const { prompt } = Enquirer;
 

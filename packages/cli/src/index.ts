@@ -1,8 +1,7 @@
 import { config } from "dotenv";
 config();
 
-import { createLogger } from "@tuttiai/core";
-const logger = createLogger("tutti-cli");
+import { logger } from "./logger.js";
 
 process.on("unhandledRejection", (reason) => {
   logger.error({ error: reason instanceof Error ? reason.message : String(reason) }, "Unhandled rejection");

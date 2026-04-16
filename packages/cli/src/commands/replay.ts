@@ -17,7 +17,6 @@ import {
   ScoreLoader,
   TuttiRuntime,
   SecretsManager,
-  createLogger,
 } from "@tuttiai/core";
 import type { Session } from "@tuttiai/types";
 import {
@@ -38,8 +37,7 @@ export {
   exportJSON,
   exportMarkdown,
 } from "./replay-render.js";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 // ── REPL ─────────────────────────────────────────────────────
 

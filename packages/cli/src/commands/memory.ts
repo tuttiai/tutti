@@ -16,7 +16,6 @@ import {
   MemoryUserMemoryStore,
   PostgresUserMemoryStore,
   SecretsManager,
-  createLogger,
   type UserMemoryImportance,
   type UserMemoryStore,
 } from "@tuttiai/core";
@@ -30,8 +29,7 @@ import {
   renderMemoryList,
   renderMemorySearch,
 } from "./memory-render.js";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 const { prompt } = Enquirer;
 
 /** Common opts every subcommand accepts. */

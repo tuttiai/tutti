@@ -6,11 +6,9 @@ import {
   ScoreLoader,
   EvalRunner,
   printEvalTable,
-  createLogger,
 } from "@tuttiai/core";
 import type { EvalSuite } from "@tuttiai/core";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 export async function evalCommand(suitePath: string, opts: { ci?: boolean; score?: string }): Promise<void> {
   const suiteFile = resolve(suitePath);

@@ -4,10 +4,10 @@ import { execSync } from "node:child_process";
 import chalk from "chalk";
 import ora from "ora";
 import Enquirer from "enquirer";
-import { createLogger, SecretsManager } from "@tuttiai/core";
+import { SecretsManager } from "@tuttiai/core";
+import { logger } from "../logger.js";
 
 const { prompt } = Enquirer;
-const logger = createLogger("tutti-cli");
 
 interface PkgJson {
   name?: string;

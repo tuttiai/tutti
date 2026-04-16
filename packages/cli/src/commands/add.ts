@@ -3,9 +3,7 @@ import { resolve } from "node:path";
 import { execSync } from "node:child_process";
 import chalk from "chalk";
 import ora from "ora";
-import { createLogger } from "@tuttiai/core";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 const OFFICIAL_VOICES = new Map<string, { package: string; setup: string }>([
   ["filesystem", {

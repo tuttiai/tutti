@@ -9,14 +9,12 @@ import {
   GeminiProvider,
   SecretsManager,
   InMemorySessionStore,
-  createLogger,
 } from "@tuttiai/core";
 import type { ScoreConfig, SessionStore } from "@tuttiai/types";
 import { createServer, DEFAULT_PORT, SERVER_VERSION } from "@tuttiai/server";
 import type { FastifyInstance } from "fastify";
 import { ReactiveScore } from "../watch/score-watcher.js";
-
-const logger = createLogger("tutti-serve");
+import { logger } from "../logger.js";
 
 export interface ServeOptions {
   port?: string;

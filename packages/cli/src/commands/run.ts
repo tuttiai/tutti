@@ -11,12 +11,10 @@ import {
   GeminiProvider,
   SecretsManager,
   InMemorySessionStore,
-  createLogger,
 } from "@tuttiai/core";
 import type { ScoreConfig, SessionStore } from "@tuttiai/types";
 import { ReactiveScore } from "../watch/score-watcher.js";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 export interface RunOptions {
   /** Reload the score on file changes. */

@@ -16,7 +16,6 @@ import {
   GoldenRunner,
   JsonFileGoldenStore,
   ScoreLoader,
-  createLogger,
   type GoldenCase,
   type GoldenRun,
   type GoldenStore,
@@ -31,8 +30,7 @@ import {
   renderSummary,
 } from "./eval-run-render.js";
 import { toJunitXml, type JunitRow } from "./eval-run-junit.js";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 /** CLI flags for `tutti-ai eval run`. */
 export interface EvalRunOptions {

@@ -8,9 +8,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import chalk from "chalk";
-import { ScoreLoader, createLogger } from "@tuttiai/core";
-
-const logger = createLogger("tutti-cli");
+import { ScoreLoader } from "@tuttiai/core";
+import { logger } from "../logger.js";
 
 function pad(s: string, len: number): string {
   return s.length >= len ? s : s + " ".repeat(len - s.length);

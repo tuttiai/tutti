@@ -2,9 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
-import { createLogger } from "@tuttiai/core";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 const REGISTRY_URL =
   "https://raw.githubusercontent.com/tuttiai/voices/main/voices.json";

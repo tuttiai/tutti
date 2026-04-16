@@ -11,11 +11,10 @@ import {
   SecretsManager,
   TuttiRuntime,
   createCheckpointStore,
-  createLogger,
   type Checkpoint,
   type ChatMessage,
 } from "@tuttiai/core";
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 export interface ResumeOptions {
   /** Which durable store the checkpoint was written to. */

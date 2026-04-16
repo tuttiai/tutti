@@ -7,10 +7,8 @@ import {
   OpenAIProvider,
   GeminiProvider,
   SecretsManager,
-  createLogger,
 } from "@tuttiai/core";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 const ok = (msg: string): void => { console.log(chalk.green("  \u2714 " + msg)); };
 const fail = (msg: string): void => { console.log(chalk.red("  \u2718 " + msg)); };

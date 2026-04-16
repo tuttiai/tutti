@@ -6,11 +6,9 @@ import chalk from "chalk";
 import {
   TuttiRuntime,
   ScoreLoader,
-  createLogger,
 } from "@tuttiai/core";
 import type { Response as ExpressResponse } from "express";
-
-const logger = createLogger("tutti-studio");
+import { logger } from "../logger.js";
 const envPort = Number.parseInt(process.env.PORT ?? "", 10);
 const PORT = Number.isInteger(envPort) && envPort > 0 && envPort <= 65535 ? envPort : 4747;
 

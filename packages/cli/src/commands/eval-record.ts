@@ -21,7 +21,6 @@ import {
   JsonFileGoldenStore,
   PostgresSessionStore,
   SecretsManager,
-  createLogger,
   type GoldenCase,
   type ScorerRef,
   type Session,
@@ -37,8 +36,7 @@ import {
   renderSessionSummary,
   type RecordAnswers,
 } from "./eval-record-render.js";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 const { prompt } = Enquirer;
 
 const LOCAL_SESSION_DIR = ".tutti/sessions";

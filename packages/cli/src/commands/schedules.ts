@@ -17,11 +17,9 @@ import {
   EventBus,
   InMemorySessionStore,
   SecretsManager,
-  createLogger,
 } from "@tuttiai/core";
 import type { ScheduleStore, ScheduleRecord } from "@tuttiai/core";
-
-const logger = createLogger("tutti-cli");
+import { logger } from "../logger.js";
 
 function resolveStore(): ScheduleStore {
   const pgUrl = SecretsManager.optional("TUTTI_PG_URL");
