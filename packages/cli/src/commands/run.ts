@@ -11,6 +11,7 @@ import {
   GeminiProvider,
   SecretsManager,
   InMemorySessionStore,
+  logger as coreLogger,
 } from "@tuttiai/core";
 import type { ScoreConfig, SessionStore } from "@tuttiai/types";
 import { ReactiveScore } from "../watch/score-watcher.js";
@@ -199,6 +200,15 @@ export async function runCommand(
       );
     });
   }
+
+  // Mute info-level logs during the REPL. The event listeners already
+  // provide all the UX (spinner, streaming text, tool names). Letting
+  // the core + CLI loggers emit info lines ("Runtime initialized",
+  // "Agent started", "Running agent", …) causes pino-pretty's async
+  // output to interleave with readline's `> ` prompt — making it look
+  // like the process exited when it's actually waiting for input.
+  coreLogger.level = "warn";
+  logger.level = "warn";
 
   // REPL
   console.log(chalk.dim('Tutti REPL — type "exit" to quit\n'));
