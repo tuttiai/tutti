@@ -80,6 +80,14 @@ export async function runCommand(
 
   const spinner = ora({ color: "cyan" });
 
+  // Mute info-level logs during the REPL. The event listeners already
+  // provide all the UX (spinner, streaming text, tool names). Letting
+  // the core + CLI loggers emit info lines ("Runtime initialized",
+  // "Agent started", …) causes pino-pretty's async output to
+  // interleave with readline's `> ` prompt.
+  coreLogger.level = "warn";
+  logger.level = "warn";
+
   // REPL-level state. `streaming` resets per turn; `runtime` may be
   // swapped by the hot-reload path below.
   let streaming = false;
@@ -88,6 +96,10 @@ export async function runCommand(
   attachListeners(runtime);
 
   // REPL readline — created early so the HITL handler below can use it.
+  // Ensure stdin stays in "flowing" mode so Node's event loop doesn't
+  // exit prematurely after the agent run completes (the runtime's async
+  // work may ref/unref internal handles that leave no remaining work).
+  process.stdin.ref();
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -201,15 +213,6 @@ export async function runCommand(
     });
   }
 
-  // Mute info-level logs during the REPL. The event listeners already
-  // provide all the UX (spinner, streaming text, tool names). Letting
-  // the core + CLI loggers emit info lines ("Runtime initialized",
-  // "Agent started", "Running agent", …) causes pino-pretty's async
-  // output to interleave with readline's `> ` prompt — making it look
-  // like the process exited when it's actually waiting for input.
-  coreLogger.level = "warn";
-  logger.level = "warn";
-
   // REPL
   console.log(chalk.dim('Tutti REPL — type "exit" to quit\n'));
   if (options.watch) {
@@ -218,8 +221,15 @@ export async function runCommand(
 
   let sessionId: string | undefined;
 
+  // Keepalive: pino-pretty's worker-thread transport can unref internal
+  // handles after an agent run completes, leaving zero remaining work in
+  // the event loop — Node exits before readline has a chance to prompt.
+  // A simple interval keeps the loop alive until the REPL exits normally.
+  const keepalive = setInterval(() => {}, 60_000);
+
   // Handle Ctrl+C cleanly
   process.on("SIGINT", () => {
+    clearInterval(keepalive);
     if (streaming) process.stdout.write("\n");
     spinner.stop();
     console.log(chalk.dim("Goodbye!"));
@@ -268,10 +278,15 @@ export async function runCommand(
         );
       }
     }
-  } catch {
-    // readline closed
+  } catch (err) {
+    // readline closed — or an unexpected error broke the loop.
+    // Log it so silent exits are diagnosable.
+    if (err instanceof Error && err.message !== "readline was closed") {
+      console.error(chalk.red("REPL error: " + err.message));
+    }
   }
 
+  clearInterval(keepalive);
   console.log(chalk.dim("Goodbye!"));
   rl.close();
   if (reactive) await reactive.close();
