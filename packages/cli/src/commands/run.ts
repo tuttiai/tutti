@@ -18,9 +18,19 @@ import { ReactiveScore } from "../watch/score-watcher.js";
 import { logger } from "../logger.js";
 
 export interface RunOptions {
-  /** Reload the score on file changes. */
   watch?: boolean;
 }
+
+/**
+ * Write a line to stderr. Readline owns stdout; writing to stdout
+ * during an agent run corrupts readline's internal cursor tracking and
+ * keypress handling (backspace shows `^?`, arrows show `^[[D`). Stderr
+ * still appears in the terminal but readline doesn't track it, so its
+ * state stays clean between prompts.
+ */
+const out = (s: string): void => {
+  process.stderr.write(s);
+};
 
 export async function runCommand(
   scorePath?: string,
@@ -45,7 +55,6 @@ export async function runCommand(
     process.exit(1);
   }
 
-  // Validate that the provider has a valid API key
   const providerKeyMap: [unknown, string][] = [
     [AnthropicProvider, "ANTHROPIC_API_KEY"],
     [OpenAIProvider, "OPENAI_API_KEY"],
@@ -62,7 +71,6 @@ export async function runCommand(
     }
   }
 
-  // Enable streaming on every agent in the score.
   const applyRunDefaults = (cfg: ScoreConfig): void => {
     for (const agent of Object.values(cfg.agents)) {
       agent.streaming = true;
@@ -74,20 +82,30 @@ export async function runCommand(
     ? new InMemorySessionStore()
     : undefined;
 
-  const spinner = ora({ color: "cyan" });
+  // `discardStdin: false` is critical. Ora's default behaviour uses
+  // `stdin-discarder` which calls `process.stdin.setRawMode(false)` on
+  // spinner.stop(). Readline needs raw mode ON to handle backspace and
+  // arrow keys — once stdin-discarder flips it off, readline's keypress
+  // processing breaks and the user sees literal ^? / ^[[D characters.
+  const spinner = ora({ color: "cyan", stream: process.stderr, discardStdin: false });
 
-  // Silence pino during the REPL. Any pino output fires via
-  // pino-pretty's async worker-thread transport which writes to stdout
-  // and interferes with readline.
+  // Silence pino — the REPL's event listeners provide all the UX.
   coreLogger.level = "silent";
   logger.level = "silent";
 
   let streaming = false;
   let runtime = buildRuntime(score, sharedSessions);
 
+  // Single readline for the entire REPL — never closed until exit.
+  // All agent output goes to stderr so readline's stdout-based keypress
+  // handling stays clean across turns.
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
   attachListeners(runtime);
 
-  // Wire per-runtime listeners.
   function attachListeners(r: TuttiRuntime): void {
     r.events.on("llm:request", () => {
       spinner.start("Thinking...");
@@ -98,12 +116,12 @@ export async function runCommand(
         spinner.stop();
         streaming = true;
       }
-      process.stdout.write(e.text);
+      out(e.text);
     });
 
     r.events.on("llm:response", () => {
       if (streaming) {
-        process.stdout.write("\n");
+        out("\n");
       } else {
         spinner.stop();
       }
@@ -111,30 +129,48 @@ export async function runCommand(
 
     r.events.on("tool:start", (e) => {
       if (streaming) {
-        process.stdout.write(chalk.dim("\n  [using: " + e.tool_name + "]"));
+        out(chalk.dim("\n  [using: " + e.tool_name + "]"));
       } else {
         spinner.stop();
-        console.log(chalk.dim("  [using: " + e.tool_name + "]"));
+        out(chalk.dim("  [using: " + e.tool_name + "]\n"));
       }
     });
 
     r.events.on("tool:end", (e) => {
       if (streaming) {
-        process.stdout.write(chalk.dim("  [done: " + e.tool_name + "]\n"));
+        out(chalk.dim("  [done: " + e.tool_name + "]\n"));
       }
     });
 
     r.events.on("tool:error", (e) => {
       spinner.stop();
-      console.error(chalk.red("  Tool error: " + e.tool_name));
+      out(chalk.red("  Tool error: " + e.tool_name) + "\n");
     });
 
     r.events.on("budget:warning", () => {
-      console.error(chalk.yellow("  Approaching token budget (80%)"));
+      out(chalk.yellow("  Approaching token budget (80%)") + "\n");
     });
 
     r.events.on("budget:exceeded", () => {
-      console.error(chalk.red("  Token budget exceeded — stopping"));
+      out(chalk.red("  Token budget exceeded — stopping") + "\n");
+    });
+
+    r.events.on("hitl:requested", (e) => {
+      spinner.stop();
+      if (streaming) { out("\n"); streaming = false; }
+      out(
+        "\n" +
+        chalk.yellow("  " + chalk.bold("[Agent needs input]") + " " + e.question) +
+        "\n",
+      );
+      if (e.options) {
+        e.options.forEach((opt, i) => {
+          out(chalk.yellow("    " + (i + 1) + ". " + opt) + "\n");
+        });
+      }
+      void rl.question(chalk.yellow("  > ")).then((answer) => {
+        runtime.answer(e.session_id, answer.trim());
+      });
     });
   }
 
@@ -143,37 +179,34 @@ export async function runCommand(
   if (options.watch) {
     reactive = new ReactiveScore(score, file);
     reactive.on("file-change", () => {
-      console.log(chalk.cyan("\n[tutti] Score changed, reloading..."));
+      out(chalk.cyan("\n[tutti] Score changed, reloading...") + "\n");
     });
     reactive.on("reloaded", () => {
-      console.log(chalk.green("[tutti] Score reloaded. Changes applied."));
+      out(chalk.green("[tutti] Score reloaded. Changes applied.") + "\n");
     });
     reactive.on("reload-failed", (err) => {
-      console.error(
-        chalk.red("[tutti] Reload failed — using previous config: " +
-          (err instanceof Error ? err.message : String(err))),
+      out(
+        chalk.red("[tutti] Reload failed — " +
+          (err instanceof Error ? err.message : String(err))) + "\n",
       );
     });
   }
 
   // REPL
-  console.log(chalk.dim('Tutti REPL — type "exit" to quit\n'));
+  out(chalk.dim('Tutti REPL — type "exit" to quit') + "\n\n");
   if (options.watch) {
-    console.log(chalk.dim("Watching " + file + " for changes…\n"));
+    out(chalk.dim("Watching " + file + " for changes…") + "\n\n");
   }
 
   let sessionId: string | undefined;
-
-  // Keepalive: prevent the event loop from exiting while waiting for
-  // user input between turns.
   const keepalive = setInterval(() => {}, 60_000);
 
-  // Handle Ctrl+C cleanly
   process.on("SIGINT", () => {
     clearInterval(keepalive);
-    if (streaming) process.stdout.write("\n");
+    if (streaming) out("\n");
     spinner.stop();
-    console.log(chalk.dim("Goodbye!"));
+    out(chalk.dim("Goodbye!") + "\n");
+    rl.close();
     if (reactive) void reactive.close();
     process.exit(0);
   });
@@ -188,14 +221,8 @@ export async function runCommand(
         reactive.consumePendingReload();
       }
 
-      // Create a fresh readline interface for each prompt. Streaming
-      // output (process.stdout.write) during the agent run corrupts
-      // readline's internal cursor tracking and key handling — the
-      // backspace key shows literal ^? and arrows show ^[[D on
-      // subsequent question() calls from the same interface. A fresh
-      // interface has clean state every turn.
       spinner.stop();
-      const input = await askQuestion(chalk.cyan("> "));
+      const input = await rl.question(chalk.cyan("> "));
       const trimmed = input.trim();
 
       if (!trimmed) continue;
@@ -208,47 +235,30 @@ export async function runCommand(
         sessionId = result.session_id;
 
         if (!streaming) {
-          console.log("\n" + result.output + "\n");
+          out("\n" + result.output + "\n\n");
         } else {
-          console.log();
+          out("\n");
         }
       } catch (err) {
-        if (streaming) process.stdout.write("\n");
+        if (streaming) out("\n");
         spinner.stop();
-        console.error(
+        out(
           chalk.red("  Error: " +
-            (err instanceof Error ? err.message : String(err))),
+            (err instanceof Error ? err.message : String(err))) + "\n",
         );
       }
     }
   } catch (err) {
     if (err instanceof Error && err.message !== "readline was closed") {
-      console.error(chalk.red("REPL error: " + err.message));
+      out(chalk.red("REPL error: " + err.message) + "\n");
     }
   }
 
   clearInterval(keepalive);
-  console.log(chalk.dim("Goodbye!"));
+  out(chalk.dim("Goodbye!") + "\n");
+  rl.close();
   if (reactive) await reactive.close();
   process.exit(0);
-}
-
-/**
- * Prompt the user with a fresh readline interface. The interface is
- * created and closed per-call so that stdout writes during the agent
- * run (streaming tokens, spinner, tool notifications) cannot corrupt
- * readline's internal key-handling state between turns.
- */
-async function askQuestion(prompt: string): Promise<string> {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  try {
-    return await rl.question(prompt);
-  } finally {
-    rl.close();
-  }
 }
 
 function buildRuntime(
