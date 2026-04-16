@@ -80,13 +80,14 @@ export async function runCommand(
 
   const spinner = ora({ color: "cyan" });
 
-  // Mute info-level logs during the REPL. The event listeners already
-  // provide all the UX (spinner, streaming text, tool names). Letting
-  // the core + CLI loggers emit info lines ("Runtime initialized",
-  // "Agent started", …) causes pino-pretty's async output to
-  // interleave with readline's `> ` prompt.
-  coreLogger.level = "warn";
-  logger.level = "warn";
+  // Silence pino during the REPL. The event listeners already provide
+  // all the UX (spinner, streaming text, tool names). Any pino output —
+  // even WARN — fires via pino-pretty's async worker-thread transport
+  // which writes to stdout while ora's spinner holds the cursor. This
+  // corrupts the terminal's line discipline and breaks readline's
+  // backspace / arrow-key handling on subsequent prompts.
+  coreLogger.level = "silent";
+  logger.level = "silent";
 
   // REPL-level state. `streaming` resets per turn; `runtime` may be
   // swapped by the hot-reload path below.
@@ -251,6 +252,9 @@ export async function runCommand(
         reactive.consumePendingReload();
       }
 
+      // Defensive: ensure ora has fully released the terminal before
+      // readline takes over — a stale spinner corrupts line editing.
+      spinner.stop();
       const input = await rl.question(chalk.cyan("> "));
       const trimmed = input.trim();
 
