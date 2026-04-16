@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/cli",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "Tutti CLI — scaffold and run multi-agent projects",
   "type": "module",
   "bin": {
@@ -30,7 +30,7 @@
     "@tuttiai/types": "*",
     "chalk": "5.6.2",
     "chokidar": "5.0.0",
-    "commander": "4.1.1",
+    "commander": "13.1.0",
     "dotenv": "17.4.1",
     "enquirer": "2.4.1",
     "express": "^5.2.1",

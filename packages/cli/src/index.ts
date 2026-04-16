@@ -186,22 +186,15 @@ program
   });
 
 const evalCmd = program
-  .command("eval [suite-file]")
-  .description("Run an evaluation suite against a score")
+  .command("eval")
+  .description("Evaluation commands — run suites, manage golden cases, CI regression");
+
+evalCmd
+  .command("suite <suite-file>")
+  .description("Run an evaluation suite against a score (v1 assertion-based)")
   .option("--ci", "Exit with code 1 if any case fails")
   .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
-  .action(async (
-    suitePath: string | undefined,
-    opts: { ci?: boolean; score?: string },
-  ) => {
-    if (!suitePath) {
-      console.error(
-        "Usage: tutti-ai eval <suite-file>\n" +
-          "       tutti-ai eval record <session-id>\n" +
-          "       tutti-ai eval list",
-      );
-      process.exit(1);
-    }
+  .action(async (suitePath: string, opts: { ci?: boolean; score?: string }) => {
     await evalCommand(suitePath, opts);
   });
 
