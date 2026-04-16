@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/filesystem",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Filesystem voice for Tutti — read, write, and search files",
   "type": "module",
   "exports": {
