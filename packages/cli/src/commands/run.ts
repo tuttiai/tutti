@@ -62,8 +62,7 @@ export async function runCommand(
     }
   }
 
-  // Enable streaming on every agent in the score. Factored out so we can
-  // reapply it after a hot-reload in watch mode.
+  // Enable streaming on every agent in the score.
   const applyRunDefaults = (cfg: ScoreConfig): void => {
     for (const agent of Object.values(cfg.agents)) {
       agent.streaming = true;
@@ -71,48 +70,25 @@ export async function runCommand(
   };
   applyRunDefaults(score);
 
-  // Build a single session store up front in watch mode so the
-  // conversation history survives runtime swaps. Non-watch runs can let
-  // TuttiRuntime provision its own store from score.memory as usual.
   const sharedSessions: SessionStore | undefined = options.watch
     ? new InMemorySessionStore()
     : undefined;
 
   const spinner = ora({ color: "cyan" });
 
-  // Silence pino during the REPL. The event listeners already provide
-  // all the UX (spinner, streaming text, tool names). Any pino output —
-  // even WARN — fires via pino-pretty's async worker-thread transport
-  // which writes to stdout while ora's spinner holds the cursor. This
-  // corrupts the terminal's line discipline and breaks readline's
-  // backspace / arrow-key handling on subsequent prompts.
+  // Silence pino during the REPL. Any pino output fires via
+  // pino-pretty's async worker-thread transport which writes to stdout
+  // and interferes with readline.
   coreLogger.level = "silent";
   logger.level = "silent";
 
-  // REPL-level state. `streaming` resets per turn; `runtime` may be
-  // swapped by the hot-reload path below.
   let streaming = false;
   let runtime = buildRuntime(score, sharedSessions);
 
   attachListeners(runtime);
 
-  // REPL readline — created early so the HITL handler below can use it.
-  // Ensure stdin stays in "flowing" mode so Node's event loop doesn't
-  // exit prematurely after the agent run completes (the runtime's async
-  // work may ref/unref internal handles that leave no remaining work).
-  process.stdin.ref();
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  // Wire per-runtime listeners. Separated from the REPL so a hot-reload
-  // can swap the runtime and re-wire without touching the outer loop.
+  // Wire per-runtime listeners.
   function attachListeners(r: TuttiRuntime): void {
-    r.events.on("agent:start", (e) => {
-      logger.info({ agent: e.agent_name }, "Running agent");
-    });
-
     r.events.on("llm:request", () => {
       spinner.start("Thinking...");
     });
@@ -150,49 +126,19 @@ export async function runCommand(
 
     r.events.on("tool:error", (e) => {
       spinner.stop();
-      logger.error({ tool: e.tool_name }, "Tool error");
-    });
-
-    r.events.on("security:injection_detected", (e) => {
-      logger.warn({ tool: e.tool_name }, "Potential prompt injection detected");
+      console.error(chalk.red("  Tool error: " + e.tool_name));
     });
 
     r.events.on("budget:warning", () => {
-      logger.warn("Approaching token budget (80%)");
+      console.error(chalk.yellow("  Approaching token budget (80%)"));
     });
 
     r.events.on("budget:exceeded", () => {
-      logger.error("Token budget exceeded — stopping");
-    });
-
-    r.events.on("hitl:requested", (e) => {
-      spinner.stop();
-      if (streaming) {
-        process.stdout.write("\n");
-        streaming = false;
-      }
-      console.log();
-      console.log(
-        chalk.yellow(
-          "  " + chalk.bold("[Agent needs input]") + " " + e.question,
-        ),
-      );
-      if (e.options) {
-        e.options.forEach((opt, i) => {
-          console.log(chalk.yellow("    " + (i + 1) + ". " + opt));
-        });
-      }
-      void rl.question(chalk.yellow("  > ")).then((answer) => {
-        runtime.answer(e.session_id, answer.trim());
-      });
+      console.error(chalk.red("  Token budget exceeded — stopping"));
     });
   }
 
-  // --- Watch mode wiring ---------------------------------------------------
-  // Scope: set up a ReactiveScore that reloads the score file on change
-  // and surfaces status to the REPL. The REPL checks `pendingReload`
-  // between turns (so we never interrupt a mid-turn call) and swaps
-  // `runtime` when appropriate.
+  // --- Watch mode ---
   let reactive: ReactiveScore | undefined;
   if (options.watch) {
     reactive = new ReactiveScore(score, file);
@@ -200,16 +146,12 @@ export async function runCommand(
       console.log(chalk.cyan("\n[tutti] Score changed, reloading..."));
     });
     reactive.on("reloaded", () => {
-      // Defer the actual swap to the next turn boundary — the REPL loop
-      // checks `pendingReload` before each iteration. Applying mid-turn
-      // would either interrupt a tool call or strand events listeners
-      // pointing at the old runtime instance.
       console.log(chalk.green("[tutti] Score reloaded. Changes applied."));
     });
     reactive.on("reload-failed", (err) => {
-      logger.error(
-        { error: err instanceof Error ? err.message : String(err) },
-        "[tutti] Reload failed — using previous config",
+      console.error(
+        chalk.red("[tutti] Reload failed — using previous config: " +
+          (err instanceof Error ? err.message : String(err))),
       );
     });
   }
@@ -222,10 +164,8 @@ export async function runCommand(
 
   let sessionId: string | undefined;
 
-  // Keepalive: pino-pretty's worker-thread transport can unref internal
-  // handles after an agent run completes, leaving zero remaining work in
-  // the event loop — Node exits before readline has a chance to prompt.
-  // A simple interval keeps the loop alive until the REPL exits normally.
+  // Keepalive: prevent the event loop from exiting while waiting for
+  // user input between turns.
   const keepalive = setInterval(() => {}, 60_000);
 
   // Handle Ctrl+C cleanly
@@ -234,16 +174,12 @@ export async function runCommand(
     if (streaming) process.stdout.write("\n");
     spinner.stop();
     console.log(chalk.dim("Goodbye!"));
-    rl.close();
     if (reactive) void reactive.close();
     process.exit(0);
   });
 
   try {
     while (true) {
-      // Apply any pending hot-reload before we start the next turn. This
-      // is the "don't interrupt mid-tool-call" guarantee — we only swap
-      // at a REPL-loop boundary, after the previous `run()` resolved.
       if (reactive?.pendingReload) {
         const nextScore = reactive.current;
         applyRunDefaults(nextScore);
@@ -252,16 +188,19 @@ export async function runCommand(
         reactive.consumePendingReload();
       }
 
-      // Defensive: ensure ora has fully released the terminal before
-      // readline takes over — a stale spinner corrupts line editing.
+      // Create a fresh readline interface for each prompt. Streaming
+      // output (process.stdout.write) during the agent run corrupts
+      // readline's internal cursor tracking and key handling — the
+      // backspace key shows literal ^? and arrows show ^[[D on
+      // subsequent question() calls from the same interface. A fresh
+      // interface has clean state every turn.
       spinner.stop();
-      const input = await rl.question(chalk.cyan("> "));
+      const input = await askQuestion(chalk.cyan("> "));
       const trimmed = input.trim();
 
       if (!trimmed) continue;
       if (trimmed === "exit" || trimmed === "quit") break;
 
-      // Reset streaming state for this run
       streaming = false;
 
       try {
@@ -276,15 +215,13 @@ export async function runCommand(
       } catch (err) {
         if (streaming) process.stdout.write("\n");
         spinner.stop();
-        logger.error(
-          { error: err instanceof Error ? err.message : String(err) },
-          "Something went wrong",
+        console.error(
+          chalk.red("  Error: " +
+            (err instanceof Error ? err.message : String(err))),
         );
       }
     }
   } catch (err) {
-    // readline closed — or an unexpected error broke the loop.
-    // Log it so silent exits are diagnosable.
     if (err instanceof Error && err.message !== "readline was closed") {
       console.error(chalk.red("REPL error: " + err.message));
     }
@@ -292,9 +229,26 @@ export async function runCommand(
 
   clearInterval(keepalive);
   console.log(chalk.dim("Goodbye!"));
-  rl.close();
   if (reactive) await reactive.close();
   process.exit(0);
+}
+
+/**
+ * Prompt the user with a fresh readline interface. The interface is
+ * created and closed per-call so that stdout writes during the agent
+ * run (streaming tokens, spinner, tool notifications) cannot corrupt
+ * readline's internal key-handling state between turns.
+ */
+async function askQuestion(prompt: string): Promise<string> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    return await rl.question(prompt);
+  } finally {
+    rl.close();
+  }
 }
 
 function buildRuntime(
