@@ -228,15 +228,41 @@ export async function runCommand(
   let sessionId: string | undefined;
   const keepalive = setInterval(() => {}, 60_000);
 
-  process.on("SIGINT", () => {
+  let shuttingDown = false;
+
+  // Central shutdown path. `exit` / `quit` and SIGINT both route through
+  // this to make sure the terminal is actually usable afterwards:
+  //   - readline is closed
+  //   - stdin raw mode (set by readline + ora) is restored
+  //   - stdin is unpaused so process.exit can actually flush
+  //   - the ora spinner stops and restores the cursor
+  // Without the raw-mode restore the shell appears "stuck" after exit —
+  // the process has ended but the TTY is still in a half-raw state.
+  const shutdown = (code: number): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     clearInterval(keepalive);
     if (streaming) out("\n");
     spinner.stop();
     out(chalk.dim("Goodbye!") + "\n");
-    rl.close();
+    try {
+      rl.close();
+    } catch {
+      // ignore
+    }
+    if (process.stdin.isTTY) {
+      try {
+        process.stdin.setRawMode(false);
+      } catch {
+        // ignore
+      }
+    }
+    process.stdin.pause();
     if (reactive) void reactive.close();
-    process.exit(0);
-  });
+    process.exit(code);
+  };
+
+  process.on("SIGINT", () => shutdown(0));
 
   try {
     while (true) {
@@ -253,7 +279,10 @@ export async function runCommand(
       const trimmed = input.trim();
 
       if (!trimmed) continue;
-      if (trimmed === "exit" || trimmed === "quit") break;
+      if (trimmed === "exit" || trimmed === "quit") {
+        shutdown(0);
+        return;
+      }
 
       streaming = false;
 
@@ -281,11 +310,7 @@ export async function runCommand(
     }
   }
 
-  clearInterval(keepalive);
-  out(chalk.dim("Goodbye!") + "\n");
-  rl.close();
-  if (reactive) await reactive.close();
-  process.exit(0);
+  shutdown(0);
 }
 
 function buildRuntime(

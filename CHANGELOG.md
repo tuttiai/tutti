@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed — typing `exit` in the REPL leaves the terminal stuck
+- Typing `exit` / `quit` in `tutti-ai run` appeared to hang the shell even after the process had terminated. Root cause: readline + ora leave stdin in raw mode on exit, so the next shell prompt never draws. Fixed by routing `exit`, `quit`, SIGINT, and normal loop termination through a single `shutdown()` path that explicitly calls `process.stdin.setRawMode(false)` and `process.stdin.pause()` before `process.exit(0)`.
+- Shutdown is idempotent (guarded by a `shuttingDown` flag) — a second SIGINT while the first is still cleaning up is a no-op instead of a double `Goodbye!` banner or a crash from closing an already-closed readline.
+
 ### Added — `tutti-ai run -p "<prompt>"` one-shot non-interactive mode
 - `tutti-ai run -p "hello"` (also `--prompt`) runs a single turn against the default `assistant` agent, prints the final output to stdout, and exits. Useful for scripts, CI smoke tests, and shell pipelines. Non-zero exit on error.
 - Streaming is forced off in one-shot mode so only the final result reaches stdout; pino loggers are silenced so the output is clean.
