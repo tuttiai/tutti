@@ -11,34 +11,96 @@ Tutti is fully typed with TypeScript. This page provides a quick reference for t
 
 The runtime package. Main exports:
 
-### Classes
+### Runtime & orchestration
 
 | Export | Description |
 | ------ | ----------- |
 | `TuttiRuntime` | Main runtime — takes a score, runs agents |
 | `AgentRunner` | Low-level agentic loop (used internally by the runtime) |
 | `AgentRouter` | Multi-agent orchestration with delegation or parallel fan-out |
+| `TuttiGraph`, `defineGraph`, `GraphBuilder`, `END` | Explicit directed-graph routing |
 | `EventBus` | Typed event emitter |
-| `InMemorySessionStore` | Default session storage |
-| `InMemoryToolCache` | TTL + LRU tool result cache (`ToolCache` impl) |
-| `ScoreLoader` | Dynamic import + Zod validation for score files |
-| `SecretsManager` | API key redaction and env var access |
-| `PermissionGuard` | Voice permission enforcement |
-| `PromptGuard` | Prompt injection detection and wrapping |
-| `TokenBudget` | Token/cost tracking and budget enforcement |
+
+### Sessions & memory
+
+| Export | Description |
+| ------ | ----------- |
+| `InMemorySessionStore` | Default in-process session storage |
 | `PostgresSessionStore` | PostgreSQL session persistence |
 | `InMemorySemanticStore` | In-memory semantic (long-term) memory |
-| `TuttiTracer` | OpenTelemetry tracing for agent runs, LLM calls, tool calls |
+| `MemoryUserMemoryStore` | In-memory user memory (`{ user_id, content, importance }`) |
+| `PostgresUserMemoryStore` | Postgres user memory — survives restarts, searchable by `tutti-ai memory` |
 
-### Functions
+### Durability & scheduling
+
+| Export | Description |
+| ------ | ----------- |
+| `MemoryCheckpointStore`, `RedisCheckpointStore`, `PostgresCheckpointStore` | Durable checkpoints for `durable: true` agents |
+| `SchedulerEngine`, `MemoryScheduleStore`, `PostgresScheduleStore` | Cron / interval / one-shot scheduler for agents with a `schedule` block |
+
+### Human-in-the-loop
+
+| Export | Description |
+| ------ | ----------- |
+| `MemoryInterruptStore`, `PostgresInterruptStore` | Approval gates for `requireApproval` tool calls |
+| `globMatch` | Glob helper used by approval rules |
+
+### Guardrails & evaluation
+
+| Export | Description |
+| ------ | ----------- |
+| `profanityFilter()`, `piiDetector()`, `topicBlocker()` | Built-in `beforeRun` / `afterRun` guardrail factories |
+| `GoldenRunner`, `JsonFileGoldenStore` | Golden-dataset CI regression runner |
+| `ExactScorer`, `SimilarityScorer`, `ToolSequenceScorer` | Built-in scorers for golden cases |
+| `EvalRunner` | v1 assertion-based suite runner |
+
+### Observability
+
+| Export | Description |
+| ------ | ----------- |
+| `getTuttiTracer()` | Get the process-wide `TuttiTracer` instance |
+| `TuttiTracer` | In-process span tracer (always on) with pluggable exporters |
+| `JsonFileExporter`, `OTLPExporter` | Span exporters shipped from `@tuttiai/telemetry` |
+| `MODEL_PRICES`, `registerModelPrice()` | Cost-estimate table for LLM pricing |
+| `getCurrentTraceId()`, `getCurrentSpanId()` | Correlate logs with in-flight spans |
+| `createLogger(name)` | Create a named pino logger instance |
+
+### Security
+
+| Export | Description |
+| ------ | ----------- |
+| `SecretsManager` | API key redaction and env var access |
+| `PermissionGuard` | Voice permission enforcement |
+| `PromptGuard` | Prompt-injection detection and tool-result wrapping |
+| `TokenBudget` | Token / cost tracking and budget enforcement |
+
+### Score authoring
 
 | Export | Description |
 | ------ | ----------- |
 | `defineScore(config)` | Typed identity function for score definitions |
 | `validateScore(config)` | Zod-validate a score config object |
-| `createLogger(name)` | Create a named pino logger instance |
-| `initTelemetry(config)` | Initialize OpenTelemetry SDK |
-| `shutdownTelemetry()` | Shut down OpenTelemetry SDK |
+| `ScoreLoader` | Dynamic import + Zod validation for score files |
+
+### Caching
+
+| Export | Description |
+| ------ | ----------- |
+| `InMemoryToolCache` | TTL + LRU tool-result cache (`ToolCache` impl) |
+| `DEFAULT_WRITE_TOOLS` | Tool names never cached (e.g. `write_file`, `create_issue`) |
+
+### Hooks
+
+| Export | Description |
+| ------ | ----------- |
+| `createLoggingHook`, `createCacheHook`, `createBlocklistHook` | Ready-made hooks implementing `TuttiHooks` |
+
+### Telemetry bootstrap (OTLP export)
+
+| Export | Description |
+| ------ | ----------- |
+| `initTelemetry(config)` | Wire `TuttiTracer` to an OTLP exporter using `score.telemetry` |
+| `shutdownTelemetry()` | Flush pending spans and close the exporter cleanly |
 
 ### Providers
 

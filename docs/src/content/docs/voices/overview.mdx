@@ -14,6 +14,9 @@ A **voice** is a pluggable package that gives agents tools and capabilities. Eac
 | [Filesystem](/voices/filesystem) | `@tuttiai/filesystem` | `filesystem` | 7 | Read, write, search, and manage local files |
 | [GitHub](/voices/github) | `@tuttiai/github` | `network` | 10 | Issues, PRs, repos, code search |
 | [Playwright](/voices/playwright) | `@tuttiai/playwright` | `network`, `browser` | 12 | Browser automation, screenshots, page interaction |
+| Web | `@tuttiai/web` | `network` | 3 | Search the web, fetch URLs, parse sitemaps |
+| Sandbox | `@tuttiai/sandbox` | `shell` | 4 | Execute TypeScript, Python, Bash + sandboxed file I/O |
+| RAG | `@tuttiai/rag` | `filesystem`, `network` | ingest, chunk, embed, search | Retrieval-augmented generation over your own documents |
 | MCP Bridge | `@tuttiai/mcp` | `network` | dynamic | Wrap any MCP server as a Tutti voice |
 
 ## Installing a voice
@@ -22,6 +25,9 @@ A **voice** is a pluggable package that gives agents tools and capabilities. Eac
 npx tutti-ai add filesystem
 npx tutti-ai add github
 npx tutti-ai add playwright
+npx tutti-ai add web
+npx tutti-ai add sandbox
+npx tutti-ai add rag
 npx tutti-ai add mcp
 ```
 

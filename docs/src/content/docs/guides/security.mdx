@@ -143,6 +143,61 @@ Two rate limits protect against runaway tool execution:
 
 If a tool exceeds the timeout, the error is returned as a `tool_result` (not thrown), so the LLM can recover gracefully.
 
+## Guardrails (`beforeRun` / `afterRun`)
+
+Wrap agent inputs and outputs with policy hooks. Each hook runs synchronously around the agent loop and can block, rewrite, or annotate the run.
+
+```ts
+import { defineScore, profanityFilter, piiDetector, topicBlocker } from "@tuttiai/core";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    assistant: {
+      name: "Assistant",
+      system_prompt: "You are a customer-support agent.",
+      voices: [],
+      // Input guardrails — run before the first LLM call
+      beforeRun: [
+        profanityFilter({ on_match: "block" }),
+        piiDetector({ on_match: "redact" }),
+      ],
+      // Output guardrails — run after the agent's final response
+      afterRun: [
+        topicBlocker({ topics: ["legal advice", "medical diagnosis"] }),
+      ],
+    },
+  },
+});
+```
+
+Each factory returns a `GuardrailHook`. Three built-in factories ship with `@tuttiai/core`:
+
+| Factory | Purpose | Common config |
+| ------- | ------- | ------------- |
+| `profanityFilter(opts)` | Block / warn on profane input or output | `{ on_match: "block" \| "warn" \| "redact" }` |
+| `piiDetector(opts)` | Detect / redact emails, phone numbers, SSNs, credit cards | `{ on_match, patterns? }` |
+| `topicBlocker(opts)` | Refuse to answer prompts about listed topics | `{ topics: string[], on_match }` |
+
+You can also write your own by implementing the `GuardrailHook` contract — any `(context) => Promise<GuardrailResult>` function with `action: "allow" | "block" | "rewrite"`. See [Guardrails](/guides/guardrails) for the full API.
+
+## Approval gates (HITL)
+
+Gate destructive tool calls behind human approval with `requireApproval`:
+
+```ts
+{
+  assistant: {
+    requireApproval: [
+      { tool: "delete_file" },
+      { tool: "push_branch", when: "branch === 'main'" },
+    ],
+  },
+}
+```
+
+When the agent attempts a matching tool call, the runtime emits `hitl:requested`, writes an interrupt to the configured `InterruptStore`, and pauses the run. Review and resolve via the [`tutti-ai interrupts`](/cli/reference#tutti-ai-interrupts) TUI, the `/interrupts/*` HTTP endpoints, or the Studio UI.
+
 ## Score validation
 
 Score files are Zod-validated when loaded. Common mistakes are caught early:

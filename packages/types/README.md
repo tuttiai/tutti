@@ -10,14 +10,15 @@ npm install @tuttiai/types
 
 ## What's included
 
-All core interfaces for building on Tutti:
+All core interfaces for building on Tutti — zero runtime dependencies, zod only:
 
-- **LLM** — `LLMProvider`, `ChatRequest`, `ChatResponse`, `ContentBlock`, `ChatMessage`
-- **Voice** — `Voice`, `Tool<T>`, `ToolResult`, `ToolContext`
-- **Agent** — `AgentConfig`, `AgentResult`
-- **Score** — `ScoreConfig`
+- **LLM** — `LLMProvider`, `ChatRequest`, `ChatResponse`, `StreamChunk`, `ContentBlock` (`TextBlock` / `ToolUseBlock` / `ToolResultBlock`), `ChatMessage`, `StopReason`, `ToolDefinition`, `TokenUsage`
+- **Voice** — `Voice`, `Tool<T>`, `ToolResult`, `ToolContext`, `VoiceContext`, `Permission`, `ToolMemoryHelpers`, `UserMemoryToolHelpers`
+- **Agent** — `AgentConfig`, `AgentResult`, `ParallelAgentResult`, `BudgetConfig`, `AgentMemoryConfig`, `AgentUserMemoryConfig`, `AgentCacheConfig`, `AgentDurableConfig`, `AgentScheduleConfig`, `GuardrailHook`, `RunContext`
+- **Score** — `ScoreConfig`, `MemoryConfig`, `TelemetryConfig`, `ParallelEntryConfig`
 - **Session** — `Session`, `SessionStore`
 - **Events** — `TuttiEvent`, `TuttiEventType`, `TuttiEventHandler`
+- **Hooks** — `HookContext`, `TuttiHooks` (Claude Code–style hook system)
 
 ## Usage
 

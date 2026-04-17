@@ -1,29 +1,63 @@
 ---
 title: "CLI Reference"
-description: "Complete reference for all tutti-ai CLI commands"
+description: "Complete reference for every tutti-ai command"
 sidebar:
   order: 1
 ---
 
-The `tutti-ai` CLI helps you scaffold, run, and validate Tutti projects.
+The `tutti-ai` CLI scaffolds, runs, validates, schedules, and inspects Tutti projects. Every command is listed here with its flags, defaults, and a sample output.
 
 ## Installation
 
 ```bash
 npm install -g tutti-ai
-# or use npx:
+# or invoke on demand with npx:
 npx tutti-ai <command>
 ```
 
+## Global options
+
+```bash
+tutti-ai --version         # print version
+tutti-ai --help            # list commands
+tutti-ai <cmd> --help      # show command-specific help
+```
+
+All commands auto-load `.env` / `.env.local` via `dotenv` and exit 1 on
+unhandled errors. The CLI installs handlers for `unhandledRejection`
+and `uncaughtException` so the process always dies with a clean error
+message.
+
+## Command groups
+
+- **Project lifecycle** — [`init`](#tutti-ai-init-project-name), [`templates`](#tutti-ai-templates), [`check`](#tutti-ai-check-score) / [`doctor`](#tutti-ai-doctor-score), [`info`](#tutti-ai-info-score)
+- **Running agents** — [`run`](#tutti-ai-run-score), [`serve`](#tutti-ai-serve-score), [`studio`](#tutti-ai-studio-score), [`resume`](#tutti-ai-resume-session-id), [`replay`](#tutti-ai-replay-session-id)
+- **Voices** — [`add`](#tutti-ai-add-voice), [`voices`](#tutti-ai-voices), [`search`](#tutti-ai-search-query), [`publish`](#tutti-ai-publish)
+- **Packages** — [`update`](#tutti-ai-update), [`outdated`](#tutti-ai-outdated), [`upgrade`](#tutti-ai-upgrade-voice)
+- **Scheduling** — [`schedule`](#tutti-ai-schedule-score), [`schedules`](#tutti-ai-schedules)
+- **Observability** — [`traces`](#tutti-ai-traces)
+- **Memory** — [`memory`](#tutti-ai-memory)
+- **Evaluation** — [`eval`](#tutti-ai-eval)
+- **Human-in-the-loop** — [`interrupts`](#tutti-ai-interrupts) / [`approve`](#tutti-ai-approve)
+
 ---
 
-## `tutti-ai init [project-name]`
+## Project lifecycle
+
+### `tutti-ai init [project-name]`
 
 Create a new Tutti project with scaffolded files.
 
 ```bash
 tutti-ai init my-project
+tutti-ai init my-project --template coding-agent
 ```
+
+**Options:**
+
+| Flag | Description |
+| ---- | ----------- |
+| `-t, --template <id>` | Template to use: `minimal`, `coding-agent`, `research-agent`, `qa-pipeline`, `dev-team`. See [`tutti-ai templates`](#tutti-ai-templates). |
 
 **What it creates:**
 
@@ -37,116 +71,29 @@ my-project/
 └── README.md         # Project description
 ```
 
-**Interactive mode:** If you omit the project name, it will prompt you.
+If you omit the project name, the CLI prompts for it interactively.
 
----
+### `tutti-ai templates`
 
-## `tutti-ai run [score]`
-
-Run a Tutti score interactively in a REPL, or run a single turn
-non-interactively with `-p`.
+List every project template available to [`init`](#tutti-ai-init-project-name).
 
 ```bash
-tutti-ai run                         # REPL, uses ./tutti.score.ts
-tutti-ai run ./path/to/score.ts      # REPL, custom path
-tutti-ai run --watch                 # REPL with hot-reload on file changes
-tutti-ai run -p "What is 2 + 2?"     # one-shot, prints result, exits
+tutti-ai templates
 ```
 
-**Options:**
-
-| Flag | Description |
-| ---- | ----------- |
-| `-w, --watch` | Reload the score and rebuild the runtime whenever the score file (or any file in its directory tree) changes on disk. Session history survives across reloads. |
-| `-p, --prompt <text>` | Run a single turn against the default `assistant` agent, print the result to stdout, and exit. Streaming is forced off so stdout contains only the final output — safe to pipe. Non-zero exit on error. |
-
-### Interactive REPL
+Sample output:
 
 ```
-Tutti REPL — type "exit" to quit
+  Available Templates
 
-> Hello!
-Running agent: assistant
-
-Hello! How can I help you today?
-
-> exit
-Goodbye!
+  minimal           One agent, no voices — the simplest starting point
+  coding-agent      TypeScript developer with filesystem + GitHub access
+  research-agent    Researcher that saves structured notes to files
+  qa-pipeline       Orchestrator + QA specialist with browser testing and HITL
+  dev-team          Full team: orchestrator + coder + PM + QA with all voices
 ```
 
-**Behaviour:**
-
-- Loads `.env` automatically via `dotenv`
-- Validates the API key for the detected provider
-- Maintains a session across REPL turns
-- Shows tool usage, errors, security warnings, and budget events
-- **Streaming output** — tokens print to the terminal as they arrive (spinner until first token)
-- Tool calls shown inline: `[using: tool_name]` / `[done: tool_name]`
-- `exit`, `quit`, or Ctrl+C leave gracefully — stdin raw mode and the
-  cursor are restored so the shell prompt redraws cleanly afterwards
-
-### One-shot mode (`-p` / `--prompt`)
-
-Designed for scripting, CI smoke tests, and pipelines.
-
-```bash
-$ tutti-ai run -p "What is 2 + 2?"
-4
-
-$ tutti-ai run -p "summarize this README" > summary.txt
-
-$ tutti-ai run --prompt "explain TypeScript generics in one sentence"
-TypeScript generics let you write reusable code parameterized by types.
-```
-
-One-shot mode always targets the agent keyed `assistant` in the score.
-Streaming and pino logs are silenced so the stdout stream is clean.
-The REPL (readline, spinner, file watcher) is bypassed entirely —
-stdin is never read, so it's safe inside non-TTY contexts (cron, CI,
-shell subprocesses).
-
----
-
-## `tutti-ai add <voice>`
-
-Install a voice package and print setup instructions.
-
-```bash
-tutti-ai add filesystem
-tutti-ai add github
-tutti-ai add playwright
-tutti-ai add postgres
-tutti-ai add @someone/custom-voice
-```
-
-**Official packages:**
-
-| Shorthand | Package installed | What it provides |
-| --------- | ---------------- | ---------------- |
-| `filesystem` | `@tuttiai/filesystem` | 7 file tools |
-| `github` | `@tuttiai/github` | 10 GitHub tools |
-| `playwright` | `@tuttiai/playwright` | 12 browser tools |
-| `postgres` | `pg` | PostgreSQL session storage |
-
-For unknown names, it tries `@tuttiai/<name>` first, then the literal package name.
-
-**Example output:**
-
-```
-✔ Installed @tuttiai/github
-
-  Setup:
-  Add GITHUB_TOKEN to your .env file:
-    GITHUB_TOKEN=ghp_your_token_here
-
-  Add to your score:
-    import { GitHubVoice } from "@tuttiai/github"
-    voices: [new GitHubVoice()]
-```
-
----
-
-## `tutti-ai check [score]`
+### `tutti-ai check [score]`
 
 Validate a score file without running it. Checks configuration, API keys, and installed voices.
 
@@ -155,7 +102,7 @@ tutti-ai check                    # uses ./tutti.score.ts
 tutti-ai check ./path/to/score.ts # custom path
 ```
 
-**Example output (all passing):**
+**Sample output (passing):**
 
 ```
 Checking tutti.score.ts...
@@ -169,7 +116,7 @@ Checking tutti.score.ts...
 All checks passed. Run tutti-ai run to start.
 ```
 
-**Example output (failures):**
+**Sample output (failing):**
 
 ```
 Checking tutti.score.ts...
@@ -183,35 +130,31 @@ Checking tutti.score.ts...
 **What it checks:**
 
 1. Score file exists and can be loaded
-2. Zod schema validation (required fields, valid types, cross-references)
+2. Zod schema validation (required fields, types, cross-references)
 3. Provider API key is set in the environment
 4. Voices that need env vars (e.g. `GITHUB_TOKEN`) have them set
 
----
+Exits non-zero on any failure — safe to use as a CI gate.
 
-## `tutti-ai doctor [score]`
+### `tutti-ai doctor [score]`
 
-Alias for `check`. Validates a score file without running it.
+Alias for [`check`](#tutti-ai-check-score).
 
 ```bash
 tutti-ai doctor
 tutti-ai doctor ./path/to/score.ts
 ```
 
----
+### `tutti-ai info [score]`
 
-## `tutti-ai info [score]`
-
-Show project information — agents, voices, models, installed package
-versions, schedule configs, and feature flags. Useful for confirming
-your local setup matches what the score expects.
+Show project information — agents, voices, models, installed package versions, schedule configs, and feature flags. Useful for confirming your local setup matches what the score expects.
 
 ```bash
 tutti-ai info
 tutti-ai info ./path/to/score.ts
 ```
 
-**Example output:**
+**Sample output:**
 
 ```
   Tutti Project Info
@@ -232,16 +175,13 @@ tutti-ai info ./path/to/score.ts
       Flags:  streaming
 ```
 
-**Package versions** are read from `node_modules/<name>/package.json`,
-so what you see is what your project will actually run — not the
-`*` / `^0.18.0` / `workspace:*` spec from `package.json`. When a
-package isn't installed, the spec string is shown as a fallback.
+**Package versions** are read from `node_modules/<name>/package.json`, so what you see is what your project will actually run — not the `*` / `^0.18.0` / `workspace:*` spec from `package.json`. When a package isn't installed, the spec string is shown as a fallback.
 
-**Agent flags** that appear:
+**Agent flags:**
 
 | Flag | Meaning |
 | ---- | ------- |
-| `streaming` | Agent streams tokens during `tutti-ai run` |
+| `streaming` | Agent streams tokens during [`run`](#tutti-ai-run-score) |
 | `hitl` | Agent can request human input via `allow_human_input` |
 | `durable` | Checkpoints to Redis/Postgres between turns |
 | `scheduled` | Has a `schedule` block (cron / interval / one-shot) |
@@ -250,21 +190,240 @@ package isn't installed, the spec string is shown as a fallback.
 
 ---
 
-## `tutti-ai studio [score]`
+## Running agents
+
+### `tutti-ai run [score]`
+
+Run a Tutti score interactively in a REPL, or run a single turn non-interactively with `-p`.
+
+```bash
+tutti-ai run                         # REPL, uses ./tutti.score.ts
+tutti-ai run ./path/to/score.ts      # REPL, custom path
+tutti-ai run --watch                 # REPL with hot-reload on file changes
+tutti-ai run -p "What is 2 + 2?"     # one-shot, prints result, exits
+```
+
+**Options:**
+
+| Flag | Description |
+| ---- | ----------- |
+| `-w, --watch` | Reload the score and rebuild the runtime whenever the score file (or any file in its directory tree) changes on disk. Session history survives across reloads. |
+| `-p, --prompt <text>` | Run a single turn against the default `assistant` agent, print the result to stdout, and exit. Streaming is forced off so stdout contains only the final output — safe to pipe. Non-zero exit on error. |
+
+#### Interactive REPL
+
+```
+Tutti REPL — type "exit" to quit
+
+> Hello!
+Running agent: assistant
+
+Hello! How can I help you today?
+
+> exit
+Goodbye!
+```
+
+**Behaviour:**
+
+- Loads `.env` automatically
+- Validates the API key for the detected provider
+- Maintains a session across REPL turns
+- Shows tool usage, errors, security warnings, and budget events
+- **Streaming output** — tokens print to the terminal as they arrive (spinner until first token)
+- Tool calls shown inline: `[using: tool_name]` / `[done: tool_name]`
+- `exit`, `quit`, or Ctrl+C leave gracefully — stdin raw mode and the cursor are restored so the shell prompt redraws cleanly
+
+#### Watch mode
+
+`--watch` reloads the score (and any file in the score's directory tree, excluding `node_modules`, `dist`, and dotfiles) whenever it changes. Changes are debounced 200ms so editor saves that touch the file multiple times collapse into a single reload.
+
+- **Changes take effect at turn boundaries**, never mid-tool-call.
+- **Session history is preserved** across reloads — the REPL's `session_id` carries over.
+- **Syntax errors are recovered** — if the reload fails to parse or validate, the error is printed and the REPL keeps using the previous config.
+- **Trade-off**: runtime-internal caches (tool cache, semantic memory) reset on reload.
+
+#### One-shot mode (`-p` / `--prompt`)
+
+Designed for scripting, CI smoke tests, and pipelines.
+
+```bash
+$ tutti-ai run -p "What is 2 + 2?"
+4
+
+$ tutti-ai run -p "summarize this README" > summary.txt
+
+$ tutti-ai run --prompt "explain TypeScript generics in one sentence"
+TypeScript generics let you write reusable code parameterized by types.
+```
+
+Always targets the agent keyed `assistant` in the score. Streaming and pino logs are silenced so stdout is clean. The REPL (readline, spinner, file watcher) is bypassed entirely — stdin is never read, so it's safe inside non-TTY contexts (cron, CI, shell subprocesses).
+
+### `tutti-ai serve [score]`
+
+Start the Tutti HTTP server — exposes your score as a REST API with SSE streaming.
+
+```bash
+tutti-ai serve                       # defaults to ./tutti.score.ts
+tutti-ai serve ./custom-score.ts     # custom score path
+tutti-ai serve --port 8080           # custom port
+tutti-ai serve --watch               # reload on file changes
+tutti-ai serve -a researcher         # expose a specific agent
+```
+
+**Options:**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `-p, --port <number>` | `3847` | Port to listen on. |
+| `-H, --host <address>` | `0.0.0.0` | Interface to bind to. |
+| `-k, --api-key <key>` | `TUTTI_API_KEY` env | Bearer token clients must send. |
+| `-a, --agent <name>` | `score.entry` or first agent | Which agent the default endpoint routes to. |
+| `-w, --watch` | off | Reload the score and restart the server on file changes. |
+
+**Endpoints:**
+
+```
+POST  /run              # non-streaming agent call
+POST  /run/stream       # SSE streaming (tokens + events)
+GET   /sessions/:id     # session history
+GET   /health           # health check
+```
+
+**Environment variables:**
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `TUTTI_API_KEY` | Yes | Bearer token for authenticating requests. |
+| `ANTHROPIC_API_KEY` | Provider-dependent | Anthropic API key. |
+| `OPENAI_API_KEY` | Provider-dependent | OpenAI API key. |
+| `GEMINI_API_KEY` | Provider-dependent | Gemini API key. |
+| `TUTTI_ALLOWED_ORIGINS` | No | Comma-separated CORS origins (default: `*`). |
+| `DATABASE_URL` | No | PostgreSQL URL for session persistence. |
+| `TUTTI_REDIS_URL` | No | Redis URL for durable checkpoints. |
+
+**Example curl:**
+
+```bash
+# Non-streaming
+curl -X POST http://localhost:3847/run \
+  -H "Authorization: Bearer $TUTTI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Summarize the latest AI news"}'
+
+# Streaming SSE
+curl -N -X POST http://localhost:3847/run/stream \
+  -H "Authorization: Bearer $TUTTI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"input": "Write a short poem about TypeScript"}'
+```
+
+SIGINT/SIGTERM drain in-flight requests before exit. See the [server docs](/guides/serve) for the full API schema.
+
+### `tutti-ai studio [score]`
 
 Launch Tutti Studio — a local web UI for inspecting agent runs at `localhost:4747`.
 
 ```bash
-tutti-ai studio                    # uses ./tutti.score.ts
-tutti-ai studio ./path/to/score.ts # custom path
-PORT=8080 tutti-ai studio          # custom port
+tutti-ai studio                      # defaults to ./tutti.score.ts
+tutti-ai studio ./path/to/score.ts   # custom score path
+PORT=8080 tutti-ai studio            # custom port via env var
 ```
 
-Opens the browser automatically. Four panels: SVG agent graph, live SSE event stream, session browser, and token usage bar. Includes a REST API for programmatic access (`/api/score`, `/api/sessions`, `/api/run`).
+Opens the browser automatically. Four panels:
+
+1. **Agent graph** — SVG visualisation of the score's agents and their delegation edges
+2. **Live event stream** — SSE feed of every `llm:request`, `llm:response`, `tool:start`, `tool:end`, `budget:*`, `hitl:*` event
+3. **Session browser** — sortable table of sessions with drill-down to message history
+4. **Token usage** — running total of input/output tokens and cost estimate
+
+Also exposes a REST API for programmatic access: `/api/score`, `/api/sessions`, `/api/run`.
+
+### `tutti-ai resume <session-id>`
+
+Resume a crashed or interrupted run from its last durable checkpoint. Requires `durable: true` on the original agent and a Redis or Postgres backend.
+
+```bash
+# Redis-backed checkpoint
+export TUTTI_REDIS_URL=redis://127.0.0.1:6379/0
+tutti-ai resume 811b3b38-9a1d-4b98-ab7d-57e4acaecdea --store redis
+
+# Postgres-backed checkpoint
+export TUTTI_PG_URL=postgres://localhost/tutti
+tutti-ai resume 811b3b38-9a1d-4b98-ab7d-57e4acaecdea --store postgres
+```
+
+**Options:**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `--store <backend>` | `redis` | Which durable store the checkpoint was written to (`redis` or `postgres`). |
+| `-s, --score <path>` | `./tutti.score.ts` | Score file to load — must match the one the original run used. |
+| `-a, --agent <name>` | `score.entry` or first agent | Agent to resume. |
+| `-y, --yes` | false | Skip the confirmation prompt. |
+
+Prints a checkpoint summary and asks `Resume from turn N? (y/n)` before handing off. On confirm, loads the score, reattaches the checkpoint store, seeds the session, and calls the runtime — picking up exactly where the previous run left off.
+
+### `tutti-ai replay <session-id>`
+
+Time-travel debugger — navigate and replay a session from PostgreSQL. Lets you step forwards and backwards through every turn, inspect state at each point, and branch a new run from any historical turn.
+
+```bash
+export TUTTI_PG_URL=postgres://localhost/tutti
+tutti-ai replay 811b3b38-9a1d-4b98-ab7d-57e4acaecdea
+tutti-ai replay 811b3b38 --score ./custom.score.ts
+```
+
+**Options:**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `-s, --score <path>` | `./tutti.score.ts` | Score file to load for "replay-from" branching. |
+
+Interactive controls: `n` (next turn), `p` (prev turn), `b` (branch from here), `q` (quit).
 
 ---
 
-## `tutti-ai search <query>`
+## Voices
+
+### `tutti-ai add <voice>`
+
+Install a voice package and print setup instructions.
+
+```bash
+tutti-ai add filesystem
+tutti-ai add github
+tutti-ai add playwright
+tutti-ai add postgres
+tutti-ai add @someone/custom-voice
+```
+
+**Shorthands:**
+
+| Shorthand | Package | Provides |
+| --------- | ------- | -------- |
+| `filesystem` | `@tuttiai/filesystem` | 7 file tools |
+| `github` | `@tuttiai/github` | 10 GitHub tools |
+| `playwright` | `@tuttiai/playwright` | 12 browser tools |
+| `web` | `@tuttiai/web` | 3 web tools (search, fetch, sitemap) |
+| `sandbox` | `@tuttiai/sandbox` | 4 code-execution tools |
+| `mcp` | `@tuttiai/mcp` | MCP bridge |
+| `rag` | `@tuttiai/rag` | RAG (ingest, chunk, embed, search) |
+| `postgres` | `pg` | PostgreSQL session storage |
+
+For unknown names, it tries `@tuttiai/<name>` first, then the literal package name.
+
+### `tutti-ai voices`
+
+List all available official voices with install status.
+
+```bash
+tutti-ai voices
+```
+
+Shows each voice with `[official]` badge, description, tags, and whether it's installed in the current project.
+
+### `tutti-ai search <query>`
 
 Search the voice registry for voices matching a query.
 
@@ -275,21 +434,7 @@ tutti-ai search database
 
 Searches name, description, and tags (case-insensitive). Fetches the live registry from `github.com/tuttiai/voices`, falls back to a built-in list when offline.
 
----
-
-## `tutti-ai voices`
-
-List all available official voices with install status.
-
-```bash
-tutti-ai voices
-```
-
-Shows each voice with `[official]` badge and whether it's installed in the current project.
-
----
-
-## `tutti-ai publish`
+### `tutti-ai publish`
 
 Publish the current voice to npm and the voice registry. Run from inside a voice directory.
 
@@ -298,18 +443,233 @@ tutti-ai publish            # full publish flow
 tutti-ai publish --dry-run  # validate without publishing
 ```
 
-Five-step flow: pre-flight checks (structure, naming, build, tests, audit), pack dry-run, npm publish with confirmation, registry PR via GitHub API, success summary.
+**Options:**
+
+| Flag | Description |
+| ---- | ----------- |
+| `--dry-run` | Run all checks without actually publishing. |
+
+Five-step flow: pre-flight checks (structure, naming, build, tests, audit), pack dry-run, `npm publish` with confirmation, registry PR via GitHub API, success summary.
 
 ---
 
-## Global options
+## Packages
+
+### `tutti-ai update`
+
+Update all installed `@tuttiai/*` packages to their latest versions. Auto-detects global CLI installs, npm/yarn/pnpm, and updates accordingly.
 
 ```bash
-tutti-ai --version    # Print version
-tutti-ai --help       # Show help
-tutti-ai <cmd> --help # Show command help
+tutti-ai update
 ```
+
+### `tutti-ai outdated`
+
+Show a table of installed `@tuttiai/*` packages with current vs latest versions. Does **not** install anything — just reports.
+
+```bash
+tutti-ai outdated
+```
+
+Sample output:
+
+```
+  PACKAGE                     CURRENT     LATEST      STATUS
+  ────────────────────────────────────────────────────────────────
+  @tuttiai/core               0.18.0      0.18.3      update available
+  @tuttiai/filesystem         0.4.2       0.4.2       up to date
+```
+
+### `tutti-ai upgrade [voice]`
+
+Upgrade a specific voice — or all installed `@tuttiai/*` packages — to their latest versions.
+
+```bash
+tutti-ai upgrade                  # upgrade all @tuttiai packages
+tutti-ai upgrade filesystem       # upgrade just @tuttiai/filesystem
+tutti-ai upgrade @tuttiai/rag     # full package name also works
+```
+
+---
+
+## Scheduling
+
+### `tutti-ai schedule [score]`
+
+Start the scheduler daemon — reads the score, registers every agent with a `schedule` block, and runs on their configured triggers (cron, interval, or one-shot datetime) until killed.
+
+```bash
+tutti-ai schedule                      # defaults to ./tutti.score.ts
+tutti-ai schedule ./path/to/score.ts   # custom score path
+```
+
+**Score example:**
+
+```ts
+const score = defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    reporter: {
+      name: "Reporter",
+      system_prompt: "Generate a daily status report.",
+      voices: [],
+      schedule: {
+        cron: "0 9 * * *",           // 9 AM daily
+        input: "Generate the daily status report",
+        max_runs: 30,                 // auto-disable after 30 runs
+      },
+    },
+  },
+});
+```
+
+**Environment:**
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `TUTTI_PG_URL` | Recommended | PostgreSQL URL for durable schedule persistence. Falls back to in-memory (lost on restart). |
+
+Emits `schedule:triggered`, `schedule:completed`, and `schedule:error` events to stdout with timestamps.
+
+### `tutti-ai schedules`
+
+Manage registered schedules — list, enable/disable, trigger manually, and view run history.
+
+```bash
+tutti-ai schedules list                        # show all registered schedules
+tutti-ai schedules enable nightly-report       # re-enable a disabled schedule
+tutti-ai schedules disable nightly-report      # disable without deleting
+tutti-ai schedules trigger nightly-report      # run once immediately (testing)
+tutti-ai schedules trigger nightly-report -s ./custom.score.ts
+tutti-ai schedules runs nightly-report         # last 20 runs
+```
+
+**`list` sample output:**
+
+```
+  ID                  AGENT           TRIGGER               ENABLED   RUNS    CREATED
+  ──────────────────────────────────────────────────────────────────────────────────────
+  nightly-report      reporter        cron: 0 9 * * *       yes       12      2026-04-14
+  health-check        monitor         every 30m             yes       48/100  2026-04-14
+```
+
+Requires `TUTTI_PG_URL` for the schedule store.
+
+---
+
+## Observability
+
+### `tutti-ai traces`
+
+Inspect OpenTelemetry spans emitted by a running `tutti-ai serve` process.
+
+```bash
+tutti-ai traces list                   # last 20 traces (most recent first)
+tutti-ai traces show <trace-id>        # full span tree for one trace
+tutti-ai traces tail                   # live-tail spans (Ctrl+C to exit)
+```
+
+**Common options (all subcommands):**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `-u, --url <url>` | `http://127.0.0.1:3847` | Server URL. |
+| `-k, --api-key <key>` | `TUTTI_API_KEY` env | Bearer token. |
+
+`traces show` renders every span as an indented tree with duration, status, and attributes — ideal for spotting slow tool calls or flaky providers. `traces tail` streams spans live via SSE.
+
+---
+
+## Memory
+
+### `tutti-ai memory`
+
+Manage per-user memories (uses `TUTTI_PG_URL` like the runtime).
+
+```bash
+tutti-ai memory list --user alice                      # every memory for alice
+tutti-ai memory search "favorite colour" --user alice  # semantic search
+tutti-ai memory add "Prefers dark mode" --user alice   # manual insert
+tutti-ai memory add "Allergic to shellfish" --user alice --importance 3
+tutti-ai memory delete <memory-id> --user alice        # remove one memory
+tutti-ai memory clear --user alice                     # delete all (confirms)
+tutti-ai memory export --user alice > alice-memory.json
+```
+
+**Common options:**
+
+| Flag | Description |
+| ---- | ----------- |
+| `--user <user-id>` | End-user identifier (required for most subcommands). |
+| `--importance <n>` | `1` (low), `2` (normal, default), `3` (high). Used by `add`. |
+
+Memories are ranked by importance and recency; `search` uses the same embedding model as the runtime's semantic memory.
+
+---
+
+## Evaluation
+
+### `tutti-ai eval`
+
+Run evaluation suites, manage golden cases, and gate CI on regression.
+
+```bash
+tutti-ai eval list                                  # every golden case + latest status
+tutti-ai eval record <session-id>                   # promote a past run to a golden case
+tutti-ai eval run                                   # replay every case, report pass/fail
+tutti-ai eval run --case <id>                       # filter by id (8-char prefix ok)
+tutti-ai eval run --tag regression                  # filter by tag
+tutti-ai eval run --ci                              # JUnit XML + exit 1 on any failure
+tutti-ai eval suite ./my-suite.ts                   # v1 assertion-based suite runner
+```
+
+**`eval run` options:**
+
+| Flag | Description |
+| ---- | ----------- |
+| `--case <id>` | Run only the case with this id (full or 8-char prefix). |
+| `--tag <tag>` | Run only cases carrying this tag. Combinable with `--case` (ANDed). |
+| `--ci` | Plain one-line-per-case output, no ANSI, writes JUnit XML to `.tutti/eval-results.xml`, exits 1 if any case fails. |
+| `-s, --score <path>` | Score file to load (default `./tutti.score.ts`). |
+
+`eval record <session-id>` captures the output + tool sequence of a past session and stores it as a pinned golden case. Subsequent `eval run` calls replay the agent against the captured input and score the result with configured scorers (`exact`, `similarity`, `tool-sequence`, or custom modules).
+
+See the [eval guide](/guides/eval) for scorer configuration and CI integration.
+
+---
+
+## Human-in-the-loop
+
+### `tutti-ai interrupts`
+
+Review and resolve approval-gated tool calls produced by agents with `requireApproval` configured.
+
+```bash
+tutti-ai interrupts                         # interactive TUI (default)
+tutti-ai interrupts list                    # plain table, script-friendly
+tutti-ai interrupts approve <interrupt-id>  # approve directly
+tutti-ai interrupts deny <interrupt-id>     # deny directly
+```
+
+**Common options:**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `-u, --url <url>` | `http://127.0.0.1:3847` | Server URL. |
+| `-k, --api-key <key>` | `TUTTI_API_KEY` env | Bearer token. |
+
+The interactive TUI shows each pending interrupt (agent, tool, input, reason) and accepts `a` (approve), `d` (deny), `s` (skip), or `q` (quit). `list` prints a plain table and exits — useful in shell scripts.
+
+### `tutti-ai approve`
+
+Alias for the interactive TUI (`tutti-ai interrupts` with no subcommand). Same flags as [`interrupts`](#tutti-ai-interrupts).
+
+```bash
+tutti-ai approve
+```
+
+---
 
 ## Error handling
 
-The CLI installs global handlers for `unhandledRejection` and `uncaughtException`, ensuring a clean error message and exit code 1 on unexpected failures.
+The CLI installs global handlers for `unhandledRejection` and `uncaughtException`, ensuring a clean error message and exit code 1 on unexpected failures. All user-facing error messages are redacted through `SecretsManager` before printing — secrets (API keys, tokens, DB URLs) never appear in output.

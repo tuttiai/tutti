@@ -40,10 +40,16 @@ An **agent** is an LLM-powered worker. Each agent has:
 | `max_tool_calls` | No | Max tool calls per run (default: 20) |
 | `tool_timeout_ms` | No | Per-tool timeout in ms (default: 30000) |
 | `budget` | No | Token/cost budget for this agent |
-| `semantic_memory` | No | Long-term memory config (`{ enabled, max_memories }`) |
+| `memory` | No | Long-term memory (`{ semantic_memory?, user_memory? }`). See [Memory](#memory). |
 | `streaming` | No | Enable token-by-token streaming (default: false) |
 | `delegates` | No | Agent IDs this orchestrator can delegate to |
 | `role` | No | `"orchestrator"` or `"specialist"` |
+| `durable` | No | Checkpoint between turns to Redis/Postgres so crashed runs can resume. |
+| `schedule` | No | Cron / interval / one-shot trigger — see the [scheduler guide](/guides/scheduling). |
+| `outputSchema` | No | Zod schema; the agent returns a validated typed object. |
+| `allow_human_input` | No | Agent can emit `hitl:requested` events to ask a human. |
+| `requireApproval` | No | Gate specific tool calls behind an interrupt that must be approved. |
+| `beforeRun` / `afterRun` | No | Guardrail hooks (validation, PII redaction, topic blocking). |
 
 ```ts
 {
@@ -86,6 +92,12 @@ Official voices:
 | Filesystem | `@tuttiai/filesystem` | `filesystem` | 7 tools |
 | GitHub | `@tuttiai/github` | `network` | 10 tools |
 | Playwright | `@tuttiai/playwright` | `network`, `browser` | 12 tools |
+| Web | `@tuttiai/web` | `network` | 3 tools |
+| Sandbox | `@tuttiai/sandbox` | `shell` | 4 tools |
+| RAG | `@tuttiai/rag` | `filesystem`, `network` | ingest / chunk / embed / search |
+| MCP Bridge | `@tuttiai/mcp` | `network` | dynamic (any MCP server) |
+
+See the [Voices Overview](/voices/overview) for details on each.
 
 ## Runtime
 
@@ -144,25 +156,43 @@ By default, sessions live in memory. Add `memory: { provider: "postgres" }` to y
 
 ## Memory
 
-Tutti has two kinds of memory:
+Tutti has three kinds of memory, each configured separately:
 
-| Type | Scope | Survives restart? | Config |
-| ---- | ----- | ----------------- | ------ |
-| **Session** | One conversation | In-memory: no. Postgres: yes. | `score.memory` |
-| **Semantic** | Across all sessions | In-memory only (for now) | `agent.semantic_memory` |
+| Type | Scope | Backend | Config |
+| ---- | ----- | ------- | ------ |
+| **Session** | One conversation | In-memory / Postgres | `score.memory.provider` |
+| **Semantic** | All sessions for an agent | In-memory / Postgres | `agent.memory.semantic_memory` |
+| **User** | All sessions for an end-user, across agents | Postgres | `agent.memory.user_memory` |
 
-**Semantic memory** lets agents remember facts across sessions — preferences, project context, decisions. Enable it per agent:
+**Semantic memory** lets agents remember facts about their own work — project context, past decisions, recurring preferences. Enable it per agent:
 
 ```ts
 {
   coder: {
-    semantic_memory: { enabled: true, max_memories: 5 },
+    memory: { semantic_memory: { enabled: true, max_memories: 5 } },
     // ...
   },
 }
 ```
 
-Tools can explicitly store memories via `context.memory.remember()`. See the [Memory & Sessions guide](/guides/memory-sessions) for full details.
+**User memory** attaches facts to an end-user identifier and auto-injects them into the system prompt on every run, so agents remember who they're talking to across sessions. Optionally, memories can be auto-extracted from conversation. Backed by `TUTTI_PG_URL`.
+
+```ts
+{
+  assistant: {
+    memory: {
+      user_memory: { enabled: true, auto_extract: true, max_memories: 20 },
+    },
+  },
+}
+
+// At runtime — pass the end-user id so memories are scoped correctly:
+await tutti.run("assistant", "Hi again", undefined, { user_id: "alice" });
+```
+
+Inspect or edit user memories via the [`tutti-ai memory`](/cli/reference#tutti-ai-memory) CLI.
+
+Tools can explicitly store semantic memories via `context.memory.remember()`. See the [Memory & Sessions guide](/guides/memory-sessions) for full details.
 
 ## Tool result caching
 
@@ -267,7 +297,16 @@ In development, logs are colorized via pino-pretty. In production (`NODE_ENV=pro
 
 ## Telemetry
 
-Tutti supports [OpenTelemetry](https://opentelemetry.io/) for distributed tracing. Enable it in your score:
+Tracing is **always on** — the runtime emits spans for every agent run, LLM call, and tool invocation through a built-in in-process tracer (`TuttiTracer` from `@tuttiai/telemetry`). No config needed for local inspection:
+
+```bash
+tutti-ai serve            # in one shell
+tutti-ai traces list      # in another — see the last 20 runs
+tutti-ai traces show <id> # render every span in a trace as an indented tree
+tutti-ai traces tail      # live-tail spans as they are emitted
+```
+
+To export spans to an external backend (Grafana Tempo, Honeycomb, Jaeger, etc.), add an OTLP endpoint to your score:
 
 ```ts
 export default defineScore({
@@ -281,7 +320,7 @@ export default defineScore({
 });
 ```
 
-When enabled, the runtime wraps agent runs, LLM calls, and tool executions in OpenTelemetry spans:
+Span tree:
 
 ```
 agent.run (agent.name=assistant, session.id=abc-123)
@@ -290,6 +329,8 @@ agent.run (agent.name=assistant, session.id=abc-123)
   ├── llm.call (llm.model=claude-sonnet-4-20250514)
   └── ...
 ```
+
+Cost estimates are attached to every `llm.call` span via the built-in `MODEL_PRICES` table — register custom models with `registerModelPrice()` from `@tuttiai/telemetry`.
 
 ## MCP Bridge
 

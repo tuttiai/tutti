@@ -56,19 +56,24 @@ npx tutti-ai run
 
 ## Packages
 
-| Package | Version | Description |
-| ------- | ------- | ----------- |
-| [`@tuttiai/types`](packages/types) | 0.7.0 | Type definitions and Zod schemas |
-| [`@tuttiai/core`](packages/core) | 0.11.0 | Runtime, providers, security, memory, telemetry |
-| [`@tuttiai/cli`](packages/cli) | 0.11.0 | CLI (`tutti-ai init`, `run`, `serve`, `studio`, `eval`) |
-| [`@tuttiai/server`](packages/server) | 0.1.0 | HTTP server: REST API, SSE streaming, Docker support |
-| [`@tuttiai/filesystem`](voices/filesystem) | 0.1.0 | 7 file tools (read, write, search, etc.) |
-| [`@tuttiai/github`](voices/github) | 0.1.0 | 10 GitHub tools (issues, PRs, repos, code search) |
-| [`@tuttiai/playwright`](voices/playwright) | 0.1.0 | 12 browser tools (navigate, click, type, screenshot) |
-| [`@tuttiai/web`](voices/web) | 0.1.0 | 3 web tools (search, fetch URL, sitemap) |
-| [`@tuttiai/sandbox`](voices/sandbox) | 0.1.0 | 4 code execution tools (TS, Python, Bash + file I/O) |
-| [`@tuttiai/mcp`](voices/mcp) | 0.1.0 | MCP bridge — wraps any MCP server |
-| [`@tuttiai/rag`](voices/rag) | 0.1.0 | RAG: ingest, chunk, embed, search |
+Published on npm — run `tutti-ai outdated` in your project for the
+versions currently installed, or check the npm page for each package
+for the latest published version.
+
+| Package | Description |
+| ------- | ----------- |
+| [`@tuttiai/types`](packages/types) | Type definitions and Zod schemas (zero runtime deps) |
+| [`@tuttiai/core`](packages/core) | Runtime, agent loop, providers, security, memory, telemetry |
+| [`@tuttiai/cli`](packages/cli) | CLI — `init`, `run`, `serve`, `studio`, `schedule`, `eval`, `traces`, `memory`, and more |
+| [`@tuttiai/server`](packages/server) | HTTP server: REST API, SSE streaming, HITL endpoints, Docker support |
+| [`@tuttiai/telemetry`](packages/telemetry) | OpenTelemetry tracer — spans for every run, LLM call, and tool invocation |
+| [`@tuttiai/filesystem`](voices/filesystem) | 7 file tools (read, write, search, etc.) |
+| [`@tuttiai/github`](voices/github) | 10 GitHub tools (issues, PRs, repos, code search) |
+| [`@tuttiai/playwright`](voices/playwright) | 12 browser tools (navigate, click, type, screenshot) |
+| [`@tuttiai/web`](voices/web) | 3 web tools (search, fetch URL, sitemap) |
+| [`@tuttiai/sandbox`](voices/sandbox) | 4 code execution tools (TS, Python, Bash + file I/O) |
+| [`@tuttiai/mcp`](voices/mcp) | MCP bridge — wraps any MCP server as a voice |
+| [`@tuttiai/rag`](voices/rag) | RAG: ingest, chunk, embed, search |
 
 ## Features
 
