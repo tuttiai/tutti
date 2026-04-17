@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed — `tutti-ai info` resolves installed package versions
+- `tutti-ai info` now reads `node_modules/<name>/package.json` to show the actual installed version of each `@tuttiai/*` dependency instead of echoing back the spec string (e.g. `0.18.3` instead of `*`, `^1.0.0`, or `workspace:*`). Falls back to the spec when the package isn't installed or its manifest is unreadable.
+- `resolveInstalledVersion(name, spec, cwd?)` exported from `packages/cli/src/commands/info.ts` — pure helper with 4 unit tests covering installed / missing / malformed manifest / missing-version cases.
+
 ## [0.21.0] - 2026-04-15
 
 Four major features landed in this milestone — each one closes a specific gap Tutti had versus the broader agent-framework ecosystem:

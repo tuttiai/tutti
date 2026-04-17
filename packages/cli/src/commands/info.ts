@@ -15,6 +15,31 @@ function pad(s: string, len: number): string {
   return s.length >= len ? s : s + " ".repeat(len - s.length);
 }
 
+/**
+ * Resolve the installed version of a dependency by reading its
+ * `node_modules/<name>/package.json`. Falls back to the spec string
+ * (e.g. `*`, `^1.0.0`, `workspace:*`) when the package isn't installed
+ * or the file can't be read.
+ *
+ * @param name - Dependency package name (e.g. `@tuttiai/core`).
+ * @param spec - Version range from the project's `package.json`.
+ * @param cwd - Project root to search from. Defaults to `process.cwd()`.
+ */
+export function resolveInstalledVersion(
+  name: string,
+  spec: string,
+  cwd: string = process.cwd(),
+): string {
+  try {
+    const pkgPath = resolve(cwd, "node_modules", name, "package.json");
+    if (!existsSync(pkgPath)) return spec;
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
+    return pkg.version ?? spec;
+  } catch {
+    return spec;
+  }
+}
+
 export async function infoCommand(scorePath?: string): Promise<void> {
   // Project info from package.json
   const pkgPath = resolve(process.cwd(), "package.json");
@@ -58,7 +83,8 @@ export async function infoCommand(scorePath?: string): Promise<void> {
     console.log();
     console.log("  " + chalk.bold("Packages:"));
     for (const [name, version] of tuttiPkgs) {
-      console.log("    " + pad(name, 28) + chalk.dim(version));
+      const resolved = resolveInstalledVersion(name, version);
+      console.log("    " + pad(name, 28) + chalk.dim(resolved));
     }
   }
 
