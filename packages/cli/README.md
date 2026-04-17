@@ -24,21 +24,59 @@ npm run dev
 
 ### `tutti-ai run [score]`
 
-Load a score file and open an interactive REPL:
+Load a score file and open an interactive REPL, or run a single turn
+non-interactively with `-p`.
 
 ```bash
-tutti-ai run                     # defaults to ./tutti.score.ts
-tutti-ai run ./custom-score.ts   # specify a score file
-tutti-ai run --watch             # hot-reload the score on file changes
-tutti-ai run -w ./score.ts       # short alias
+tutti-ai run                     # REPL, defaults to ./tutti.score.ts
+tutti-ai run ./custom-score.ts   # REPL, custom score path
+tutti-ai run --watch             # REPL with hot reload on file changes
+tutti-ai run -w ./score.ts       # short alias for --watch
+tutti-ai run -p "what is 2 + 2?" # one-shot: runs once, prints, exits
 ```
 
-Features:
-- Spinner on LLM calls
-- Colored tool execution trace
+Options:
+
+| Flag | What it does |
+|---|---|
+| `-w, --watch` | Reload the score and rebuild the runtime whenever the score file (or any file in its directory tree) changes on disk. |
+| `-p, --prompt <text>` | Run a single turn against the default `assistant` agent, print the final output to stdout, and exit. Skips the REPL entirely — safe to pipe and script. |
+
+Features in REPL mode:
+- Streaming output (spinner until the first token, then live tokens)
+- Colored tool execution trace: `[using: tool_name]` / `[done: tool_name]`
 - Session continuity across messages
-- Graceful Ctrl+C handling
+- Graceful exit — type `exit` / `quit`, or Ctrl+C; the terminal state
+  (raw mode, cursor, stdin) is fully restored before the process exits
 - Hot reload with `--watch` / `-w` (see below)
+
+#### One-shot mode (`-p` / `--prompt`)
+
+`-p "<text>"` runs a single turn and exits — designed for scripting,
+CI smoke tests, and shell pipelines.
+
+```bash
+$ tutti-ai run -p "What is 2 + 2?"
+4
+
+$ tutti-ai run -p "summarize this README" > summary.txt
+
+$ tutti-ai run --prompt "explain TypeScript generics in one sentence"
+TypeScript generics let you write reusable code parameterized by types.
+```
+
+Behaviour:
+
+- Always targets the agent keyed `assistant` in the score. Adjust the
+  score if you want a different agent to answer.
+- Streaming is forced off — only the final result reaches stdout, so
+  piping is safe.
+- Logs (`pino`) are silenced to keep stdout clean. Use the server
+  (`tutti-ai serve`) if you need structured events.
+- Non-zero exit on error (missing API key, agent exception, etc.).
+  Error messages go to stderr with a red `Error:` prefix.
+- No interactive prompts at all — stdin is never read, so it's safe
+  inside non-TTY contexts (cron, CI, shell subprocesses).
 
 #### Watch mode
 
@@ -261,12 +299,49 @@ Output:
 
 ### `tutti-ai info [score]`
 
-Show project information — agents, voices, models, package versions,
-schedule configs, and feature flags.
+Show project information — agents, voices, models, installed package
+versions, schedule configs, and feature flags. Handy for verifying
+that your environment matches what the score expects.
 
 ```bash
 tutti-ai info
 tutti-ai info ./custom-score.ts
+```
+
+What it prints:
+
+- **Project** — name + version from `package.json`
+- **Packages** — every `@tuttiai/*` dependency with its **resolved**
+  installed version read from `node_modules/<name>/package.json`
+  (e.g. `0.18.3` rather than the `*` / `^0.18.0` / `workspace:*` spec).
+  Falls back to the spec string when the package isn't installed.
+- **Score** — path / name of the score file
+- **Agents** — for each agent: id, display name, model, voices, and
+  feature flags (streaming, hitl, durable, scheduled, structured,
+  guardrails). Scheduled agents show their trigger (cron / interval /
+  one-shot datetime).
+- **Entry** — the entry agent id or `parallel` when the score runs
+  multiple agents concurrently.
+
+Sample output:
+
+```
+  Tutti Project Info
+
+  Project:  my-agent 0.1.0
+
+  Packages:
+    @tuttiai/core               0.18.3
+    @tuttiai/filesystem         0.4.2
+    @tuttiai/types              0.7.0
+  Score:    /path/to/tutti.score.ts
+
+  Agents: (1)
+
+    assistant (Assistant)
+      Model:  claude-sonnet-4-20250514
+      Voices: filesystem
+      Flags:  streaming
 ```
 
 ### `tutti-ai upgrade [voice]`

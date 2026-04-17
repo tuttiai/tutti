@@ -22,6 +22,16 @@ npm install
 tutti-ai run                 # interactive REPL
 ```
 
+Or skip the REPL for a one-shot prompt:
+
+```bash
+tutti-ai run -p "What is 2 + 2?"
+```
+
+See the [CLI reference](https://tutti-ai.com/cli/reference) for the
+full command list — `run`, `serve`, `studio`, `info`, `check`,
+`schedule`, `eval`, and more.
+
 ## Links
 
 - [Website](https://tutti-ai.com)

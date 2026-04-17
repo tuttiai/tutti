@@ -43,14 +43,24 @@ my-project/
 
 ## `tutti-ai run [score]`
 
-Run a Tutti score interactively in a REPL.
+Run a Tutti score interactively in a REPL, or run a single turn
+non-interactively with `-p`.
 
 ```bash
-tutti-ai run                    # uses ./tutti.score.ts
-tutti-ai run ./path/to/score.ts # custom path
+tutti-ai run                         # REPL, uses ./tutti.score.ts
+tutti-ai run ./path/to/score.ts      # REPL, custom path
+tutti-ai run --watch                 # REPL with hot-reload on file changes
+tutti-ai run -p "What is 2 + 2?"     # one-shot, prints result, exits
 ```
 
-**Output:**
+**Options:**
+
+| Flag | Description |
+| ---- | ----------- |
+| `-w, --watch` | Reload the score and rebuild the runtime whenever the score file (or any file in its directory tree) changes on disk. Session history survives across reloads. |
+| `-p, --prompt <text>` | Run a single turn against the default `assistant` agent, print the result to stdout, and exit. Streaming is forced off so stdout contains only the final output — safe to pipe. Non-zero exit on error. |
+
+### Interactive REPL
 
 ```
 Tutti REPL — type "exit" to quit
@@ -64,7 +74,7 @@ Hello! How can I help you today?
 Goodbye!
 ```
 
-**Behavior:**
+**Behaviour:**
 
 - Loads `.env` automatically via `dotenv`
 - Validates the API key for the detected provider
@@ -72,7 +82,28 @@ Goodbye!
 - Shows tool usage, errors, security warnings, and budget events
 - **Streaming output** — tokens print to the terminal as they arrive (spinner until first token)
 - Tool calls shown inline: `[using: tool_name]` / `[done: tool_name]`
-- Ctrl+C to exit gracefully (even mid-stream)
+- `exit`, `quit`, or Ctrl+C leave gracefully — stdin raw mode and the
+  cursor are restored so the shell prompt redraws cleanly afterwards
+
+### One-shot mode (`-p` / `--prompt`)
+
+Designed for scripting, CI smoke tests, and pipelines.
+
+```bash
+$ tutti-ai run -p "What is 2 + 2?"
+4
+
+$ tutti-ai run -p "summarize this README" > summary.txt
+
+$ tutti-ai run --prompt "explain TypeScript generics in one sentence"
+TypeScript generics let you write reusable code parameterized by types.
+```
+
+One-shot mode always targets the agent keyed `assistant` in the score.
+Streaming and pino logs are silenced so the stdout stream is clean.
+The REPL (readline, spinner, file watcher) is bypassed entirely —
+stdin is never read, so it's safe inside non-TTY contexts (cron, CI,
+shell subprocesses).
 
 ---
 
@@ -166,6 +197,56 @@ Alias for `check`. Validates a score file without running it.
 tutti-ai doctor
 tutti-ai doctor ./path/to/score.ts
 ```
+
+---
+
+## `tutti-ai info [score]`
+
+Show project information — agents, voices, models, installed package
+versions, schedule configs, and feature flags. Useful for confirming
+your local setup matches what the score expects.
+
+```bash
+tutti-ai info
+tutti-ai info ./path/to/score.ts
+```
+
+**Example output:**
+
+```
+  Tutti Project Info
+
+  Project:  my-agent 0.1.0
+
+  Packages:
+    @tuttiai/core               0.18.3
+    @tuttiai/filesystem         0.4.2
+    @tuttiai/types              0.7.0
+  Score:    /path/to/tutti.score.ts
+
+  Agents: (1)
+
+    assistant (Assistant)
+      Model:  claude-sonnet-4-20250514
+      Voices: filesystem
+      Flags:  streaming
+```
+
+**Package versions** are read from `node_modules/<name>/package.json`,
+so what you see is what your project will actually run — not the
+`*` / `^0.18.0` / `workspace:*` spec from `package.json`. When a
+package isn't installed, the spec string is shown as a fallback.
+
+**Agent flags** that appear:
+
+| Flag | Meaning |
+| ---- | ------- |
+| `streaming` | Agent streams tokens during `tutti-ai run` |
+| `hitl` | Agent can request human input via `allow_human_input` |
+| `durable` | Checkpoints to Redis/Postgres between turns |
+| `scheduled` | Has a `schedule` block (cron / interval / one-shot) |
+| `structured` | Has an `outputSchema` for typed output |
+| `guardrails` | Has `beforeRun` or `afterRun` hooks |
 
 ---
 

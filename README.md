@@ -206,7 +206,8 @@ tutti-ai check [score]           # Validate a score
 tutti-ai info [score]            # Show agents, voices, versions
 
 # Run
-tutti-ai run [score]             # Run a score interactively
+tutti-ai run [score]             # Run a score interactively (REPL)
+tutti-ai run -p "ask something"  # One-shot: single prompt, prints to stdout
 tutti-ai serve [score]           # Start the HTTP server
 tutti-ai studio [score]          # Launch the web UI
 tutti-ai replay <session-id>     # Time-travel debug a session

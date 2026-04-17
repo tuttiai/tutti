@@ -69,6 +69,18 @@ The capital of France is Paris.
 >
 ```
 
+Type `exit` (or Ctrl+C) to leave.
+
+### One-shot mode
+
+Skip the REPL entirely — run a single prompt and get the answer back on
+stdout. Great for scripts and pipelines:
+
+```bash
+$ npx tutti-ai run -p "What is the capital of France?"
+The capital of France is Paris.
+```
+
 ## 5. Add tools
 
 Let's give the agent filesystem access:
