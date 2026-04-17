@@ -21,8 +21,8 @@ const score = defineScore({
       name: "assistant",
       voices: [
         new McpVoice({
-          command: "npx",
-          args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+          // Full shell command for the MCP server — split on whitespace
+          server: "npx -y @modelcontextprotocol/server-filesystem /tmp",
         }),
       ],
       permissions: ["network"],
@@ -30,6 +30,15 @@ const score = defineScore({
   },
 });
 ```
+
+### Options
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `server` | `string` (required) | Shell command that launches the MCP server. Split on whitespace — the first token is the executable, the rest are arguments. |
+| `args` | `string[]` | Additional CLI arguments appended after the server command. |
+| `env` | `Record<string, string>` | Extra environment variables passed to the server child process. |
+| `name` | `string` | Override the voice name (default: `mcp-<server-name>`). |
 
 The voice spawns the MCP server as a child process on `setup()`, discovers
 its tools via `tools/list`, and exposes them as Tutti tools. On `teardown()`,

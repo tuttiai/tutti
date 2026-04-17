@@ -13,9 +13,25 @@ Voices give agents the ability to interact with external systems. This guide cov
 npx tutti-ai add filesystem
 npx tutti-ai add github
 npx tutti-ai add playwright
+npx tutti-ai add web
+npx tutti-ai add sandbox
+npx tutti-ai add rag
+npx tutti-ai add mcp
 ```
 
-The `add` command installs the npm package and prints setup instructions.
+The `add` command installs the npm package and prints setup instructions. Shorthand names resolve to official packages (`@tuttiai/<name>`); unknown names fall back to the literal package, so `tutti-ai add @someone/custom-voice` works too.
+
+### Official voices at a glance
+
+| Shorthand | Package | Tools | What it gives the agent |
+| --------- | ------- | ----- | ----------------------- |
+| `filesystem` | `@tuttiai/filesystem` | 7 | Read, write, search, and manage local files |
+| `github` | `@tuttiai/github` | 10 | Issues, PRs, repos, code search via the GitHub API |
+| `playwright` | `@tuttiai/playwright` | 12 | Browser automation (navigate, click, type, screenshot, etc.) |
+| `web` | `@tuttiai/web` | 3 | Search the web, fetch URLs, parse sitemaps |
+| `sandbox` | `@tuttiai/sandbox` | 4 | Execute TypeScript / Python / Bash in a sandboxed subprocess |
+| `rag` | `@tuttiai/rag` | ingest / chunk / embed / search | Retrieval-augmented generation over your own docs |
+| `mcp` | `@tuttiai/mcp` | dynamic | Wrap any MCP server — tools discovered at runtime |
 
 ## Use a voice in your score
 
@@ -71,6 +87,10 @@ new PlaywrightVoice({
 | Filesystem | — | No |
 | GitHub | `GITHUB_TOKEN` | Yes (for authenticated API access) |
 | Playwright | — | No (but needs `npx playwright install chromium`) |
+| Web | `BRAVE_SEARCH_API_KEY` or `SERPER_API_KEY` | Yes, for `search_web` (fetch / sitemap work without one) |
+| Sandbox | — | No (requires TypeScript / Python / Bash runtimes available on `PATH`) |
+| RAG | `OPENAI_API_KEY` for embeddings; `RAG_PG_URL` if using the pgvector store | Depends on configured backend |
+| MCP | varies | Per the MCP server you wrap — passed through via the `env` option |
 
 ## Community voices
 
