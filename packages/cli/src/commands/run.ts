@@ -19,6 +19,11 @@ import { logger } from "../logger.js";
 
 export interface RunOptions {
   watch?: boolean;
+  /**
+   * When set, run a single turn with this prompt and exit instead of
+   * entering the REPL. Useful for scripting and CI smoke tests.
+   */
+  prompt?: string;
 }
 
 /**
@@ -77,6 +82,28 @@ export async function runCommand(
     }
   };
   applyRunDefaults(score);
+
+  // One-shot non-interactive mode: run a single turn with -p and exit.
+  // Skip the REPL setup entirely — no readline, no spinner, no watcher.
+  if (options.prompt !== undefined) {
+    for (const agent of Object.values(score.agents)) {
+      agent.streaming = false;
+    }
+    coreLogger.level = "silent";
+    logger.level = "silent";
+    const runtime = buildRuntime(score, undefined);
+    try {
+      const result = await runtime.run("assistant", options.prompt);
+      process.stdout.write(result.output + "\n");
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(
+        chalk.red("Error: " + (err instanceof Error ? err.message : String(err))) +
+          "\n",
+      );
+      process.exit(1);
+    }
+  }
 
   const sharedSessions: SessionStore | undefined = options.watch
     ? new InMemorySessionStore()

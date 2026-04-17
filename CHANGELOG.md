@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added — `tutti-ai run -p "<prompt>"` one-shot non-interactive mode
+- `tutti-ai run -p "hello"` (also `--prompt`) runs a single turn against the default `assistant` agent, prints the final output to stdout, and exits. Useful for scripts, CI smoke tests, and shell pipelines. Non-zero exit on error.
+- Streaming is forced off in one-shot mode so only the final result reaches stdout; pino loggers are silenced so the output is clean.
+- REPL setup (readline, spinner, file watcher) is entirely skipped on the one-shot path — no stdin interaction, safe to pipe.
+
 ### Fixed — `tutti-ai info` resolves installed package versions
 - `tutti-ai info` now reads `node_modules/<name>/package.json` to show the actual installed version of each `@tuttiai/*` dependency instead of echoing back the spec string (e.g. `0.18.3` instead of `*`, `^1.0.0`, or `workspace:*`). Falls back to the spec when the package isn't installed or its manifest is unreadable.
 - `resolveInstalledVersion(name, spec, cwd?)` exported from `packages/cli/src/commands/info.ts` — pure helper with 4 unit tests covering installed / missing / malformed manifest / missing-version cases.

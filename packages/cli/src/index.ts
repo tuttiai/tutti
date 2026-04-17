@@ -86,11 +86,20 @@ program
 
 program
   .command("run [score]")
-  .description("Run a Tutti score interactively")
+  .description("Run a Tutti score interactively, or one-shot with -p")
   .option("-w, --watch", "Reload the score on file changes")
-  .action(async (score: string | undefined, opts: { watch?: boolean }) => {
-    await runCommand(score, { watch: opts.watch });
-  });
+  .option("-p, --prompt <text>", "Run a single prompt non-interactively and exit")
+  .action(
+    async (
+      score: string | undefined,
+      opts: { watch?: boolean; prompt?: string },
+    ) => {
+      await runCommand(score, {
+        ...(opts.watch !== undefined ? { watch: opts.watch } : {}),
+        ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
+      });
+    },
+  );
 
 program
   .command("serve [score]")
