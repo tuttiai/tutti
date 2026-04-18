@@ -14,8 +14,6 @@ export default defineConfig({
         "src/index.ts",
         "dist/**",
         "**/*.d.ts",
-        // pgvector store requires a live PostgreSQL + pgvector extension
-        "src/stores/pgvector.ts",
       ],
       thresholds: {
         lines: 80,

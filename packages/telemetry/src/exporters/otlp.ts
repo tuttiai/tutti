@@ -57,7 +57,9 @@ export interface OTLPExporterOptions {
 function dateToHrTime(d: Date): HrTime {
   const ms = d.getTime();
   const seconds = Math.trunc(ms / 1000);
-  const nanos = Math.round((ms - seconds * 1000) * 1_000_000);
+  // `ms % 1000` — cheaper and more precise than `ms - seconds * 1000`,
+  // which drifts once `ms` nears the 53-bit safe-integer range.
+  const nanos = Math.round((ms % 1000) * 1_000_000);
   return [seconds, nanos];
 }
 
@@ -122,7 +124,8 @@ function tuttiSpanToReadableSpan(span: TuttiSpan): ReadableSpan {
   const endTime = span.ended_at ? dateToHrTime(span.ended_at) : startTime;
   const durationMs = span.duration_ms ?? 0;
   const durationSec = Math.trunc(durationMs / 1000);
-  const durationNano = Math.round((durationMs - durationSec * 1000) * 1_000_000);
+  // Same modulo trick as dateToHrTime — avoid subtractive precision loss.
+  const durationNano = Math.round((durationMs % 1000) * 1_000_000);
 
   const ctx: SpanContext = {
     traceId,

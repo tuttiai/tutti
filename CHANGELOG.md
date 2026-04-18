@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed — close open GitHub Code Quality findings
+- `packages/core/tests/eval/golden/runner.test.ts`: drop unused `afterEach` / `beforeEach` vitest imports.
+- `packages/core/tests/interrupt/runner-interrupt.test.ts`: drop unused `InterruptDeniedError` import.
+- `packages/cli/src/logger.ts`: attach a TSDoc comment directly to the `logger` singleton export so TypeScript tooling surfaces the "import this, don't call `createLogger()`" rule (and the `MaxListenersExceededWarning` rationale behind it) on hover / completions, not just as a file-header comment.
+- `voices/rag/vitest.config.ts`: stop excluding `src/stores/pgvector.ts` from coverage — the tests in `tests/stores/pgvector.test.ts` already exercise it conditionally (skipping when no Postgres is reachable), so tracking real coverage is the more accurate signal. Overall coverage remains above all `voices/*` thresholds (82.79 % lines).
+- `packages/telemetry/src/exporters/otlp.ts`: replace the two `ms - seconds * 1000` subtractions with `ms % 1000` in `dateToHrTime` and in the `tuttiSpanToReadableSpan` duration split. Avoids floating-point drift when the input approaches the 53-bit safe-integer range and is marginally cheaper.
+
 ### Security — patch four Dependabot advisories
 - `fastify` → `5.8.5` in `packages/server/package.json` (direct dep). Fixes [GHSA](https://github.com/advisories) body-schema validation bypass via leading space in the `Content-Type` header (high).
 - `protobufjs` → `7.5.5` via lockfile update (transitive through `@opentelemetry/auto-instrumentations-node` → `@grpc/grpc-js` → `@grpc/proto-loader`). Fixes arbitrary code execution advisory (critical).

@@ -5,7 +5,6 @@ import { AgentRunner } from "../../src/agent-runner.js";
 import { EventBus } from "../../src/event-bus.js";
 import { InMemorySessionStore } from "../../src/session-store.js";
 import { MemoryInterruptStore } from "../../src/interrupt/memory-store.js";
-import { InterruptDeniedError } from "../../src/errors.js";
 import {
   createMockProvider,
   textResponse,
