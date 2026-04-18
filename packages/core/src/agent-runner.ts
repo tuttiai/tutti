@@ -1065,7 +1065,7 @@ export class AgentRunner {
         // see) and BEFORE cache lookup (so a cached result doesn't
         // bypass review). Denial throws InterruptDeniedError which
         // propagates up and aborts the run.
-        if (needsApproval(requireApproval, block.name)) {
+        if (needsApproval(requireApproval, block.name, tool.destructive)) {
           await this.awaitApproval(context.session_id, block.name, parsed);
         }
 

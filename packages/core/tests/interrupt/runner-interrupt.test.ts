@@ -18,7 +18,10 @@ import type { AgentConfig, TuttiEvent, Voice } from "@tuttiai/types";
  * spy rejects by default (to make unapproved runs visible) and can be
  * reconfigured per-test.
  */
-function buildToolVoice(name: string): {
+function buildToolVoice(
+  name: string,
+  options: { destructive?: boolean } = {},
+): {
   voice: Voice;
   execute: ReturnType<typeof vi.fn>;
 } {
@@ -32,6 +35,7 @@ function buildToolVoice(name: string): {
         description: "Does a thing",
         parameters: z.object({ to: z.string() }),
         execute,
+        ...(options.destructive !== undefined ? { destructive: options.destructive } : {}),
       },
     ],
   };
@@ -344,5 +348,106 @@ describe("AgentRunner — requireApproval end-to-end", () => {
     expect(second.resolved_by).toBe("first");
 
     await expect(runPromise).resolves.toBeDefined();
+  });
+});
+
+describe("AgentRunner — destructive tool gating", () => {
+  it("gates a destructive tool with no requireApproval config", async () => {
+    const { voice, execute } = buildToolVoice("post_tweet", { destructive: true });
+
+    const provider = createMockProvider([
+      toolUseResponse("post_tweet", { to: "hello world" }),
+      textResponse("Done!"),
+    ]);
+    const events = new EventBus();
+    const store = new MemoryInterruptStore();
+    const runner = new AgentRunner(
+      provider,
+      events,
+      new InMemorySessionStore(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      store,
+    );
+
+    // No requireApproval on this agent — destructive flag alone should gate.
+    const agent: AgentConfig = { ...simpleAgent, voices: [voice] };
+    const runPromise = runner.run(agent, "post that");
+
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+      if ((await store.listPending()).length > 0) break;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+
+    const [pending] = await store.listPending();
+    expect(pending).toBeDefined();
+    expect(pending!.tool_name).toBe("post_tweet");
+    expect(execute).not.toHaveBeenCalled();
+
+    await runner.resolveInterrupt(pending!.interrupt_id, "approved");
+    await expect(runPromise).resolves.toMatchObject({ output: "Done!" });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT gate destructive tools when requireApproval=false (explicit opt-out)", async () => {
+    const { voice, execute } = buildToolVoice("post_tweet", { destructive: true });
+
+    const provider = createMockProvider([
+      toolUseResponse("post_tweet", { to: "yolo" }),
+      textResponse("done"),
+    ]);
+    const events = new EventBus();
+    const store = new MemoryInterruptStore();
+    const runner = new AgentRunner(
+      provider,
+      events,
+      new InMemorySessionStore(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      store,
+    );
+
+    // Operator has explicitly opted out — destructive flag must not re-gate.
+    const agent: AgentConfig = {
+      ...simpleAgent,
+      voices: [voice],
+      requireApproval: false,
+    };
+    await runner.run(agent, "go");
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(await store.listPending()).toEqual([]);
+  });
+
+  it("leaves non-destructive tools ungated when no requireApproval config is set", async () => {
+    const { voice, execute } = buildToolVoice("read_file", { destructive: false });
+
+    const provider = createMockProvider([
+      toolUseResponse("read_file", { to: "/a" }),
+      textResponse("read"),
+    ]);
+    const events = new EventBus();
+    const store = new MemoryInterruptStore();
+    const runner = new AgentRunner(
+      provider,
+      events,
+      new InMemorySessionStore(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      store,
+    );
+
+    const agent: AgentConfig = { ...simpleAgent, voices: [voice] };
+    await runner.run(agent, "read it");
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(await store.listPending()).toEqual([]);
   });
 });

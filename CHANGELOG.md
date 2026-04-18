@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/twitter` voice (9 tools)
+- New official voice at `voices/twitter/`, published as `@tuttiai/twitter@0.1.0`. Built on `twitter-api-v2@1.29.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
+- 9 tools — 3 write (destructive) + 6 read:
+  - `post_tweet { text, reply_to?, quote_url? }`, `post_thread { tweets[] }`, `delete_tweet { tweet_id }` — all marked `destructive: true` so HITL-enabled runtimes gate them behind operator approval automatically.
+  - `search_tweets`, `get_tweet`, `list_mentions`, `list_replies`, `get_user`, `get_timeline` — read-only.
+- Auth resolution is lazy and fail-soft: OAuth 1.0a credentials (`TWITTER_API_KEY` + `TWITTER_API_SECRET` + `TWITTER_ACCESS_TOKEN` + `TWITTER_ACCESS_TOKEN_SECRET`) give full read + write; `TWITTER_BEARER_TOKEN` alone gives read-only and write tools short-circuit with a helpful `is_error` message rather than throwing. Missing-auth cases return `is_error` with a link to developer.x.com.
+- Quote tweet URLs (`https://x.com/<user>/status/<id>` or twitter.com equivalent) are parsed locally and the `quote_tweet_id` is forwarded to the v2 API; malformed URLs are rejected before hitting the network.
+- 54 unit tests covering happy path, auth gating for every write tool, read-only fallback, search/timeline/user rendering, zero-result branches, and every HTTP-status branch (401/403/404/429/generic) of the error formatter. Line coverage 99.18 %, function coverage 100 %, branch coverage 75.15 % — all voice thresholds met.
+
+### Added — `Tool.destructive?: boolean` + automatic HITL gating
+- New optional field on the `Tool` interface in `@tuttiai/types` (`packages/types/src/voice.ts`). Marks tools whose side effects are hard to undo — posting, deleting, sending, paying. Optional, defaults to `false`; existing voices are unaffected.
+- `needsApproval(config, tool_name, destructive?)` in `packages/core/src/interrupt/index.ts` now consults the flag. Precedence: (1) `requireApproval: false` is an explicit operator opt-out — nothing gates, not even destructive tools; (2) `destructive: true` on the tool → always gate; (3) otherwise fall back to the existing `"all"` / glob-list / undefined behaviour.
+- `AgentRunner.executeTool` forwards `tool.destructive` to `needsApproval` at the existing gate site — no change to the `InterruptStore` contract, the `interrupt:requested` / `interrupt:resolved` event shape, or the `tutti-ai interrupts` TUI.
+- Practical effect: an agent using `@tuttiai/twitter` with no `requireApproval` config will still pause on `post_tweet` / `post_thread` / `delete_tweet` until an operator approves via `TuttiRuntime.resolveInterrupt`. Agents that need the old "never pause" behaviour set `requireApproval: false` explicitly.
+- 5 new unit tests on `needsApproval` covering every branch + 3 end-to-end tests through `AgentRunner` proving (a) destructive tools gate with no config, (b) `requireApproval: false` still opts out, (c) non-destructive tools remain ungated without config.
+
 ### Fixed — close open GitHub Code Quality findings
 - `packages/core/tests/eval/golden/runner.test.ts`: drop unused `afterEach` / `beforeEach` vitest imports.
 - `packages/core/tests/interrupt/runner-interrupt.test.ts`: drop unused `InterruptDeniedError` import.

@@ -91,4 +91,32 @@ describe("needsApproval", () => {
   it("returns false for an empty pattern array", () => {
     expect(needsApproval([], "anything")).toBe(false);
   });
+
+  describe("destructive-tool gating", () => {
+    it("gates a destructive tool when config is undefined", () => {
+      expect(needsApproval(undefined, "post_tweet", true)).toBe(true);
+    });
+
+    it("does NOT gate a destructive tool when config is explicitly false", () => {
+      // Explicit operator opt-out wins over the tool's destructive flag.
+      expect(needsApproval(false, "post_tweet", true)).toBe(false);
+    });
+
+    it("gates destructive tools even when not in the glob list", () => {
+      expect(needsApproval(["send_*"], "post_tweet", true)).toBe(true);
+    });
+
+    it("does not change existing behaviour for non-destructive tools", () => {
+      expect(needsApproval(undefined, "read_file", false)).toBe(false);
+      expect(needsApproval(["send_*"], "read_file", false)).toBe(false);
+      expect(needsApproval(["send_*"], "send_email", false)).toBe(true);
+    });
+
+    it("treats destructive=undefined the same as destructive=false", () => {
+      // The Tool interface makes `destructive` optional. Missing flag =
+      // not destructive.
+      expect(needsApproval(undefined, "read_file")).toBe(false);
+      expect(needsApproval(["send_*"], "read_file")).toBe(false);
+    });
+  });
 });
