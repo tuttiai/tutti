@@ -63,6 +63,13 @@ export interface Tool<T = unknown> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parameters: ZodType<T, any, any>;
   execute(input: T, context: ToolContext): Promise<ToolResult>;
+  /**
+   * Marks the tool as having real-world side effects that are hard to
+   * undo — posting, sending, deleting, paying, etc. Runtimes with HITL
+   * support may gate execution behind human approval when this is true.
+   * Optional; defaults to false.
+   */
+  destructive?: boolean;
 }
 
 export interface VoiceContext {
