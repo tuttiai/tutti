@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Security — patch four Dependabot advisories
+- `fastify` → `5.8.5` in `packages/server/package.json` (direct dep). Fixes [GHSA](https://github.com/advisories) body-schema validation bypass via leading space in the `Content-Type` header (high).
+- `protobufjs` → `7.5.5` via lockfile update (transitive through `@opentelemetry/auto-instrumentations-node` → `@grpc/grpc-js` → `@grpc/proto-loader`). Fixes arbitrary code execution advisory (critical).
+- `hono` → `4.12.14` via lockfile update (transitive through `@modelcontextprotocol/sdk` → `@hono/node-server`). Fixes JSX attribute HTML-injection in the `hono/jsx` SSR path (moderate).
+- `npm audit --audit-level=high` now reports `found 0 vulnerabilities`.
+
 ### Fixed — typing `exit` in the REPL leaves the terminal stuck
 - Typing `exit` / `quit` in `tutti-ai run` appeared to hang the shell even after the process had terminated. Root cause: readline + ora leave stdin in raw mode on exit, so the next shell prompt never draws. Fixed by routing `exit`, `quit`, SIGINT, and normal loop termination through a single `shutdown()` path that explicitly calls `process.stdin.setRawMode(false)` and `process.stdin.pause()` before `process.exit(0)`.
 - Shutdown is idempotent (guarded by a `shuttingDown` flag) — a second SIGINT while the first is still cleaning up is a no-op instead of a double `Goodbye!` banner or a crash from closing an already-closed readline.
