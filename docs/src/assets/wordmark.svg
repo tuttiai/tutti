@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="60" viewBox="0 0 260 60" fill="none">
+  <g transform="translate(6 6)">
+    <path d="M 8 40 C 8 3, 50 3, 50 40" stroke="#0F6E56" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="29" cy="27" r="4.5" fill="#0F6E56"/>
+  </g>
+  <text x="72" y="42" font-family="Inter, system-ui, sans-serif" font-size="34" font-weight="500" letter-spacing="-1" fill="#0F1117">tutti <tspan fill="#0F6E56">ai</tspan></text>
+</svg>

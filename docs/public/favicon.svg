@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 100 80">
+  <defs>
+    <mask id="dot">
+      <rect width="100" height="80" fill="white"/>
+      <circle cx="50" cy="38" r="9" fill="black"/>
+    </mask>
+  </defs>
+  <path d="M 14 56 C 14 8, 86 8, 86 56 L 14 56 Z" fill="#0F6E56" mask="url(#dot)"/>
+</svg>

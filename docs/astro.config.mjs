@@ -5,21 +5,30 @@ export default defineConfig({
   site: "https://docs.tutti-ai.com",
   integrations: [
     starlight({
-      title: "Tutti",
-      description:
-        "Open-source multi-agent orchestration framework for TypeScript",
-      // logo: { src: "./public/logo.svg" },
+      title: "Tutti AI",
+      description: "All agents. All together.",
+      logo: {
+        light: "./src/assets/logo.svg",
+        dark: "./src/assets/logo-dark.svg",
+        replacesTitle: false,
+      },
       social: [
         { icon: "github", label: "GitHub", href: "https://github.com/tuttiai/tutti" },
       ],
       editLink: {
         baseUrl: "https://github.com/tuttiai/tutti/edit/main/docs/",
       },
-      customCss: [],
-      // Algolia search — uncomment when ready:
-      // head: [
-      //   { tag: 'link', attrs: { rel: 'stylesheet', href: 'https://cdn.jsdelivr.net/npm/@docsearch/css@3' } },
-      // ],
+      customCss: ["./src/styles/custom.css"],
+      head: [
+        { tag: "link", attrs: { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" } },
+        { tag: "link", attrs: { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" } },
+        { tag: "link", attrs: { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" } },
+        { tag: "link", attrs: { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" } },
+        { tag: "meta", attrs: { property: "og:image", content: "https://docs.tutti-ai.com/og-image.png" } },
+        { tag: "meta", attrs: { property: "og:title", content: "Tutti AI" } },
+        { tag: "meta", attrs: { property: "og:description", content: "All agents. All together." } },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+      ],
       sidebar: [
         {
           label: "Getting Started",

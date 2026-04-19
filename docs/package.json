@@ -4,11 +4,15 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "astro": "^5.0.0",
     "@astrojs/starlight": "^0.33.0",
     "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
   }
 }

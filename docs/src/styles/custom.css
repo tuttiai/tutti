@@ -1,0 +1,21 @@
+@import './brand-tokens.css';
+
+:root {
+  --sl-color-accent: var(--tutti-brand-deep);
+  --sl-color-accent-high: var(--tutti-brand-bright);
+  --sl-font: var(--tutti-font-body);
+  --sl-font-system-mono: var(--tutti-font-mono);
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent: var(--tutti-brand-soft);
+  --sl-color-accent-high: var(--tutti-brand-bright);
+}
+
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3 {
+  font-family: var(--tutti-font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}

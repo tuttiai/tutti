@@ -1,0 +1,35 @@
+/**
+ * Tutti AI — brand tokens v1.0
+ * Imported by tutti/docs and (later) the private website repo.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --tutti-brand-deep: #0F6E56;
+  --tutti-brand-bright: #1D9E75;
+  --tutti-brand-soft: #5DCAA5;
+  --tutti-ink: #0F1117;
+  --tutti-paper: #FAF9F5;
+  --tutti-stone: #F1EFE8;
+  --tutti-smoke: #5F5E5A;
+  --tutti-graphite: #2C2C2A;
+  --tutti-purple: #7F77DD;
+  --tutti-amber: #BA7517;
+  --tutti-coral: #D85A30;
+  --tutti-blue: #378ADD;
+  --tutti-font-display: 'Instrument Serif', Georgia, serif;
+  --tutti-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --tutti-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --tutti-surface: var(--tutti-paper);
+  --tutti-text: var(--tutti-ink);
+  --tutti-text-muted: var(--tutti-smoke);
+  --tutti-accent: var(--tutti-brand-deep);
+  --tutti-border: rgba(15, 17, 23, 0.1);
+}
+:root[data-theme='dark'] {
+  --tutti-surface: var(--tutti-ink);
+  --tutti-text: var(--tutti-paper);
+  --tutti-text-muted: #9b9a94;
+  --tutti-accent: var(--tutti-brand-soft);
+  --tutti-border: rgba(250, 249, 245, 0.1);
+}
