@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/stripe` voice (27 tools)
+- New official voice at `voices/stripe/`, published as `@tuttiai/stripe@0.1.0`. Built on `stripe@18.5.0` with API version pinned to `2025-08-27.basil`; runtime additions are `zod` + `@tuttiai/types`.
+- Broad Stripe API surface — 27 tools across customers, products, prices, payment links, payment intents, charges, refunds, subscriptions, invoices, disputes, balance:
+  - **Read (18)**: `list_customers`, `get_customer`, `list_products`, `list_prices`, `list_payment_intents`, `get_payment_intent`, `list_charges`, `get_charge`, `list_refunds`, `get_refund`, `list_subscriptions`, `get_subscription`, `list_invoices`, `get_invoice`, `list_disputes`, `get_dispute`, `get_balance`, `list_balance_transactions`.
+  - **Write (9, all `destructive: true`)**: `create_customer`, `create_product`, `create_price`, `create_payment_link`, `cancel_payment_intent`, `create_refund`, `cancel_subscription`, `finalize_invoice`, `void_invoice`. Critical here because a `create_refund` or `void_invoice` against a `sk_live_` key moves real money — HITL-enabled runtimes pause every one for operator approval.
+- Auth resolution is lazy and fail-soft: missing `STRIPE_SECRET_KEY` returns a `kind: "missing"` client; tool calls short-circuit with `is_error` and a hint pointing at dashboard.stripe.com/apikeys plus the test-mode recommendation. The voice detects the `sk_live_` prefix and stamps `[test]` on every output line for test-mode keys, giving operators a visual cue while reviewing.
+- Amount formatting via `Intl.NumberFormat` per ISO currency, with explicit handling of zero-decimal currencies (`JPY`, `KRW`, `BIF`, etc.) so `1500 JPY` renders as `1,500 JPY` and not `15.00 JPY`. Unknown 3-letter codes fall through to `Intl` (which renders sensibly on modern Node) with a `<amount>.toFixed(2) <CODE>` defensive fallback for older runtimes.
+- Error mapping covers every Stripe error class: `StripeAuthenticationError` → "check key + mode", `StripePermissionError` → "restricted key needs grant", `StripeRateLimitError` → "slow down", `StripeIdempotencyError`, `StripeInvalidRequestError` (with `param` surfaced), `StripeCardError` (with `decline_code`), `StripeAPIError` → "Stripe-side, retry with backoff", `StripeConnectionError`. Every formatted message includes status code, request id, and `doc_url` when present.
+- `create_refund` validates that at least one of `charge`/`payment_intent` is provided via a Zod refinement, so the agent never reaches Stripe with an ambiguous request.
+- 111 unit tests covering happy path, auth gating, lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), every list tool's pagination + filter forwarding, every write tool's destructive marking, every error-class branch in the error formatter, and per-tool error-path tests so every tool's catch handler is exercised. Line coverage 99.25 %, function coverage 98.75 %, branch coverage 76.01 % — all voice thresholds met.
+
 ### Added — `@tuttiai/postgres` voice (8 tools)
 - New official voice at `voices/postgres/`, published as `@tuttiai/postgres@0.1.0`. Built on `pg@8.20.0` (already a workspace dep via `voices/rag`), so no new transitive surface; runtime additions are `zod` + `@tuttiai/types`.
 - Read-only by default with one destructive escape hatch:

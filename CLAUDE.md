@@ -43,6 +43,7 @@ voices/web/          @tuttiai/web        3 web tools: search, fetch, sitemap
 voices/sandbox/      @tuttiai/sandbox    4 tools: execute, read, write, install
 voices/slack/        @tuttiai/slack      11 Slack workspace tools (chat, reactions, channels, users)
 voices/postgres/     @tuttiai/postgres   8 Postgres tools (query/execute + introspection)
+voices/stripe/       @tuttiai/stripe     27 Stripe API tools (customers, payments, subs, invoices, balance)
 docs/                                    Astro Starlight documentation site
 ```
 
@@ -378,7 +379,7 @@ async run(agent_name: string, input: string, session_id?: string): Promise<Agent
 | `chore` | Build, deps, CI config |
 | `ci` | CI pipeline changes |
 
-Scopes: `core`, `cli`, `types`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `voice/slack`, `voice/postgres`, `docs`, `ci`.
+Scopes: `core`, `cli`, `types`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `voice/slack`, `voice/postgres`, `voice/stripe`, `docs`, `ci`.
 
 ### PR checklist (ALL must pass before merge)
 
