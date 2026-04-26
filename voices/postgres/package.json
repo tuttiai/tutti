@@ -1,0 +1,41 @@
+{
+  "name": "@tuttiai/postgres",
+  "version": "0.1.0",
+  "description": "Tutti voice — query and inspect a PostgreSQL database from agents (read-only by default)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pg": "8.20.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.0"
+  },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.9.0"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "voices/postgres"
+  },
+  "homepage": "https://tutti-ai.com",
+  "keywords": ["tutti", "ai", "agents", "postgres", "postgresql", "database", "sql", "voice"]
+}
