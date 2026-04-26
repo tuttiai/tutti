@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/postgres` voice (8 tools)
+- New official voice at `voices/postgres/`, published as `@tuttiai/postgres@0.1.0`. Built on `pg@8.20.0` (already a workspace dep via `voices/rag`), so no new transitive surface; runtime additions are `zod` + `@tuttiai/types`.
+- Read-only by default with one destructive escape hatch:
+  - `query { sql, params, max_rows }` — runs every statement inside `BEGIN READ ONLY ... ROLLBACK`. Postgres rejects writes with SQLSTATE `25006` even if the connecting role has write privileges, and the error is mapped to a clear "use the 'execute' tool" hint.
+  - `execute { sql, params }` — only writable surface. Marked `destructive: true`, so HITL-enabled runtimes gate it behind operator approval automatically. Returns `<COMMAND> — N rows affected`.
+  - 6 introspection tools — `list_schemas`, `list_tables` (with `pg_class.reltuples` row estimates), `describe_table` (columns + types + nullability + defaults + PK membership), `list_indexes` (with full `CREATE INDEX` DDL), `explain` (`EXPLAIN VERBOSE` or `EXPLAIN (ANALYZE, BUFFERS, VERBOSE)` inside the same read-only transaction), and `get_database_info` (version, db, user, on-disk size, schema/table counts).
+- Pool lifecycle is lazy and fail-soft: missing `DATABASE_URL` (or `POSTGRES_URL`) returns a `kind: "missing"` client; tool calls short-circuit with `is_error` and a hint pointing at the connection-string format and the recommended read-only role grant. Construction never throws.
+- `statement_timeout` is configured pool-wide (default 30 s) — even direct `pool.query()` calls cannot hang the agent loop. SQLSTATE `57014` is mapped to "raise statement_timeout_ms or simplify the query" so the cause is obvious. `max_connections` defaults to 5, low enough to coexist with a small managed Postgres without exhausting its limit.
+- Identifier safety helpers in `src/utils/identifiers.ts` (`assertIdentifier`, `quoteIdent`, `quoteQualified`) keep schema/table interpolation bounded to ASCII identifiers; everywhere else, schema/table strings travel as bind parameters into `information_schema` and `pg_indexes` queries instead of being concatenated into SQL.
+- Result rendering: rows formatted as a fixed-width text grid via `formatTable()`, cells truncated at 200 chars, full text capped at 8 KB with a "[result truncated]" footer so a wide SELECT can never blow up the agent's context window.
+- 57 unit tests covering happy path, auth gating, read-only enforcement (the 25006-rejection path *plus* the cleanup path where `ROLLBACK` itself fails after a query error and the connection is still released), `statement_timeout`-cancelled (57014), every documented SQLSTATE branch (`28P01`/`28000`/`3D000`/`42P01`/`42703`/`42501`/`42601`/`23505`/`23503`/`23502`/`53300`/`57014`/`25006`), `formatCell` for every pg row type (null, number, boolean, string, Date, Buffer, BigInt, plain object, cyclic), pool lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), and identifier-helper rejection of `'a";DROP'` / `'a.b.c'` / leading-digit / spaces. Line coverage 95.48 %, function coverage 96.96 %, branch coverage 81.58 % — all voice thresholds met.
+
 ### Added — `@tuttiai/slack` voice (11 tools)
 - New official voice at `voices/slack/`, published as `@tuttiai/slack@0.1.0`. Built on `@slack/web-api@7.10.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
 - 11 tools — 5 write (destructive) + 6 read:
