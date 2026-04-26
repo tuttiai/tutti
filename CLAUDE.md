@@ -41,6 +41,7 @@ voices/playwright/   @tuttiai/playwright 12 browser automation tools
 voices/mcp/          @tuttiai/mcp        MCP bridge — wraps any MCP server
 voices/web/          @tuttiai/web        3 web tools: search, fetch, sitemap
 voices/sandbox/      @tuttiai/sandbox    4 tools: execute, read, write, install
+voices/slack/        @tuttiai/slack      11 Slack workspace tools (chat, reactions, channels, users)
 docs/                                    Astro Starlight documentation site
 ```
 
@@ -376,7 +377,7 @@ async run(agent_name: string, input: string, session_id?: string): Promise<Agent
 | `chore` | Build, deps, CI config |
 | `ci` | CI pipeline changes |
 
-Scopes: `core`, `cli`, `types`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `docs`, `ci`.
+Scopes: `core`, `cli`, `types`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `voice/slack`, `docs`, `ci`.
 
 ### PR checklist (ALL must pass before merge)
 

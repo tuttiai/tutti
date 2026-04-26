@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/slack` voice (11 tools)
+- New official voice at `voices/slack/`, published as `@tuttiai/slack@0.1.0`. Built on `@slack/web-api@7.10.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
+- 11 tools — 5 write (destructive) + 6 read:
+  - `post_message { channel, text, thread_ts? }`, `update_message { channel, ts, text }`, `delete_message { channel, ts }`, `add_reaction { channel, ts, name }`, `send_dm { user, text }` — all marked `destructive: true` so HITL-enabled runtimes gate them behind operator approval automatically.
+  - `list_messages`, `get_message`, `list_channels`, `list_members`, `search_messages`, `get_workspace_info` — read-only.
+- Auth resolution is lazy and fail-soft: missing `SLACK_BOT_TOKEN` returns a `kind: "missing"` client; tool calls short-circuit with `is_error` and a hint pointing at api.slack.com plus the OAuth scopes the bot needs (`chat:write`, `channels:read`, `channels:history`, `reactions:write`, `users:read`, `team:read`, optional `groups:read` / `groups:history` / `im:write`). Construction never throws.
+- `add_reaction` accepts emoji names with or without surrounding `:` and normalises them before calling `reactions.add`.
+- `send_dm` is a single tool that opens (or reuses) the IM channel via `conversations.open` and posts a message in one step — agents do not need to reason about Slack's two-step DM flow.
+- `search_messages` does a local case-insensitive substring scan over the last 200 messages of one channel via `conversations.history`. The workspace-wide `search.messages` endpoint requires a user token (`xoxp-`) which standard bot installs do not have, so we never reach for it — same approach as the discord voice.
+- 66 unit tests covering happy path, auth gating for every write tool, lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), and every documented Slack error code branch (`not_authed`, `invalid_auth`, `missing_scope`, `channel_not_found`, `user_not_found`, `not_in_channel`, `message_not_found`, `cant_update_message`, `cant_delete_message`, `ratelimited`, `msg_too_long`, `is_archived`, `no_text`). Line coverage 97.79 %, function coverage 97.22 %, branch coverage 82.70 % — all voice thresholds met.
+
 ### Added — `@tuttiai/twitter` voice (9 tools)
 - New official voice at `voices/twitter/`, published as `@tuttiai/twitter@0.1.0`. Built on `twitter-api-v2@1.29.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
 - 9 tools — 3 write (destructive) + 6 read:
