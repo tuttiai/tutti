@@ -1,0 +1,54 @@
+{
+  "name": "@tuttiai/router",
+  "version": "0.1.0",
+  "description": "Smart model router for Tutti — picks the cheapest LLM that can handle each turn",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tuttiai/core": "*",
+    "@tuttiai/types": "*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  },
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "router",
+    "llm",
+    "cost-optimization"
+  ],
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "packages/router"
+  },
+  "homepage": "https://tutti-ai.com"
+}
