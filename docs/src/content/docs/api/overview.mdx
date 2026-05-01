@@ -262,6 +262,37 @@ interface StreamChunk {
 }
 ```
 
+## @tuttiai/router
+
+Smart model routing — meta-provider that picks the cheapest configured model per turn based on task difficulty, the agent's destructive-tool count, and the active token budget. See the [Smart Routing guide](/guides/smart-routing) for usage and policy choices.
+
+### Provider
+
+| Export | Description |
+| ------ | ----------- |
+| `SmartProvider` | Meta-`LLMProvider` — classifies each request and dispatches to a configured tier; supports `previewDecision()`, `getLastDecision()`, and per-call `force_tier` / `force_reason` overrides |
+
+### Classifiers
+
+| Export | Description |
+| ------ | ----------- |
+| `HeuristicClassifier` | Default — input length, code detection, complexity keywords, tool count, destructive-tool premium. ~1ms, $0 / call |
+| `LLMClassifier` | Asks a small/cheap LLM (configurable via `classifier_provider`, defaults to the `small` tier) for a one-word difficulty label per turn |
+
+### Types
+
+| Export | Description |
+| ------ | ----------- |
+| `Tier` | `"small"`, `"medium"`, `"large"`, or `"fallback"` |
+| `ModelTier` | `{ tier, provider, model, max_context?, pricing? }` — one entry per configured model |
+| `ClassifierStrategy` | `"heuristic"`, `"llm"`, or `"embedding"` (placeholder for a follow-up release) |
+| `RoutingPolicy` | `"cost-optimised"` (default), `"quality-first"`, or `"balanced"` — biases tier thresholds |
+| `SmartProviderConfig` | Constructor options for `SmartProvider` (`tiers`, `classifier`, `policy`, `max_cost_per_run_usd`, `auto_escalate`, `classifier_provider`, `on_decision`, `on_fallback`) |
+| `RoutingDecision` | Per-call result: `{ tier, model, reason, classifier, estimated_input_tokens, estimated_cost_usd }` — also emitted on the `router:decision` event |
+| `ClassifierContext` | Routing-only signals passed to a classifier (policy, voices loaded, turn index, remaining budget, previous stop reason, destructive-tool count) |
+| `Classifier` | Strategy interface — `classify(req, ctx) => Promise<Tier>` |
+| `ChatOverride` | `{ force_tier?, force_reason? }` for `SmartProvider.chat()` |
+
 ## @tuttiai/mcp
 
 MCP bridge voice — wraps any MCP server as a Tutti voice.
