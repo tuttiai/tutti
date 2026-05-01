@@ -1,21 +1,94 @@
 @import './brand-tokens.css';
 
+/* ───────────────────────────────────────────────────────────
+   Starlight uses a three-stop accent scale plus a separate
+   text-accent for links. All four must be set, per theme.
+   Default :root block = dark mode (Starlight convention).
+   :root[data-theme='light'] overrides for light mode.
+   ─────────────────────────────────────────────────────────── */
+
 :root {
-  --sl-color-accent: var(--tutti-brand-deep);
-  --sl-color-accent-high: var(--tutti-brand-bright);
+  /* Dark mode (default) */
+  --sl-color-accent-low: #04342C;
+  --sl-color-accent: #1D9E75;
+  --sl-color-accent-high: #5DCAA5;
+  --sl-color-text-accent: #5DCAA5;
+
+  --sl-color-white: var(--tutti-paper);
+  --sl-color-gray-1: #e6e5e1;
+  --sl-color-gray-2: #bfbeb8;
+  --sl-color-gray-3: #888780;
+  --sl-color-gray-4: #5F5E5A;
+  --sl-color-gray-5: #2C2C2A;
+  --sl-color-gray-6: #1a1d24;
+  --sl-color-black: var(--tutti-ink);
+
+  --sl-color-bg: var(--tutti-ink);
+  --sl-color-bg-nav: rgba(15, 17, 23, 0.8);
+  --sl-color-bg-sidebar: #1a1d24;
+  --sl-color-bg-inline-code: #1a1d24;
+
   --sl-font: var(--tutti-font-body);
   --sl-font-system-mono: var(--tutti-font-mono);
 }
 
-:root[data-theme='dark'] {
-  --sl-color-accent: var(--tutti-brand-soft);
-  --sl-color-accent-high: var(--tutti-brand-bright);
+:root[data-theme='light'] {
+  --sl-color-accent-low: #E1F5EE;
+  --sl-color-accent: #0F6E56;
+  --sl-color-accent-high: #04342C;
+  --sl-color-text-accent: #0F6E56;
+
+  --sl-color-white: var(--tutti-ink);
+  --sl-color-gray-1: #2C2C2A;
+  --sl-color-gray-2: #444441;
+  --sl-color-gray-3: #5F5E5A;
+  --sl-color-gray-4: #888780;
+  --sl-color-gray-5: #e6e5e1;
+  --sl-color-gray-6: var(--tutti-stone);
+  --sl-color-gray-7: #faf9f5;
+  --sl-color-black: var(--tutti-paper);
+
+  --sl-color-bg: var(--tutti-paper);
+  --sl-color-bg-nav: rgba(250, 249, 245, 0.8);
+  --sl-color-bg-sidebar: var(--tutti-stone);
+  --sl-color-bg-inline-code: var(--tutti-stone);
 }
 
+/* ───────────────────────────────────────────────────────────
+   Display serif on Splash hero + markdown headings.
+   .hero h1 is the Splash template home title.
+   .sl-markdown-content covers regular doc pages.
+   ─────────────────────────────────────────────────────────── */
+
+.hero h1,
 .sl-markdown-content h1,
 .sl-markdown-content h2,
 .sl-markdown-content h3 {
   font-family: var(--tutti-font-display);
   font-weight: 400;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
+
+.hero h1 {
+  font-size: clamp(3rem, 6vw, 5rem);
+  line-height: 1;
+}
+
+.hero .tagline {
+  font-family: var(--tutti-font-display);
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--sl-color-gray-3);
+}
+
+/* Sitename in the header — keep it sans but tint the AI */
+.site-title {
+  font-family: var(--tutti-font-body);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+/* ───────────────────────────────────────────────────────────
+   Starlight Splash CTAs inherit --sl-color-accent correctly
+   once the variables above are fixed — no extra rules needed.
+   ─────────────────────────────────────────────────────────── */

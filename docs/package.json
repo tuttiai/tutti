@@ -14,5 +14,8 @@
   },
   "devDependencies": {
     "vitest": "^2.1.0"
+  },
+  "overrides": {
+    "@astrojs/sitemap": "3.7.0"
   }
 }
