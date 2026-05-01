@@ -20,6 +20,8 @@ import {
 chalk.level = 1;
 
 import {
+  isRouterSpan,
+  renderRouterSummary,
   renderSpanLine,
   renderTraceShow,
   renderTracesList,
@@ -294,5 +296,156 @@ describe("renderSpanLine", () => {
     expect(stripAnsi(renderSpanLine(span, 0)).startsWith("▶")).toBe(true);
     expect(stripAnsi(renderSpanLine(span, 1)).startsWith("  ▶")).toBe(true);
     expect(stripAnsi(renderSpanLine(span, 3)).startsWith("      ▶")).toBe(true);
+  });
+});
+
+/**
+ * Build an agent.run trace whose llm.completion children carry the
+ * `router_*` attributes set by `AgentRunner`'s `@tuttiai/router`
+ * event hooks. `decisions` is the per-call sequence; pass `fallback`
+ * to record a fallback on a specific call.
+ */
+function buildRouterTrace(
+  tracer: TuttiTracer,
+  options: {
+    agentId?: string;
+    decisions: Array<{
+      tier: string;
+      classifier: string;
+      model: string;
+      reason: string;
+      cost?: number;
+      fallback_from?: string;
+      fallback_to?: string;
+      fallback_error?: string;
+    }>;
+  },
+): { traceId: string } {
+  const root = tracer.startSpan(
+    "agent.run",
+    "agent",
+    {
+      ...(options.agentId !== undefined ? { agent_id: options.agentId } : {}),
+      session_id: "sess-r",
+    },
+  );
+
+  for (const d of options.decisions) {
+    const llm = tracer.startSpan("llm.completion", "llm", { model: d.model }, root.span_id);
+    tracer.setAttributes(llm.span_id, {
+      router_tier: d.tier,
+      router_model: d.model,
+      router_classifier: d.classifier,
+      router_reason: d.reason,
+      ...(d.cost !== undefined ? { router_cost_estimate: d.cost } : {}),
+      ...(d.fallback_from !== undefined ? { router_fallback_from: d.fallback_from } : {}),
+      ...(d.fallback_to !== undefined ? { router_fallback_to: d.fallback_to } : {}),
+      ...(d.fallback_error !== undefined ? { router_fallback_error: d.fallback_error } : {}),
+    });
+    tracer.endSpan(llm.span_id, "ok");
+  }
+  tracer.endSpan(root.span_id, "ok");
+  return { traceId: root.trace_id };
+}
+
+describe("isRouterSpan", () => {
+  it("returns true for an llm.completion span carrying any router_* attribute", () => {
+    const tracer = new TuttiTracer();
+    const span = tracer.startSpan("llm.completion", "llm");
+    tracer.setAttributes(span.span_id, { router_tier: "small" });
+    tracer.endSpan(span.span_id, "ok");
+    expect(isRouterSpan(span)).toBe(true);
+  });
+
+  it("returns false for spans with no router_* attributes", () => {
+    const tracer = new TuttiTracer();
+    const span = tracer.startSpan("llm.completion", "llm", { model: "m" });
+    tracer.endSpan(span.span_id, "ok", { total_tokens: 10 });
+    expect(isRouterSpan(span)).toBe(false);
+  });
+
+  it("returns true even if only fallback fields are set", () => {
+    const tracer = new TuttiTracer();
+    const span = tracer.startSpan("llm.completion", "llm");
+    tracer.setAttributes(span.span_id, {
+      router_fallback_from: "a",
+      router_fallback_to: "b",
+      router_fallback_error: "boom",
+    });
+    tracer.endSpan(span.span_id, "ok");
+    expect(isRouterSpan(span)).toBe(true);
+  });
+});
+
+describe("renderRouterSummary", () => {
+  let tracer: TuttiTracer;
+  beforeEach(() => {
+    tracer = new TuttiTracer();
+  });
+
+  it("renders the empty-state message when the trace has no router decisions", () => {
+    const root = tracer.startSpan("agent.run", "agent", { agent_id: "plain" });
+    const llm = tracer.startSpan("llm.completion", "llm", { model: "m" }, root.span_id);
+    tracer.endSpan(llm.span_id, "ok");
+    tracer.endSpan(root.span_id, "ok");
+    const out = stripAnsi(renderRouterSummary(tracer.getAllSpans()));
+    expect(out).toBe("No router decisions found in this trace.");
+  });
+
+  it("renders one row per router decision with tier, classifier, model, cost, reason", () => {
+    const { traceId } = buildRouterTrace(tracer, {
+      agentId: "assistant",
+      decisions: [
+        { tier: "small", classifier: "heuristic", model: "small-m", reason: "classified", cost: 0.000123 },
+        { tier: "medium", classifier: "heuristic", model: "medium-m", reason: "classified", cost: 0.000456 },
+      ],
+    });
+
+    const out = stripAnsi(renderRouterSummary(tracer.getTrace(traceId)));
+    expect(out).toContain("Trace " + traceId.slice(0, 8));
+    expect(out).toContain("agent: assistant");
+    expect(out).toContain("TIER");
+    expect(out).toContain("CLASSIFIER");
+    expect(out).toContain("MODEL");
+    expect(out).toContain("COST");
+    expect(out).toContain("REASON");
+    expect(out).toContain("small");
+    expect(out).toContain("medium");
+    expect(out).toContain("small-m");
+    expect(out).toContain("medium-m");
+    expect(out).toContain("$0.000123");
+    expect(out).toContain("$0.000456");
+    expect(out).toContain("classified");
+    expect(out).toContain("2 router decisions");
+    // Footer total = 0.000123 + 0.000456 = 0.000579
+    expect(out).toContain("$0.000579");
+  });
+
+  it("annotates fallback decisions with a from→to arrow and the error message", () => {
+    const { traceId } = buildRouterTrace(tracer, {
+      agentId: "assistant",
+      decisions: [
+        {
+          tier: "fallback",
+          classifier: "heuristic",
+          model: "fallback-m",
+          reason: "fallback after error: boom",
+          cost: 0.0007,
+          fallback_from: "small-m",
+          fallback_to: "fallback-m",
+          fallback_error: "boom",
+        },
+      ],
+    });
+
+    const out = stripAnsi(renderRouterSummary(tracer.getTrace(traceId)));
+    expect(out).toContain("fallback");
+    expect(out).toContain("fallback-m");
+    expect(out).toContain("fallback after error: boom");
+    expect(out).toContain("↩ small-m → fallback-m");
+    expect(out).toContain('"boom"');
+    expect(out).toContain("1 router decision");
+    // Singular form, not "1 router decisions".
+    expect(out).not.toContain("1 router decisions");
   });
 });

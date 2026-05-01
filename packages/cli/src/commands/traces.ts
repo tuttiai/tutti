@@ -12,6 +12,8 @@ import { SecretsManager } from "@tuttiai/core";
 import type { TraceSummary, TuttiSpan } from "@tuttiai/core";
 
 import {
+  isRouterSpan,
+  renderRouterSummary,
   renderSpanLine,
   renderTraceShow,
   renderTracesList,
@@ -103,9 +105,54 @@ export async function tracesShowCommand(
   console.log(renderTraceShow(spans));
 }
 
+// ── router (one-shot summary) ─────────────────────────────────
+
+/**
+ * Fetch a single trace and render only its `@tuttiai/router` decisions
+ * — chosen tier, classifier, model, and cost per call, plus any fallback
+ * arrows. Useful for "what tier did the router pick on every call of
+ * this run, and how much did it think the run would cost?".
+ */
+export async function tracesRouterCommand(
+  traceId: string,
+  opts: TracesOptions,
+): Promise<void> {
+  const baseUrl = resolveUrl(opts);
+  const url = baseUrl.replace(/\/$/, "") + "/traces/" + encodeURIComponent(traceId);
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: resolveAuthHeader(opts) });
+  } catch (err) {
+    explainConnectionError(err, baseUrl);
+  }
+
+  if (res.status === 404) {
+    console.error(chalk.red('Trace "' + traceId + '" not found.'));
+    process.exit(1);
+  }
+  if (res.status === 401) {
+    console.error(chalk.red("Unauthorized — set --api-key or TUTTI_API_KEY."));
+    process.exit(1);
+  }
+  if (!res.ok) {
+    console.error(chalk.red("Server returned " + res.status + " " + res.statusText));
+    process.exit(1);
+  }
+
+  const body = (await res.json()) as { trace_id: string; spans: TuttiSpan[] };
+  const spans = body.spans.map(reviveSpanDates);
+  console.log(renderRouterSummary(spans));
+}
+
 // ── tail ──────────────────────────────────────────────────────
 
-export async function tracesTailCommand(opts: TracesOptions): Promise<void> {
+/** Extra options for `traces tail` beyond the shared connection settings. */
+export interface TracesTailOptions extends TracesOptions {
+  /** When true, suppress every span that doesn't carry router_* attributes. */
+  routerOnly?: boolean;
+}
+
+export async function tracesTailCommand(opts: TracesTailOptions): Promise<void> {
   const baseUrl = resolveUrl(opts);
   const url = baseUrl.replace(/\/$/, "") + "/traces/stream";
 
@@ -163,6 +210,7 @@ export async function tracesTailCommand(opts: TracesOptions): Promise<void> {
       if (!dataLine) continue;
       try {
         const span = reviveSpanDates(JSON.parse(dataLine.slice(6)) as TuttiSpan);
+        if (opts.routerOnly && !isRouterSpan(span)) continue;
         console.log(renderSpanLine(span, 0));
       } catch (err) {
         console.error(chalk.red("Bad SSE frame: " + (err instanceof Error ? err.message : String(err))));

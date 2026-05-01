@@ -42,9 +42,11 @@ import {
 } from "./commands/schedules.js";
 import {
   tracesListCommand,
+  tracesRouterCommand,
   tracesShowCommand,
   tracesTailCommand,
   type TracesOptions,
+  type TracesTailOptions,
 } from "./commands/traces.js";
 import {
   memoryAddCommand,
@@ -355,12 +357,27 @@ tracesCmd
   .description("Live-tail spans as they are emitted (Ctrl+C to exit)")
   .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
   .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
-  .action(async (opts: { url?: string; apiKey?: string }) => {
+  .option("--router-only", "Suppress spans that don't carry @tuttiai/router attributes")
+  .action(async (opts: { url?: string; apiKey?: string; routerOnly?: boolean }) => {
+    const resolved: TracesTailOptions = {
+      ...(opts.url !== undefined ? { url: opts.url } : {}),
+      ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
+      ...(opts.routerOnly !== undefined ? { routerOnly: opts.routerOnly } : {}),
+    };
+    await tracesTailCommand(resolved);
+  });
+
+tracesCmd
+  .command("router <trace-id>")
+  .description("Render only the @tuttiai/router decisions in this trace")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (traceId: string, opts: { url?: string; apiKey?: string }) => {
     const resolved: TracesOptions = {
       ...(opts.url !== undefined ? { url: opts.url } : {}),
       ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
     };
-    await tracesTailCommand(resolved);
+    await tracesRouterCommand(traceId, resolved);
   });
 
 const memoryCmd = program

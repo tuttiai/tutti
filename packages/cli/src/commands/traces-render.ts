@@ -122,6 +122,121 @@ export function renderSpanLine(span: TuttiSpan, indent: number): string {
   return indentStr + icon + " " + chalk.bold(span.name) + dur + status + attrSuffix;
 }
 
+/**
+ * Returns `true` when the span carries any `router_*` attribute set by
+ * `AgentRunner`'s `@tuttiai/router` event hooks. Cheap predicate used
+ * by the live `traces tail --router-only` filter and by the one-shot
+ * `traces router <trace-id>` summary renderer.
+ */
+export function isRouterSpan(span: TuttiSpan): boolean {
+  const a = span.attributes;
+  return (
+    a.router_tier !== undefined ||
+    a.router_model !== undefined ||
+    a.router_classifier !== undefined ||
+    a.router_reason !== undefined ||
+    a.router_cost_estimate !== undefined ||
+    a.router_fallback_from !== undefined ||
+    a.router_fallback_to !== undefined ||
+    a.router_fallback_error !== undefined
+  );
+}
+
+/**
+ * One-shot summary of every router decision recorded inside a single
+ * trace. Filters to `llm.completion` spans that carry `router_*`
+ * attributes and renders one row per decision plus a footer with the
+ * total estimated routing cost. Renders a friendly empty message when
+ * no router decisions are present (e.g. agent ran against a plain
+ * provider, or the trace pre-dates v0.23.0).
+ */
+export function renderRouterSummary(spans: readonly TuttiSpan[]): string {
+  const decisions = spans.filter((s) => s.name === "llm.completion" && isRouterSpan(s));
+  if (decisions.length === 0) {
+    return chalk.dim("No router decisions found in this trace.");
+  }
+
+  decisions.sort((a, b) => a.started_at.getTime() - b.started_at.getTime());
+
+  const traceId = decisions[0]?.trace_id ?? "";
+  const agentSpan = spans.find((s) => s.kind === "agent" && s.attributes.agent_id !== undefined);
+  const agentLabel = agentSpan?.attributes.agent_id ?? chalk.dim("—");
+
+  const lines: string[] = [""];
+  lines.push(
+    chalk.bold("Trace " + traceId.slice(0, 8)) +
+      chalk.dim(" — agent: ") +
+      agentLabel,
+  );
+  lines.push(chalk.dim("─".repeat(80)));
+  lines.push(
+    chalk.dim(
+      "  " +
+        pad("#", 4) +
+        pad("TIER", 12) +
+        pad("CLASSIFIER", 12) +
+        pad("MODEL", 22) +
+        pad("COST", 14) +
+        "REASON",
+    ),
+  );
+  lines.push(chalk.dim("  " + "─".repeat(78)));
+
+  let totalCost = 0;
+  let anyCost = false;
+  for (let i = 0; i < decisions.length; i++) {
+    const span = decisions[i];
+    if (!span) continue;
+    const a = span.attributes;
+    const tier = a.router_tier ?? chalk.dim("—");
+    const classifier = a.router_classifier ?? chalk.dim("—");
+    const model = a.router_model ?? chalk.dim("—");
+    const cost = a.router_cost_estimate;
+    const reason = a.router_reason ?? chalk.dim("—");
+    if (cost !== undefined) {
+      totalCost += cost;
+      anyCost = true;
+    }
+
+    lines.push(
+      "  " +
+        pad(String(i + 1) + ".", 4) +
+        pad(colorTier(tier), 12) +
+        pad(classifier, 12) +
+        pad(model, 22) +
+        pad(formatCost(cost ?? null), 14) +
+        reason,
+    );
+    if (a.router_fallback_from !== undefined && a.router_fallback_to !== undefined) {
+      const errMsg = a.router_fallback_error ?? "(no error message)";
+      lines.push(
+        "    " +
+          chalk.dim("↩ ") +
+          chalk.red(a.router_fallback_from + " → " + a.router_fallback_to) +
+          chalk.dim('  "' + errMsg + '"'),
+      );
+    }
+  }
+
+  lines.push(chalk.dim("─".repeat(80)));
+  lines.push(
+    chalk.bold(decisions.length.toString()) +
+      chalk.dim(" router decision" + (decisions.length === 1 ? "" : "s") + " · estimated ") +
+      chalk.bold(anyCost ? formatCost(totalCost) : chalk.dim("—")) +
+      chalk.dim(" routing cost"),
+  );
+  lines.push("");
+  return lines.join("\n");
+}
+
+function colorTier(tier: string): string {
+  if (tier === "small") return chalk.green(tier);
+  if (tier === "medium") return chalk.yellow(tier);
+  if (tier === "large") return chalk.magenta(tier);
+  if (tier === "fallback") return chalk.red(tier);
+  return tier;
+}
+
 function formatAttrs(span: TuttiSpan): string {
   const a = span.attributes;
   const parts: string[] = [];
