@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type {
@@ -47,6 +48,27 @@ import {
   RateLimitError,
   StructuredOutputError,
 } from "./errors.js";
+
+/**
+ * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
+ * passes to its `on_decision` callback. Inlined here so `@tuttiai/core`
+ * does not need to depend on `@tuttiai/router` (which would cycle).
+ */
+interface RouterDecisionPayload {
+  tier: string;
+  model: string;
+  reason: string;
+  classifier: string;
+  estimated_input_tokens: number;
+  estimated_cost_usd: number;
+}
+
+/** Mirror of `@tuttiai/router`'s on_fallback payload. */
+interface RouterFallbackPayload {
+  from_model: string;
+  to_model: string;
+  error: string;
+}
 
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
@@ -101,6 +123,13 @@ export class AgentRunner {
     { resolve: (r: InterruptRequest) => void; reject: (err: Error) => void }
   >();
 
+  /**
+   * Per-runner ALS scope used to thread `agent.name` from the call site
+   * down into the `SmartProvider`'s decision/fallback callbacks. A class
+   * field would race when two parallel agents share one runner.
+   */
+  private routerContext = new AsyncLocalStorage<string>();
+
   constructor(
     private provider: LLMProvider,
     private events: EventBus,
@@ -110,7 +139,68 @@ export class AgentRunner {
     private toolCache?: ToolCache,
     private checkpointStore?: CheckpointStore,
     private interruptStore?: InterruptStore,
-  ) {}
+  ) {
+    this.installRouterEventHooks();
+  }
+
+  /**
+   * Run `provider.chat` inside the ALS scope so `SmartProvider`'s
+   * decision/fallback callbacks (installed in
+   * {@link installRouterEventHooks}) can tag emitted events with the
+   * correct `agent_name`. Always called — the no-op cost is a single
+   * `als.run` for non-router providers.
+   */
+  private callProviderChat(agentName: string, request: ChatRequest): Promise<ChatResponse> {
+    return this.routerContext.run(agentName, () => this.provider.chat(request));
+  }
+
+  /**
+   * Detect a `@tuttiai/router` `SmartProvider` via the public `name`
+   * marker and chain wrappers around its `on_decision` /
+   * `on_fallback` config callbacks so router events surface on the
+   * standard EventBus. The user's existing callbacks (if any) keep
+   * firing — we wrap, never replace.
+   */
+  private installRouterEventHooks(): void {
+    const candidate = this.provider as {
+      name?: string;
+      config?: {
+        on_decision?: (decision: RouterDecisionPayload) => void;
+        on_fallback?: (info: RouterFallbackPayload) => void;
+      };
+    };
+    if (candidate.name !== "smart-router" || !candidate.config) return;
+
+    const cfg = candidate.config;
+    const userOnDecision = cfg.on_decision;
+    const userOnFallback = cfg.on_fallback;
+    const events = this.events;
+    const ctx = this.routerContext;
+
+    cfg.on_decision = (decision) => {
+      events.emit({
+        type: "router:decision",
+        agent_name: ctx.getStore() ?? "unknown",
+        tier: decision.tier,
+        model: decision.model,
+        reason: decision.reason,
+        classifier: decision.classifier,
+        estimated_input_tokens: decision.estimated_input_tokens,
+        estimated_cost_usd: decision.estimated_cost_usd,
+      });
+      userOnDecision?.(decision);
+    };
+    cfg.on_fallback = (info) => {
+      events.emit({
+        type: "router:fallback",
+        agent_name: ctx.getStore() ?? "unknown",
+        from_model: info.from_model,
+        to_model: info.to_model,
+        error: info.error,
+      });
+      userOnFallback?.(info);
+    };
+  }
 
   /**
    * Approve or deny a pending interrupt. Updates the
@@ -490,7 +580,7 @@ export class AgentRunner {
           () => withRetry(() =>
             agent.streaming
               ? this.streamToResponse(agent.name, request)
-              : this.provider.chat(request),
+              : this.callProviderChat(agent.name, request),
           ),
         );
 
@@ -748,7 +838,7 @@ export class AgentRunner {
             const retryResponse = await withRetry(() =>
               agent.streaming
                 ? this.streamToResponse(agent.name, retryRequest)
-                : this.provider.chat(retryRequest),
+                : this.callProviderChat(agent.name, retryRequest),
             );
 
             totalUsage.input_tokens += retryResponse.usage.input_tokens;
@@ -856,7 +946,7 @@ export class AgentRunner {
 
     let response: ChatResponse;
     try {
-      response = await this.provider.chat({
+      response = await this.callProviderChat(agent.name, {
         model: agent.model,
         system: extractionPrompt,
         messages: recent,
@@ -913,6 +1003,15 @@ export class AgentRunner {
   }
 
   private async streamToResponse(
+    agentName: string,
+    request: ChatRequest,
+  ): Promise<ChatResponse> {
+    return this.routerContext.run(agentName, async () => {
+      return this.streamToResponseInner(agentName, request);
+    });
+  }
+
+  private async streamToResponseInner(
     agentName: string,
     request: ChatRequest,
   ): Promise<ChatResponse> {

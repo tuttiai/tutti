@@ -15,6 +15,11 @@
 
 ### Changed — `@tuttiai/core`
 - `PRICING` (per-million USD per-model rate table previously file-private to `src/token-budget.ts`) is now exported from `@tuttiai/core`'s public surface so `@tuttiai/router` can estimate per-decision cost without duplicating the table. No change to the existing `TokenBudget` behaviour.
+- `AgentRunner` now duck-types `SmartProvider` (via `provider.name === "smart-router"`) and chains wrappers around its `config.on_decision` / `config.on_fallback` callbacks so router events surface on the standard `EventBus`. The user's existing callbacks keep firing — we wrap, never replace. Per-call `agent_name` is threaded through `AsyncLocalStorage` so events stay correctly attributed even when parallel agents share one runner instance.
+
+### Added — new event types in `@tuttiai/types`
+- `router:decision` — emitted whenever a `SmartProvider` makes a routing decision. Carries `agent_name`, `tier`, `model`, `reason`, `classifier`, `estimated_input_tokens`, `estimated_cost_usd`. Mirrors the `RoutingDecision` shape inline so `@tuttiai/types` does not need to depend on `@tuttiai/router`.
+- `router:fallback` — emitted when a `SmartProvider`'s primary tier throws and the configured `fallback` tier handles the call instead. Carries `agent_name`, `from_model`, `to_model`, `error`. Followed by a second `router:decision` event with a `fallback after error: …` reason so consumers see both the primary attempt and the eventual dispatch.
 
 ### Added — `@tuttiai/stripe` voice (27 tools)
 - New official voice at `voices/stripe/`, published as `@tuttiai/stripe@0.1.0`. Built on `stripe@18.5.0` with API version pinned to `2025-08-27.basil`; runtime additions are `zod` + `@tuttiai/types`.

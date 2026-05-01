@@ -46,6 +46,33 @@ export type TuttiEvent =
       status: "approved" | "denied";
       denial_reason?: string;
       resolved_by?: string;
+    }
+  /**
+   * Emitted by `AgentRunner` whenever a `@tuttiai/router` `SmartProvider`
+   * makes a routing decision. Mirrors the fields of `RoutingDecision`
+   * inline so `@tuttiai/types` does not need to depend on
+   * `@tuttiai/router`.
+   */
+  | {
+      type: "router:decision";
+      agent_name: string;
+      tier: string;
+      model: string;
+      reason: string;
+      classifier: string;
+      estimated_input_tokens: number;
+      estimated_cost_usd: number;
+    }
+  /**
+   * Emitted when a `SmartProvider`'s primary tier throws and the
+   * configured `fallback` tier handles the call instead.
+   */
+  | {
+      type: "router:fallback";
+      agent_name: string;
+      from_model: string;
+      to_model: string;
+      error: string;
     };
 
 export type TuttiEventType = TuttiEvent["type"];
