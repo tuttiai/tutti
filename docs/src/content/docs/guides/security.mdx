@@ -198,6 +198,10 @@ Gate destructive tool calls behind human approval with `requireApproval`:
 
 When the agent attempts a matching tool call, the runtime emits `hitl:requested`, writes an interrupt to the configured `InterruptStore`, and pauses the run. Review and resolve via the [`tutti-ai interrupts`](/cli/reference#tutti-ai-interrupts) TUI, the `/interrupts/*` HTTP endpoints, or the Studio UI.
 
+:::tip[Routing impact]
+When the [smart router](./smart-routing) is enabled, agents with destructive tools loaded automatically bias toward larger, safer models. The cost of an LLM mistake on a destructive call (a posted tweet, a voided invoice, a deleted message) is far higher than the cost of using a smarter model for that turn — `SmartProvider` factors this into every routing decision.
+:::
+
 ## Score validation
 
 Score files are Zod-validated when loaded. Common mistakes are caught early:

@@ -125,3 +125,7 @@ Different models have different pricing. The `TokenBudget` knows about each mode
   },
 }
 ```
+
+## Routing between providers
+
+For agent systems where different turns benefit from different models, see the [Smart Routing guide](./smart-routing). The `SmartProvider` from `@tuttiai/router` wraps any of the providers above and picks the cheapest one that can handle each call.

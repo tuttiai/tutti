@@ -1,0 +1,172 @@
+---
+title: "Smart Model Routing"
+description: "Cut your agent bill by 40-70% — route every turn to the cheapest model that can handle it"
+sidebar:
+  order: 6
+---
+
+Tutti's `SmartProvider` is a meta-provider that picks a different model on every turn based on task difficulty, the agent's destructive tools, and the active token budget. Drop it into any score and your bill typically falls 40–70% with no quality regression on simple tasks.
+
+## Quick start
+
+```ts
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { SmartProvider } from "@tuttiai/router";
+
+export default defineScore({
+  provider: new SmartProvider({
+    tiers: [
+      { tier: "small",  provider: new AnthropicProvider(), model: "claude-haiku-4-5-20251001" },
+      { tier: "medium", provider: new AnthropicProvider(), model: "claude-sonnet-4-6" },
+      { tier: "large",  provider: new AnthropicProvider(), model: "claude-opus-4-7" },
+    ],
+    classifier: "heuristic",
+    policy: "cost-optimised",
+  }),
+  agents: { /* unchanged */ },
+});
+```
+
+That's it. Every call your agents make now picks a tier automatically.
+
+## How routing works
+
+On every `provider.chat(...)` call, Tutti runs three steps:
+
+1. **Classify** the request into a tier — `small`, `medium`, `large`, or `fallback`
+2. **Pick** the matching tier from your config
+3. **Call** that tier's provider with the chosen model
+
+The classifier looks at the actual content of the request — input length, code presence, complexity keywords, tool count, conversation depth, and destructive-tool count — not just metadata. The default `heuristic` classifier runs in roughly 1ms with no API call.
+
+## Classifier strategies
+
+| Classifier | Latency | Cost / call | Accuracy | When to use |
+|---|---|---|---|---|
+| `heuristic` | ~1ms | $0 | ~70% | Default — pure signal-based rules |
+| `llm` | ~400ms | ~$0.0001 | ~90% | When accuracy matters more than speed |
+| `embedding` | ~50ms | ~$0.00001 | ~80% | Coming in a follow-up release |
+
+```ts
+new SmartProvider({
+  tiers: [/* ... */],
+  classifier: "llm",                    // upgrade for harder routing decisions
+  classifier_provider: {                // optional — defaults to the small tier
+    provider: new AnthropicProvider(),
+    model: "claude-haiku-4-5-20251001",
+  },
+})
+```
+
+## Policies
+
+The policy decides how aggressively the router prefers cheap tiers.
+
+| Policy | Behaviour |
+|---|---|
+| `cost-optimised` (default) | Picks `small` whenever a simple task pattern matches; only escalates on clear complexity signals |
+| `quality-first` | Always picks the largest tier — useful when correctness matters more than cost |
+| `balanced` | Mid-point — escalates on code, complex keywords, or long inputs |
+
+The policy shifts thresholds; it does not change the API surface or which tiers are available. You can change policy without changing call sites.
+
+## Destructive-tool aware routing
+
+This is what no standalone routing product can do. When an agent has destructive tools loaded — anything with `destructive: true` like `post_tweet`, `void_invoice`, `delete_message`, `execute` — the router automatically biases toward larger, safer tiers:
+
+```ts
+// Agent with @tuttiai/twitter loaded:
+//   post_tweet, post_thread, delete_tweet are all destructive
+// Routing under `balanced` policy → always picks 'large'
+// Routing under `cost-optimised` with 2+ destructive tools → at least 'medium'
+```
+
+The cost of an LLM mistake on a destructive call dwarfs the cost of using a smarter model for that turn. Tutti factors this in automatically.
+
+`AgentRunner` is the source of truth for the destructive-tool count: it threads the count through `AsyncLocalStorage` so `SmartProvider` sees the right value even when several agents share one runner. The count surfaces on every `router:decision` event as `destructive_tool_count`.
+
+:::tip
+This pairs perfectly with the `requireApproval` HITL gating from v0.22.0. Destructive tools both route to safer models AND prompt the operator for approval before executing — see the [Approval gates section in Security](./security#approval-gates-hitl).
+:::
+
+## Budget integration
+
+`SmartProvider` plugs straight into the existing `TokenBudget`. If a planned call would push the cumulative cost over `max_cost_usd`, the router downgrades to the `small` tier with `reason: "budget-forced"` rather than letting the budget flip to exceeded post-hoc.
+
+```ts
+agents: {
+  assistant: {
+    name: "assistant",
+    system_prompt: "...",
+    voices: [],
+    budget: { max_cost_usd: 0.50, warn_at_percent: 80 },
+  },
+}
+```
+
+You don't need to wire anything else — `SmartProvider` and `TokenBudget` find each other through `AgentRunner`.
+
+There is also a router-level ceiling, `max_cost_per_run_usd`, that downgrades to `small` when the router's own cumulative estimate would breach it. Use `TokenBudget` as the hard runtime limit and `max_cost_per_run_usd` as a router-side safety net.
+
+## Observability
+
+Every routing decision emits a `router:decision` event on the EventBus. Fallbacks emit a `router:fallback` event followed by a second `router:decision` with a `fallback after error: …` reason.
+
+```ts
+runtime.events.on("router:decision", (e) => {
+  console.log(`→ ${e.model} (tier=${e.tier}, est=$${e.estimated_cost_usd.toFixed(5)}) — ${e.reason}`);
+});
+runtime.events.on("router:fallback", (e) => {
+  console.warn(`fallback ${e.from_model} → ${e.to_model}: ${e.error}`);
+});
+```
+
+Decision events carry `agent_name`, `tier`, `model`, `reason`, `classifier`, `estimated_input_tokens`, `estimated_cost_usd`, and the optional `destructive_tool_count` — so dashboards can correlate routing choices with blast radius.
+
+Router metadata also lands on the existing `llm.completion` (in-process) and `llm.call` (OpenTelemetry) spans as `router_tier`, `router_model`, `router_classifier`, `router_reason`, `router_cost_estimate`, and the matching `router_fallback_*` keys when a fallback fires. So `tutti-ai traces router <trace-id>` and any OTel collector see the same story.
+
+## Auto-fallback
+
+Add a `fallback` tier to survive provider outages without breaking the run:
+
+```ts
+tiers: [
+  { tier: "small",    provider: new AnthropicProvider(), model: "claude-haiku-4-5-20251001" },
+  { tier: "medium",   provider: new AnthropicProvider(), model: "claude-sonnet-4-6" },
+  { tier: "large",    provider: new AnthropicProvider(), model: "claude-opus-4-7" },
+  { tier: "fallback", provider: new OpenAIProvider(),    model: "gpt-4o-mini" },
+],
+```
+
+When the chosen tier's provider throws, `SmartProvider` retries on the fallback tier and emits `router:fallback`. The agent loop keeps running. Streaming has no fallback path because chunks may already have been yielded to the consumer.
+
+## Forcing a tier
+
+For testing or special cases, you can bypass classification on a single call:
+
+```ts
+const provider = score.provider as SmartProvider;
+const res = await provider.chat(request, { force_tier: "large", force_reason: "manual override" });
+```
+
+`previewDecision(req)` returns the same `RoutingDecision` shape without dispatching — useful for tests and dashboards.
+
+## What you should expect
+
+On a typical mixed workload (some summaries, some refactors, some long-form reasoning) running under `cost-optimised`:
+
+- 50–70% of turns route to `small`
+- 20–35% route to `medium`
+- 5–15% route to `large`
+
+The exact split depends on your agent's tasks. Use `router:decision` events to measure it on your own workload.
+
+:::note
+The first agent framework with native cost-aware routing. Standalone routing products like NotDiamond and OpenRouter `auto` exist as gateways but cannot see your tools, your budget, or your agent's role. Tutti can.
+:::
+
+## Next steps
+
+- See the [API overview](../api/overview) for the full `@tuttiai/router` surface
+- Read about [token budgets](./security#token-budget) for cost ceilings
+- Browse the [Approval gates guide](./security#approval-gates-hitl) to understand HITL on destructive tools
