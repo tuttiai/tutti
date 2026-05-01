@@ -149,6 +149,27 @@ export class TuttiTracer {
   }
 
   /**
+   * Merge `extra_attributes` into a still-running span's attribute set.
+   *
+   * Used for cross-cutting attributes that are known mid-flight rather
+   * than at open or close time — e.g. a `@tuttiai/router` decision that
+   * fires inside a `provider.chat` call, after the `llm.completion`
+   * span has opened but before it closes.
+   *
+   * Subscribers do NOT fire on this call — they see the merged
+   * attributes when `endSpan` notifies them. No-op on unknown ids so a
+   * stale id from a different tracer doesn't crash the run.
+   *
+   * @param span_id - Id returned from {@link startSpan}.
+   * @param extra_attributes - Attributes to merge over the span's existing set.
+   */
+  setAttributes(span_id: string, extra_attributes: Partial<TuttiSpanAttributes>): void {
+    const span = this.spansById.get(span_id);
+    if (!span) return;
+    span.attributes = { ...span.attributes, ...extra_attributes };
+  }
+
+  /**
    * Return every span (open or closed) belonging to a trace, in insertion
    * order. Spans evicted by the ring buffer are not included.
    */

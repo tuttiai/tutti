@@ -59,6 +59,28 @@ export interface TuttiSpanAttributes {
   /** Estimated cost of the LLM call in USD. */
   cost_usd?: number;
 
+  // ---------------------------------------------------------------- router
+  /**
+   * Tier the `@tuttiai/router` `SmartProvider` selected for this LLM call
+   * (`small` / `medium` / `large` / `fallback`). Set when the runner is
+   * driving a smart router; absent otherwise.
+   */
+  router_tier?: string;
+  /** Model the chosen tier mapped to. Mirrors `model` for non-router runs. */
+  router_model?: string;
+  /** Classifier strategy that picked the tier (`heuristic`, `llm`, `embedding`). */
+  router_classifier?: string;
+  /** Why the tier was chosen (`classified`, `forced`, `fallback after error: …`). */
+  router_reason?: string;
+  /** Per-call cost estimate (USD) the router computed when picking the tier. */
+  router_cost_estimate?: number;
+  /** Original tier's model when a fallback fired during this call. */
+  router_fallback_from?: string;
+  /** Fallback tier's model that handled the call after the primary threw. */
+  router_fallback_to?: string;
+  /** Error message that triggered the fallback. */
+  router_fallback_error?: string;
+
   // ----------------------------------------------------------------- tool
   /** Snake-case tool name (e.g. `"read_file"`). */
   tool_name?: string;

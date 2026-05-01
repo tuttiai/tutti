@@ -38,7 +38,7 @@ import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { getRunCost } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
-import { Tracing, getCurrentTraceId } from "./telemetry.js";
+import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { needsApproval } from "./interrupt/index.js";
 import {
@@ -188,6 +188,14 @@ export class AgentRunner {
         estimated_input_tokens: decision.estimated_input_tokens,
         estimated_cost_usd: decision.estimated_cost_usd,
       });
+      // Mirror onto the active llm.completion span (in-process + OTel).
+      setActiveLlmAttributes({
+        router_tier: decision.tier,
+        router_model: decision.model,
+        router_classifier: decision.classifier,
+        router_reason: decision.reason,
+        router_cost_estimate: decision.estimated_cost_usd,
+      });
       userOnDecision?.(decision);
     };
     cfg.on_fallback = (info) => {
@@ -197,6 +205,11 @@ export class AgentRunner {
         from_model: info.from_model,
         to_model: info.to_model,
         error: info.error,
+      });
+      setActiveLlmAttributes({
+        router_fallback_from: info.from_model,
+        router_fallback_to: info.to_model,
+        router_fallback_error: info.error,
       });
       userOnFallback?.(info);
     };

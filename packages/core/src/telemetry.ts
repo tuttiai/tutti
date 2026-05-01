@@ -107,6 +107,52 @@ async function recordSpan<T>(
 }
 
 /**
+ * Map from `TuttiSpanAttributes` router-keys to their dotted OTel
+ * counterparts. Centralised so the in-process and OTel attribute names
+ * stay in sync — change one, change the other.
+ */
+const ROUTER_OTEL_KEYS: Record<string, string> = {
+  router_tier: "tutti.router.tier",
+  router_model: "tutti.router.model",
+  router_classifier: "tutti.router.classifier",
+  router_reason: "tutti.router.reason",
+  router_cost_estimate: "tutti.router.cost_estimate",
+  router_fallback_from: "tutti.router.fallback.from_model",
+  router_fallback_to: "tutti.router.fallback.to_model",
+  router_fallback_error: "tutti.router.fallback.error",
+};
+
+/**
+ * Merge cross-cutting attributes onto the currently active LLM span on
+ * BOTH the in-process tracer and the parallel OTel span.
+ *
+ * Designed for callers that know an attribute mid-flight — notably
+ * `AgentRunner`'s `@tuttiai/router` decision/fallback handlers, which
+ * fire inside `provider.chat()` after `llm.completion` has opened but
+ * before it closes. No-op when called outside any traced span.
+ *
+ * @param attrs - Subset of {@link TuttiSpanAttributes}. Router fields
+ *   are mirrored to `tutti.router.*` OTel attribute keys via
+ *   {@link ROUTER_OTEL_KEYS}; other fields are merged as-is on the
+ *   in-process span only.
+ */
+export function setActiveLlmAttributes(attrs: Partial<TuttiSpanAttributes>): void {
+  const span_id = spanCtx.getStore()?.spanId;
+  if (span_id) tracer.setAttributes(span_id, attrs);
+
+  const otelSpan = trace.getActiveSpan();
+  if (!otelSpan) return;
+  const otelAttrs: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === undefined) continue;
+    const otelKey = ROUTER_OTEL_KEYS[k];
+    if (!otelKey) continue;
+    if (typeof v === "string" || typeof v === "number") otelAttrs[otelKey] = v;
+  }
+  if (Object.keys(otelAttrs).length > 0) otelSpan.setAttributes(otelAttrs);
+}
+
+/**
  * Tracing helpers used by the agent runner. Each helper opens an in-process
  * span (visible via `getTuttiTracer()`) plus, for the foundational kinds, a
  * parallel OpenTelemetry span so existing OTel pipelines keep working.

@@ -9,11 +9,13 @@
  * fake that mirrors SmartProvider's observable contract.
  */
 
+import type { TuttiSpan } from "@tuttiai/telemetry";
 import type { ChatRequest, ChatResponse, LLMProvider, StreamChunk, TuttiEvent } from "@tuttiai/types";
 import { describe, expect, it } from "vitest";
 import { AgentRunner } from "../src/agent-runner.js";
 import { EventBus } from "../src/event-bus.js";
 import { InMemorySessionStore } from "../src/session-store.js";
+import { getTuttiTracer } from "../src/telemetry.js";
 import { simpleAgent, textResponse } from "./helpers/mock-provider.js";
 
 interface RouterDecisionPayload {
@@ -164,6 +166,58 @@ describe("AgentRunner router-event wiring", () => {
     // even though both runs hit the shared FakeSmartProvider concurrently.
     expect(seen).toHaveLength(2);
     expect(seen.map((d) => d.agent_name).sort()).toEqual(["agent-a", "agent-b"]);
+  });
+
+  it("mirrors the router decision onto the active llm.completion span", async () => {
+    const provider = new FakeSmartProvider({ decision: BASE_DECISION });
+    const events = new EventBus();
+    // Capture every closed span so we can assert on the llm.completion one.
+    const closed: TuttiSpan[] = [];
+    const unsubscribe = getTuttiTracer().subscribe((s) => {
+      if (s.status !== "running") closed.push(s);
+    });
+
+    try {
+      const runner = new AgentRunner(provider, events, new InMemorySessionStore());
+      await runner.run(simpleAgent, "hi");
+    } finally {
+      unsubscribe();
+    }
+
+    const llmSpan = closed.find((s) => s.name === "llm.completion");
+    expect(llmSpan, "expected an llm.completion span to close").toBeDefined();
+    expect(llmSpan?.attributes.router_tier).toBe("small");
+    expect(llmSpan?.attributes.router_model).toBe("small-m");
+    expect(llmSpan?.attributes.router_classifier).toBe("heuristic");
+    expect(llmSpan?.attributes.router_reason).toBe("classified");
+    expect(llmSpan?.attributes.router_cost_estimate).toBeCloseTo(BASE_DECISION.estimated_cost_usd);
+  });
+
+  it("mirrors fallback metadata onto the active llm.completion span when fallback fires", async () => {
+    const provider = new FakeSmartProvider({
+      decision: BASE_DECISION,
+      fallback: { from_model: "small-m", to_model: "fallback-m", error: "boom" },
+    });
+    const events = new EventBus();
+    const closed: TuttiSpan[] = [];
+    const unsubscribe = getTuttiTracer().subscribe((s) => {
+      if (s.status !== "running") closed.push(s);
+    });
+
+    try {
+      const runner = new AgentRunner(provider, events, new InMemorySessionStore());
+      await runner.run(simpleAgent, "hi");
+    } finally {
+      unsubscribe();
+    }
+
+    const llmSpan = closed.find((s) => s.name === "llm.completion");
+    expect(llmSpan?.attributes.router_fallback_from).toBe("small-m");
+    expect(llmSpan?.attributes.router_fallback_to).toBe("fallback-m");
+    expect(llmSpan?.attributes.router_fallback_error).toBe("boom");
+    // The second decision (post-fallback) overwrites router_model + reason.
+    expect(llmSpan?.attributes.router_model).toBe("fallback-m");
+    expect(llmSpan?.attributes.router_reason).toMatch(/^fallback after error:/);
   });
 
   it("does not emit router events for non-router providers", async () => {
