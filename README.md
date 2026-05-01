@@ -54,6 +54,27 @@ npm install
 npx tutti-ai run
 ```
 
+## Smart Model Routing
+
+Pick the cheapest model that can handle each turn — automatically. Drop a `SmartProvider` into your score and the router classifies every request and dispatches it to the right tier:
+
+```ts
+provider: new SmartProvider({
+  tiers: [
+    { tier: "small",  provider: new AnthropicProvider(), model: "claude-haiku-4-5-20251001" },
+    { tier: "medium", provider: new AnthropicProvider(), model: "claude-sonnet-4-6" },
+    { tier: "large",  provider: new AnthropicProvider(), model: "claude-opus-4-7" },
+  ],
+  classifier: "heuristic",
+  policy: "cost-optimised",
+}),
+```
+
+- Cuts cost by 40–70% on typical agent workloads with zero quality loss on simple tasks.
+- Destructive-tool aware — when an agent has `@tuttiai/twitter` or `@tuttiai/stripe` loaded, the router automatically prefers larger, safer models.
+
+See [`packages/router/README.md`](packages/router/README.md) for classifier strategies, policies, fallback chains, and budget-driven downgrades.
+
 ## Packages
 
 Published on npm — run `tutti-ai outdated` in your project for the

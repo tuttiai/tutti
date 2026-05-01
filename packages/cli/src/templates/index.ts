@@ -16,6 +16,17 @@ const minimal: Template = {
   score: `import { defineScore, AnthropicProvider } from "@tuttiai/core"
 
 export default defineScore({
+  // Uncomment to enable smart model routing — cuts costs 40–70% automatically
+  // import { SmartProvider } from "@tuttiai/router"
+  // provider: new SmartProvider({
+  //   tiers: [
+  //     { tier: "small",  provider: new AnthropicProvider(), model: "claude-haiku-4-5-20251001" },
+  //     { tier: "medium", provider: new AnthropicProvider(), model: "claude-sonnet-4-6" },
+  //     { tier: "large",  provider: new AnthropicProvider(), model: "claude-opus-4-7" },
+  //   ],
+  //   classifier: "heuristic",
+  //   policy: "cost-optimised",
+  // }),
   provider: new AnthropicProvider(),
   default_model: "claude-sonnet-4-20250514",
   agents: {

@@ -1,8 +1,30 @@
 # Changelog
 
-## [Unreleased]
+## v0.23.0 — Smart Model Routing
 
-### Added — `@tuttiai/router` package (smart model router, v0.23.0 headline feature)
+### New
+- **@tuttiai/router** (0.1.0) — meta-provider that picks the cheapest model per turn
+  - Three classifier strategies: heuristic (free), llm (Haiku-judged), embedding (placeholder)
+  - Three policies: cost-optimised, quality-first, balanced
+  - Destructive-tool aware: agents with destructive tools (twitter, stripe, postgres write, etc.) automatically bias toward larger tiers
+  - Auto-fallback to a backup provider on errors
+  - Budget-aware downgrade — respects existing TokenBudget max_cost_usd
+  - Decisions emitted as router:decision EventBus events and OTel spans
+
+### Changed
+- @tuttiai/types 0.11.0 — new router:decision and router:fallback event types
+- @tuttiai/core 0.20.0 — AgentRunner integrates SmartProvider, TokenBudget gains canAfford()
+- @tuttiai/telemetry 0.3.0 — TuttiTracer.routerDecision span helper
+- @tuttiai/cli 0.18.0 / tutti-ai 0.18.0 — `tutti-ai init` template includes a commented-out SmartProvider example
+
+### Fixed
+- @tuttiai/playwright 0.1.2 — integration tests now serve the test fixture from a localhost http server instead of a `data:` URL. The 8 browser-driving tests had been silently broken since `UrlSanitizer` started rejecting `data:` URLs; switching the fixture to `http://127.0.0.1:<port>/` restores them without weakening the sanitizer.
+
+---
+
+### Full release detail
+
+#### Added — `@tuttiai/router` package (smart model router, v0.23.0 headline feature)
 - New first-party package at `packages/router/`, published as `@tuttiai/router@0.1.0`. Built on `@tuttiai/types` and `@tuttiai/core`; runtime additions are `zod`.
 - `SmartProvider` is an `LLMProvider` implementation that wraps several configured `ModelTier`s (small / medium / large / fallback) and dispatches each `chat` and `stream` call to whichever tier the active classifier picks. Drops in anywhere a provider is accepted (including `defineScore`).
 - Two classifier strategies ship in 0.1.0:
@@ -13,27 +35,27 @@
 - Fallback chain: when the chosen tier's `chat` throws and the config includes a `fallback` tier, `SmartProvider` retries on the fallback, emits `on_fallback`, and records a second `RoutingDecision` with `reason: "fallback after error: …"`. Streaming has no fallback path because chunks may already have been yielded.
 - 19 unit tests covering happy path under every policy, fallback behaviour, decision/preview semantics, force-tier overrides, empty-tier guard, and LLM-classifier wiring.
 
-### Changed — `@tuttiai/core`
+#### Changed — `@tuttiai/core`
 - `PRICING` (per-million USD per-model rate table previously file-private to `src/token-budget.ts`) is now exported from `@tuttiai/core`'s public surface so `@tuttiai/router` can estimate per-decision cost without duplicating the table. No change to the existing `TokenBudget` behaviour.
 - `AgentRunner` now duck-types `SmartProvider` (via `provider.name === "smart-router"`) and chains wrappers around its `config.on_decision` / `config.on_fallback` callbacks so router events surface on the standard `EventBus`. The user's existing callbacks keep firing — we wrap, never replace. Per-call `agent_name` is threaded through `AsyncLocalStorage` so events stay correctly attributed even when parallel agents share one runner instance.
 - `TokenBudget.canAfford(estimated_cost_usd)` (new public method) decides whether a future call with the given projected cost would push cumulative `estimated_cost_usd` over `max_cost_usd`. Returns `true` when no `max_cost_usd` ceiling is configured. `AgentRunner` calls this against the cost reported by `SmartProvider.previewDecision` before dispatching: if the budget would be breached, the call is forced onto the `small` tier with `reason: "budget-forced"` rather than letting `check()` flip to `"exceeded"` post-hoc.
 - `AgentRunner`'s router ALS scope is now an object (`{ agent_name, destructive_tool_count }`) rather than a bare `agent_name` string, so `router:decision` events can attribute the agent's blast radius alongside the routing choice. The destructive count is computed once per run from the loaded tools — neither voices nor the HITL tool toggle mid-loop. 5 new tests in `packages/core/tests/agent-runner-router.test.ts` cover destructive-count emission (with and without destructive tools), budget-forced downgrade, the no-`max_cost_usd` skip path, and the back-compat path for non-`smart-router` providers.
 
-### Added — `@tuttiai/cli` router-aware traces commands
+#### Added — `@tuttiai/cli` router-aware traces commands
 - `tutti-ai traces router <trace-id>` — one-shot summary that fetches a trace from `tutti-ai serve` and prints only its `@tuttiai/router` decisions: tier (colour-coded), classifier, model, per-call cost estimate, and reason. Fallback decisions render with a `↩ from-model → to-model` arrow plus the error message that triggered the swap. Footer reports total decisions and aggregate routing cost. Friendly empty-state when the trace pre-dates v0.23.0 or the agent ran on a plain provider.
 - `tutti-ai traces tail --router-only` — adds a client-side filter to the existing live-tail SSE stream that suppresses every span that doesn't carry a `router_*` attribute. Useful for "watch routing decisions live" without the surrounding agent-loop noise.
 - New exported renderer `renderRouterSummary(spans)` and predicate `isRouterSpan(span)` in `packages/cli/src/commands/traces-render.ts` so future surfaces (Studio dashboard, web reports) can reuse the formatting. 7 new unit tests covering empty-state, multi-decision happy path, fallback annotation, and the predicate's tier/fallback branches.
 
-### Added — OTel + in-process span attributes for router decisions
+#### Added — OTel + in-process span attributes for router decisions
 - Router decisions now mirror onto the active `llm.completion` span (in-process tracer) and `llm.call` OTel span. New `TuttiSpanAttributes` fields: `router_tier`, `router_model`, `router_classifier`, `router_reason`, `router_cost_estimate`, `router_fallback_from`, `router_fallback_to`, `router_fallback_error`. OTel keys use the dotted convention (`tutti.router.tier`, `tutti.router.cost_estimate`, `tutti.router.fallback.from_model`, …) and are kept in sync with the in-process keys via a single mapping table in `core/src/telemetry.ts`.
 - `TuttiTracer.setAttributes(span_id, attrs)` is a new public method on `@tuttiai/telemetry` for merging attributes into a still-running span. Used by `core/src/telemetry.ts:setActiveLlmAttributes` to thread router metadata onto the LLM span mid-flight, alongside `trace.getActiveSpan()?.setAttributes(...)` for the parallel OTel span.
 - Two extra tests in `packages/core/tests/agent-runner-router.test.ts` verify the router decision and the post-fallback decision both land on the right `llm.completion` span via the existing tracer subscriber API.
 
-### Added — new event types in `@tuttiai/types`
+#### Added — new event types in `@tuttiai/types`
 - `router:decision` — emitted whenever a `SmartProvider` makes a routing decision. Carries `agent_name`, `tier`, `model`, `reason`, `classifier`, `estimated_input_tokens`, `estimated_cost_usd`, plus the optional `destructive_tool_count` populated by `AgentRunner` from the loaded tools. Mirrors the `RoutingDecision` shape inline so `@tuttiai/types` does not need to depend on `@tuttiai/router`.
 - `router:fallback` — emitted when a `SmartProvider`'s primary tier throws and the configured `fallback` tier handles the call instead. Carries `agent_name`, `from_model`, `to_model`, `error`. Followed by a second `router:decision` event with a `fallback after error: …` reason so consumers see both the primary attempt and the eventual dispatch.
 
-### Added — `@tuttiai/stripe` voice (27 tools)
+#### Added — `@tuttiai/stripe` voice (27 tools)
 - New official voice at `voices/stripe/`, published as `@tuttiai/stripe@0.1.0`. Built on `stripe@18.5.0` with API version pinned to `2025-08-27.basil`; runtime additions are `zod` + `@tuttiai/types`.
 - Broad Stripe API surface — 27 tools across customers, products, prices, payment links, payment intents, charges, refunds, subscriptions, invoices, disputes, balance:
   - **Read (18)**: `list_customers`, `get_customer`, `list_products`, `list_prices`, `list_payment_intents`, `get_payment_intent`, `list_charges`, `get_charge`, `list_refunds`, `get_refund`, `list_subscriptions`, `get_subscription`, `list_invoices`, `get_invoice`, `list_disputes`, `get_dispute`, `get_balance`, `list_balance_transactions`.
@@ -44,7 +66,7 @@
 - `create_refund` validates that at least one of `charge`/`payment_intent` is provided via a Zod refinement, so the agent never reaches Stripe with an ambiguous request.
 - 111 unit tests covering happy path, auth gating, lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), every list tool's pagination + filter forwarding, every write tool's destructive marking, every error-class branch in the error formatter, and per-tool error-path tests so every tool's catch handler is exercised. Line coverage 99.25 %, function coverage 98.75 %, branch coverage 76.01 % — all voice thresholds met.
 
-### Added — `@tuttiai/postgres` voice (8 tools)
+#### Added — `@tuttiai/postgres` voice (8 tools)
 - New official voice at `voices/postgres/`, published as `@tuttiai/postgres@0.1.0`. Built on `pg@8.20.0` (already a workspace dep via `voices/rag`), so no new transitive surface; runtime additions are `zod` + `@tuttiai/types`.
 - Read-only by default with one destructive escape hatch:
   - `query { sql, params, max_rows }` — runs every statement inside `BEGIN READ ONLY ... ROLLBACK`. Postgres rejects writes with SQLSTATE `25006` even if the connecting role has write privileges, and the error is mapped to a clear "use the 'execute' tool" hint.
@@ -56,7 +78,7 @@
 - Result rendering: rows formatted as a fixed-width text grid via `formatTable()`, cells truncated at 200 chars, full text capped at 8 KB with a "[result truncated]" footer so a wide SELECT can never blow up the agent's context window.
 - 57 unit tests covering happy path, auth gating, read-only enforcement (the 25006-rejection path *plus* the cleanup path where `ROLLBACK` itself fails after a query error and the connection is still released), `statement_timeout`-cancelled (57014), every documented SQLSTATE branch (`28P01`/`28000`/`3D000`/`42P01`/`42703`/`42501`/`42601`/`23505`/`23503`/`23502`/`53300`/`57014`/`25006`), `formatCell` for every pg row type (null, number, boolean, string, Date, Buffer, BigInt, plain object, cyclic), pool lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), and identifier-helper rejection of `'a";DROP'` / `'a.b.c'` / leading-digit / spaces. Line coverage 95.48 %, function coverage 96.96 %, branch coverage 81.58 % — all voice thresholds met.
 
-### Added — `@tuttiai/slack` voice (11 tools)
+#### Added — `@tuttiai/slack` voice (11 tools)
 - New official voice at `voices/slack/`, published as `@tuttiai/slack@0.1.0`. Built on `@slack/web-api@7.10.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
 - 11 tools — 5 write (destructive) + 6 read:
   - `post_message { channel, text, thread_ts? }`, `update_message { channel, ts, text }`, `delete_message { channel, ts }`, `add_reaction { channel, ts, name }`, `send_dm { user, text }` — all marked `destructive: true` so HITL-enabled runtimes gate them behind operator approval automatically.
@@ -67,7 +89,7 @@
 - `search_messages` does a local case-insensitive substring scan over the last 200 messages of one channel via `conversations.history`. The workspace-wide `search.messages` endpoint requires a user token (`xoxp-`) which standard bot installs do not have, so we never reach for it — same approach as the discord voice.
 - 66 unit tests covering happy path, auth gating for every write tool, lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), and every documented Slack error code branch (`not_authed`, `invalid_auth`, `missing_scope`, `channel_not_found`, `user_not_found`, `not_in_channel`, `message_not_found`, `cant_update_message`, `cant_delete_message`, `ratelimited`, `msg_too_long`, `is_archived`, `no_text`). Line coverage 97.79 %, function coverage 97.22 %, branch coverage 82.70 % — all voice thresholds met.
 
-### Added — `@tuttiai/twitter` voice (9 tools)
+#### Added — `@tuttiai/twitter` voice (9 tools)
 - New official voice at `voices/twitter/`, published as `@tuttiai/twitter@0.1.0`. Built on `twitter-api-v2@1.29.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
 - 9 tools — 3 write (destructive) + 6 read:
   - `post_tweet { text, reply_to?, quote_url? }`, `post_thread { tweets[] }`, `delete_tweet { tweet_id }` — all marked `destructive: true` so HITL-enabled runtimes gate them behind operator approval automatically.
@@ -76,36 +98,36 @@
 - Quote tweet URLs (`https://x.com/<user>/status/<id>` or twitter.com equivalent) are parsed locally and the `quote_tweet_id` is forwarded to the v2 API; malformed URLs are rejected before hitting the network.
 - 54 unit tests covering happy path, auth gating for every write tool, read-only fallback, search/timeline/user rendering, zero-result branches, and every HTTP-status branch (401/403/404/429/generic) of the error formatter. Line coverage 99.18 %, function coverage 100 %, branch coverage 75.15 % — all voice thresholds met.
 
-### Added — `Tool.destructive?: boolean` + automatic HITL gating
+#### Added — `Tool.destructive?: boolean` + automatic HITL gating
 - New optional field on the `Tool` interface in `@tuttiai/types` (`packages/types/src/voice.ts`). Marks tools whose side effects are hard to undo — posting, deleting, sending, paying. Optional, defaults to `false`; existing voices are unaffected.
 - `needsApproval(config, tool_name, destructive?)` in `packages/core/src/interrupt/index.ts` now consults the flag. Precedence: (1) `requireApproval: false` is an explicit operator opt-out — nothing gates, not even destructive tools; (2) `destructive: true` on the tool → always gate; (3) otherwise fall back to the existing `"all"` / glob-list / undefined behaviour.
 - `AgentRunner.executeTool` forwards `tool.destructive` to `needsApproval` at the existing gate site — no change to the `InterruptStore` contract, the `interrupt:requested` / `interrupt:resolved` event shape, or the `tutti-ai interrupts` TUI.
 - Practical effect: an agent using `@tuttiai/twitter` with no `requireApproval` config will still pause on `post_tweet` / `post_thread` / `delete_tweet` until an operator approves via `TuttiRuntime.resolveInterrupt`. Agents that need the old "never pause" behaviour set `requireApproval: false` explicitly.
 - 5 new unit tests on `needsApproval` covering every branch + 3 end-to-end tests through `AgentRunner` proving (a) destructive tools gate with no config, (b) `requireApproval: false` still opts out, (c) non-destructive tools remain ungated without config.
 
-### Fixed — close open GitHub Code Quality findings
+#### Fixed — close open GitHub Code Quality findings
 - `packages/core/tests/eval/golden/runner.test.ts`: drop unused `afterEach` / `beforeEach` vitest imports.
 - `packages/core/tests/interrupt/runner-interrupt.test.ts`: drop unused `InterruptDeniedError` import.
 - `packages/cli/src/logger.ts`: attach a TSDoc comment directly to the `logger` singleton export so TypeScript tooling surfaces the "import this, don't call `createLogger()`" rule (and the `MaxListenersExceededWarning` rationale behind it) on hover / completions, not just as a file-header comment.
 - `voices/rag/vitest.config.ts`: stop excluding `src/stores/pgvector.ts` from coverage — the tests in `tests/stores/pgvector.test.ts` already exercise it conditionally (skipping when no Postgres is reachable), so tracking real coverage is the more accurate signal. Overall coverage remains above all `voices/*` thresholds (82.79 % lines).
 - `packages/telemetry/src/exporters/otlp.ts`: replace the two `ms - seconds * 1000` subtractions with `ms % 1000` in `dateToHrTime` and in the `tuttiSpanToReadableSpan` duration split. Avoids floating-point drift when the input approaches the 53-bit safe-integer range and is marginally cheaper.
 
-### Security — patch four Dependabot advisories
+#### Security — patch four Dependabot advisories
 - `fastify` → `5.8.5` in `packages/server/package.json` (direct dep). Fixes [GHSA](https://github.com/advisories) body-schema validation bypass via leading space in the `Content-Type` header (high).
 - `protobufjs` → `7.5.5` via lockfile update (transitive through `@opentelemetry/auto-instrumentations-node` → `@grpc/grpc-js` → `@grpc/proto-loader`). Fixes arbitrary code execution advisory (critical).
 - `hono` → `4.12.14` via lockfile update (transitive through `@modelcontextprotocol/sdk` → `@hono/node-server`). Fixes JSX attribute HTML-injection in the `hono/jsx` SSR path (moderate).
 - `npm audit --audit-level=high` now reports `found 0 vulnerabilities`.
 
-### Fixed — typing `exit` in the REPL leaves the terminal stuck
+#### Fixed — typing `exit` in the REPL leaves the terminal stuck
 - Typing `exit` / `quit` in `tutti-ai run` appeared to hang the shell even after the process had terminated. Root cause: readline + ora leave stdin in raw mode on exit, so the next shell prompt never draws. Fixed by routing `exit`, `quit`, SIGINT, and normal loop termination through a single `shutdown()` path that explicitly calls `process.stdin.setRawMode(false)` and `process.stdin.pause()` before `process.exit(0)`.
 - Shutdown is idempotent (guarded by a `shuttingDown` flag) — a second SIGINT while the first is still cleaning up is a no-op instead of a double `Goodbye!` banner or a crash from closing an already-closed readline.
 
-### Added — `tutti-ai run -p "<prompt>"` one-shot non-interactive mode
+#### Added — `tutti-ai run -p "<prompt>"` one-shot non-interactive mode
 - `tutti-ai run -p "hello"` (also `--prompt`) runs a single turn against the default `assistant` agent, prints the final output to stdout, and exits. Useful for scripts, CI smoke tests, and shell pipelines. Non-zero exit on error.
 - Streaming is forced off in one-shot mode so only the final result reaches stdout; pino loggers are silenced so the output is clean.
 - REPL setup (readline, spinner, file watcher) is entirely skipped on the one-shot path — no stdin interaction, safe to pipe.
 
-### Fixed — `tutti-ai info` resolves installed package versions
+#### Fixed — `tutti-ai info` resolves installed package versions
 - `tutti-ai info` now reads `node_modules/<name>/package.json` to show the actual installed version of each `@tuttiai/*` dependency instead of echoing back the spec string (e.g. `0.18.3` instead of `*`, `^1.0.0`, or `workspace:*`). Falls back to the spec when the package isn't installed or its manifest is unreadable.
 - `resolveInstalledVersion(name, spec, cwd?)` exported from `packages/cli/src/commands/info.ts` — pure helper with 4 unit tests covering installed / missing / malformed manifest / missing-version cases.
 

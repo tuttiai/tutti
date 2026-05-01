@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/cli",
-  "version": "0.17.7",
+  "version": "0.18.0",
   "description": "Tutti CLI — scaffold and run multi-agent projects",
   "type": "module",
   "bin": {

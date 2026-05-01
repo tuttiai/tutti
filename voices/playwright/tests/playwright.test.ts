@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ToolContext } from "@tuttiai/types";
 import { PlaywrightVoice } from "../src/index.js";
 import { BrowserManager } from "../src/browser.js";
@@ -10,6 +10,8 @@ import { createCheckElementTool } from "../src/tools/check-element.js";
 import { createGetAttributeTool } from "../src/tools/get-attribute.js";
 import { createEvaluateTool } from "../src/tools/evaluate.js";
 import { createScrollTool } from "../src/tools/scroll.js";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -19,8 +21,26 @@ const ctx: ToolContext = { session_id: "test", agent_name: "test" };
 // Shared browser for integration tests — reused across all tests
 const browser = new BrowserManager({ headless: true });
 
+// UrlSanitizer blocks data: URLs, so we serve the test fixture over real http
+// from a localhost server bound to an OS-assigned port.
+let server: Server;
+let TEST_URL = "";
+
+beforeAll(async () => {
+  server = createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(TEST_HTML);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as AddressInfo).port;
+  TEST_URL = `http://127.0.0.1:${port}/`;
+});
+
 afterAll(async () => {
   await browser.close();
+  await new Promise<void>((resolve, reject) =>
+    server.close((err) => (err ? reject(err) : resolve())),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -59,7 +79,7 @@ describe("PlaywrightVoice", () => {
 // Integration tests — real browser on a data: URL
 // ---------------------------------------------------------------------------
 
-const TEST_HTML = `data:text/html,
+const TEST_HTML = `<!doctype html>
 <html>
 <head><title>Test Page</title></head>
 <body>
@@ -75,7 +95,7 @@ describe("navigate", () => {
   it("navigates to a URL and returns title", async () => {
     const tool = createNavigateTool(browser);
     const result = await tool.execute(
-      tool.parameters.parse({ url: TEST_HTML }),
+      tool.parameters.parse({ url: TEST_URL }),
       ctx,
     );
 
