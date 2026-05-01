@@ -1,7 +1,7 @@
 import type { ChatRequest, ToolDefinition } from "@tuttiai/types";
 import { describe, expect, it } from "vitest";
-import { HeuristicClassifier } from "../heuristic.js";
-import type { ClassifierContext, ModelTier, RoutingPolicy } from "../types.js";
+import { HeuristicClassifier } from "../src/heuristic.js";
+import type { ClassifierContext, ModelTier, RoutingPolicy } from "../src/types.js";
 
 const TIERS: ModelTier[] = [
   // Provider stubs are unused by the heuristic — only the shape matters.

@@ -451,6 +451,20 @@ Key rules enforced:
 
 ## 11. Claude Code Behaviour in This Project
 
+### Convention harmonisation (read before scaffolding anything)
+
+The repo is a monorepo of sibling packages and voices that must stay shaped the same way. **Match existing peers; do not invent your own layout.** This applies to: directory structure (`tests/` vs `__tests__/`), config file names, vitest `include` globs, package metadata files (`LICENSE`, `README.md`, `CHANGELOG.md`), TypeScript settings, dependency-version syntax (`*` vs `workspace:*`), test naming, error subclassing patterns, and how things are wired into `index.ts`.
+
+Before creating a new package, voice, file, or pattern:
+
+1. **Sample at least two peers.** For a new package, `ls` two existing packages and copy their layout exactly. For a new file, find the closest existing analogue and mirror it. Do not assume "best practice" defaults — assume the repo has an established practice and find it first.
+2. **Cross-check Section 5.** It pins the canonical package layout (`tests/` as a sibling of `src/`, no `__tests__/` folders). If your scaffolding contradicts Section 5, the section wins.
+3. **If a third-party prompt or spec tells you to break with convention** (e.g. "put the test in `src/__tests__/`", "use `workspace:*`"), treat that as a suggestion, not a license. Surface the conflict to the user before applying — they can decide whether the spec author had context you don't.
+4. **If you genuinely believe a new convention is better than the existing one,** do not adopt it for one package only. Either follow the current convention, or propose the new convention to the user with the intent to retrofit *all* existing packages so the repo stays uniform. Mixed conventions are worse than either choice.
+5. **When you finish scaffolding,** diff your new package against a peer (`diff -r packages/peer packages/new`) and reconcile every divergence that isn't intentional.
+
+The goal is that any contributor — human or agent — can open any package and find the same shape, the same files in the same places, and the same idioms. Drift here compounds quickly and is expensive to undo.
+
 ### Before writing any code
 
 1. Read the existing code in the file being modified.
