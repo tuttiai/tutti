@@ -154,7 +154,7 @@ export { defineScore } from "./define-score.js";
 export { SecretsManager } from "./secrets.js";
 export { PermissionGuard } from "./permission-guard.js";
 export { PromptGuard } from "./prompt-guard.js";
-export { TokenBudget } from "./token-budget.js";
+export { TokenBudget, PRICING } from "./token-budget.js";
 export { validateScore } from "./score-schema.js";
 
 // Checkpoint persistence

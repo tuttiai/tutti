@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added — `@tuttiai/router` package (smart model router, v0.23.0 headline feature)
+- New first-party package at `packages/router/`, published as `@tuttiai/router@0.1.0`. Built on `@tuttiai/types` and `@tuttiai/core`; runtime additions are `zod`.
+- `SmartProvider` is an `LLMProvider` implementation that wraps several configured `ModelTier`s (small / medium / large / fallback) and dispatches each `chat` and `stream` call to whichever tier the active classifier picks. Drops in anywhere a provider is accepted (including `defineScore`).
+- Two classifier strategies ship in 0.1.0:
+  - `HeuristicClassifier` — zero-cost regex + length + tool-count rules, with a destructive-tool premium so agents holding tools marked `destructive: true` (added in v0.22.0) pay a small quality bias.
+  - `LLMClassifier` — asks a small/cheap LLM (configurable via `classifier_provider`, falling back to the configured `small` tier) for a one-word difficulty label per turn.
+- Routing policies — `cost-optimised` (default), `balanced`, and `quality-first` — bias the heuristic's tier thresholds without changing the API surface.
+- Per-call surface for the runtime: `previewDecision(req)` returns a `RoutingDecision` without dispatching; `chat(req, { force_tier, force_reason })` skips classification entirely; `getLastDecision()` exposes the last decision for tests, EventBus emission, and OTel spans. `on_decision` and `on_fallback` callbacks let `AgentRunner` forward router events into the standard event surface.
+- Fallback chain: when the chosen tier's `chat` throws and the config includes a `fallback` tier, `SmartProvider` retries on the fallback, emits `on_fallback`, and records a second `RoutingDecision` with `reason: "fallback after error: …"`. Streaming has no fallback path because chunks may already have been yielded.
+- 19 unit tests covering happy path under every policy, fallback behaviour, decision/preview semantics, force-tier overrides, empty-tier guard, and LLM-classifier wiring.
+
+### Changed — `@tuttiai/core`
+- `PRICING` (per-million USD per-model rate table previously file-private to `src/token-budget.ts`) is now exported from `@tuttiai/core`'s public surface so `@tuttiai/router` can estimate per-decision cost without duplicating the table. No change to the existing `TokenBudget` behaviour.
+
 ### Added — `@tuttiai/stripe` voice (27 tools)
 - New official voice at `voices/stripe/`, published as `@tuttiai/stripe@0.1.0`. Built on `stripe@18.5.0` with API version pinned to `2025-08-27.basil`; runtime additions are `zod` + `@tuttiai/types`.
 - Broad Stripe API surface — 27 tools across customers, products, prices, payment links, payment intents, charges, refunds, subscriptions, invoices, disputes, balance:

@@ -7,3 +7,5 @@
 
 export * from "./types.js";
 export { HeuristicClassifier } from "./heuristic.js";
+export { LLMClassifier } from "./llm-classifier.js";
+export { SmartProvider, type ChatOverride } from "./smart-provider.js";

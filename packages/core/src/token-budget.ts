@@ -1,6 +1,13 @@
 import type { BudgetConfig } from "@tuttiai/types";
 
-const PRICING: Record<string, { input: number; output: number }> = {
+/**
+ * Per-million USD pricing for known models.
+ *
+ * Re-exported from `@tuttiai/core` so downstream packages (notably
+ * `@tuttiai/router`) can estimate cost without duplicating the table.
+ * Add new entries here whenever a provider ships a new model.
+ */
+export const PRICING: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-20250514": { input: 3.0, output: 15.0 },
   "claude-opus-4-20250514": { input: 15.0, output: 75.0 },
   "claude-haiku-4-20250514": { input: 0.25, output: 1.25 },
