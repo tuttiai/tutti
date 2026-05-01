@@ -42,6 +42,23 @@ export class TokenBudget {
     );
   }
 
+  /**
+   * Decide whether a future call with the given projected cost would
+   * push the cumulative `estimated_cost_usd` over `max_cost_usd`.
+   *
+   * Returns `true` when no `max_cost_usd` ceiling is configured — the
+   * caller has no budget to violate. Used by `AgentRunner`'s router
+   * integration to demote a request to a cheaper tier before dispatch
+   * rather than waiting for `check()` to flip to `"exceeded"` after the
+   * fact.
+   *
+   * @param estimated_cost_usd - Projected USD cost of the upcoming call.
+   */
+  canAfford(estimated_cost_usd: number): boolean {
+    if (!this.config.max_cost_usd) return true;
+    return this.estimated_cost_usd + estimated_cost_usd <= this.config.max_cost_usd;
+  }
+
   check(): "ok" | "warning" | "exceeded" {
     const warnAt = this.config.warn_at_percent ?? 80;
     if (this.config.max_tokens) {

@@ -70,6 +70,33 @@ interface RouterFallbackPayload {
   error: string;
 }
 
+/**
+ * Per-call ALS scope that carries the routing context the
+ * `SmartProvider`'s `on_decision` / `on_fallback` callbacks need to
+ * tag emitted events. Stored as one object so adding new fields stays
+ * cheap as the integration grows.
+ */
+interface RouterScope {
+  agent_name: string;
+  destructive_tool_count: number;
+}
+
+/**
+ * Subset of `@tuttiai/router`'s `SmartProvider` surface that
+ * `AgentRunner` calls into. Inlined so `@tuttiai/core` doesn't depend
+ * on `@tuttiai/router` (cycle).
+ */
+interface SmartProviderSurface {
+  previewDecision: (
+    request: ChatRequest,
+    ctx?: { destructive_tool_count?: number },
+  ) => Promise<{ estimated_cost_usd: number }>;
+  chat: (
+    request: ChatRequest,
+    override?: { force_tier?: "small" | "medium" | "large" | "fallback"; force_reason?: string },
+  ) => Promise<ChatResponse>;
+}
+
 const DEFAULT_MAX_TURNS = 10;
 const DEFAULT_MAX_TOOL_CALLS = 20;
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
@@ -124,11 +151,12 @@ export class AgentRunner {
   >();
 
   /**
-   * Per-runner ALS scope used to thread `agent.name` from the call site
-   * down into the `SmartProvider`'s decision/fallback callbacks. A class
-   * field would race when two parallel agents share one runner.
+   * Per-runner ALS scope used to thread routing context (agent name and
+   * loaded destructive-tool count) from the call site down into the
+   * `SmartProvider`'s decision/fallback callbacks. A class field would
+   * race when two parallel agents share one runner.
    */
-  private routerContext = new AsyncLocalStorage<string>();
+  private routerContext = new AsyncLocalStorage<RouterScope>();
 
   constructor(
     private provider: LLMProvider,
@@ -147,11 +175,61 @@ export class AgentRunner {
    * Run `provider.chat` inside the ALS scope so `SmartProvider`'s
    * decision/fallback callbacks (installed in
    * {@link installRouterEventHooks}) can tag emitted events with the
-   * correct `agent_name`. Always called — the no-op cost is a single
+   * correct routing context. Always called — the no-op cost is a single
    * `als.run` for non-router providers.
+   *
+   * When the provider is a `SmartProvider` and a {@link TokenBudget} is
+   * supplied, this previews the routing decision first and forces the
+   * `small` tier with `reason: "budget-forced"` if the projected cost
+   * would push the run over `max_cost_usd`. Lets the runtime degrade
+   * gracefully instead of waiting for the post-hoc `check()` to flip.
    */
-  private callProviderChat(agentName: string, request: ChatRequest): Promise<ChatResponse> {
-    return this.routerContext.run(agentName, () => this.provider.chat(request));
+  private callProviderChat(
+    scope: RouterScope,
+    request: ChatRequest,
+    budget?: TokenBudget,
+  ): Promise<ChatResponse> {
+    return this.routerContext.run(scope, () => this.invokeChat(request, scope, budget));
+  }
+
+  private async invokeChat(
+    request: ChatRequest,
+    scope: RouterScope,
+    budget: TokenBudget | undefined,
+  ): Promise<ChatResponse> {
+    const sp = this.asSmartProvider();
+    if (!sp || !budget) return this.provider.chat(request);
+
+    const preview = await sp.previewDecision(request, {
+      destructive_tool_count: scope.destructive_tool_count,
+    });
+    if (!budget.canAfford(preview.estimated_cost_usd)) {
+      return sp.chat(request, { force_tier: "small", force_reason: "budget-forced" });
+    }
+    return this.provider.chat(request);
+  }
+
+  /**
+   * Return the active provider as a `SmartProvider` surface when its
+   * `name` marker matches and the duck-typed methods exist; otherwise
+   * `null`. Centralised so the router-aware paths agree on what
+   * "smart" means without each duplicating the predicate.
+   */
+  private asSmartProvider(): SmartProviderSurface | null {
+    const candidate = this.provider as {
+      name?: string;
+      previewDecision?: unknown;
+      chat?: unknown;
+    };
+    if (
+      candidate.name !== "smart-router" ||
+      typeof candidate.previewDecision !== "function" ||
+      typeof candidate.chat !== "function"
+    ) {
+      return null;
+    }
+    // Safe cast: the duck-type checks above prove the surface exists.
+    return this.provider as unknown as SmartProviderSurface;
   }
 
   /**
@@ -178,15 +256,19 @@ export class AgentRunner {
     const ctx = this.routerContext;
 
     cfg.on_decision = (decision) => {
+      const scope = ctx.getStore();
       events.emit({
         type: "router:decision",
-        agent_name: ctx.getStore() ?? "unknown",
+        agent_name: scope?.agent_name ?? "unknown",
         tier: decision.tier,
         model: decision.model,
         reason: decision.reason,
         classifier: decision.classifier,
         estimated_input_tokens: decision.estimated_input_tokens,
         estimated_cost_usd: decision.estimated_cost_usd,
+        // Only attach the count when the runner is the source — keeps
+        // the field absent for events emitted from outside any ALS scope.
+        ...(scope ? { destructive_tool_count: scope.destructive_tool_count } : {}),
       });
       // Mirror onto the active llm.completion span (in-process + OTel).
       setActiveLlmAttributes({
@@ -199,9 +281,10 @@ export class AgentRunner {
       userOnDecision?.(decision);
     };
     cfg.on_fallback = (info) => {
+      const scope = ctx.getStore();
       events.emit({
         type: "router:fallback",
-        agent_name: ctx.getStore() ?? "unknown",
+        agent_name: scope?.agent_name ?? "unknown",
         from_model: info.from_model,
         to_model: info.to_model,
         error: info.error,
@@ -420,6 +503,14 @@ export class AgentRunner {
       }
 
       const toolDefs = allTools.map(toolToDefinition);
+      // Counted once per run — neither voices nor HITL toggle mid-loop.
+      // Threaded into the router ALS scope so emitted decisions can
+      // attribute the agent's blast radius alongside the routing choice.
+      const destructiveToolCount = allTools.filter((t) => t.destructive === true).length;
+      const routerScope: RouterScope = {
+        agent_name: agent.name,
+        destructive_tool_count: destructiveToolCount,
+      };
 
       // Input guardrail — may modify or block the input before any turn.
       const runCtx: RunContext = { agent_name: agent.name, session_id: session.id };
@@ -592,8 +683,8 @@ export class AgentRunner {
           agent.model ?? "unknown",
           () => withRetry(() =>
             agent.streaming
-              ? this.streamToResponse(agent.name, request)
-              : this.callProviderChat(agent.name, request),
+              ? this.streamToResponse(routerScope, request)
+              : this.callProviderChat(routerScope, request, budget),
           ),
         );
 
@@ -850,8 +941,8 @@ export class AgentRunner {
 
             const retryResponse = await withRetry(() =>
               agent.streaming
-                ? this.streamToResponse(agent.name, retryRequest)
-                : this.callProviderChat(agent.name, retryRequest),
+                ? this.streamToResponse(routerScope, retryRequest)
+                : this.callProviderChat(routerScope, retryRequest, budget),
             );
 
             totalUsage.input_tokens += retryResponse.usage.input_tokens;
@@ -959,11 +1050,14 @@ export class AgentRunner {
 
     let response: ChatResponse;
     try {
-      response = await this.callProviderChat(agent.name, {
-        model: agent.model,
-        system: extractionPrompt,
-        messages: recent,
-      });
+      response = await this.callProviderChat(
+        { agent_name: agent.name, destructive_tool_count: 0 },
+        {
+          model: agent.model,
+          system: extractionPrompt,
+          messages: recent,
+        },
+      );
     } catch (err) {
       logger.warn(
         { error: err instanceof Error ? err.message : String(err), agent: agent.name },
@@ -1016,11 +1110,11 @@ export class AgentRunner {
   }
 
   private async streamToResponse(
-    agentName: string,
+    scope: RouterScope,
     request: ChatRequest,
   ): Promise<ChatResponse> {
-    return this.routerContext.run(agentName, async () => {
-      return this.streamToResponseInner(agentName, request);
+    return this.routerContext.run(scope, async () => {
+      return this.streamToResponseInner(scope.agent_name, request);
     });
   }
 

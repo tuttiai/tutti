@@ -62,6 +62,13 @@ export type TuttiEvent =
       classifier: string;
       estimated_input_tokens: number;
       estimated_cost_usd: number;
+      /**
+       * Number of `destructive: true` tools loaded on the agent at the
+       * time of the decision. Lets consumers correlate routing choices
+       * with the agent's blast radius. Only present when emitted from
+       * inside `AgentRunner` (the source of truth for the count).
+       */
+      destructive_tool_count?: number;
     }
   /**
    * Emitted when a `SmartProvider`'s primary tier throws and the

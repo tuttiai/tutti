@@ -10,8 +10,9 @@
  */
 
 import type { TuttiSpan } from "@tuttiai/telemetry";
-import type { ChatRequest, ChatResponse, LLMProvider, StreamChunk, TuttiEvent } from "@tuttiai/types";
+import type { AgentConfig, ChatRequest, ChatResponse, LLMProvider, StreamChunk, Tool, TuttiEvent } from "@tuttiai/types";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { AgentRunner } from "../src/agent-runner.js";
 import { EventBus } from "../src/event-bus.js";
 import { InMemorySessionStore } from "../src/session-store.js";
@@ -37,15 +38,30 @@ interface FakeSmartProviderOptions {
   decision: RouterDecisionPayload;
   /** When set, simulates the primary tier failing — on_fallback fires, then a second on_decision is recorded. */
   fallback?: RouterFallbackPayload;
+  /**
+   * What `previewDecision` returns. AgentRunner calls this before
+   * `chat` when a budget is configured, then forces `small` if the
+   * preview's cost would push the run over `max_cost_usd`.
+   */
+  preview?: { estimated_cost_usd: number };
+  /**
+   * Captured by `chat` so tests can assert that AgentRunner forwarded
+   * the right `force_tier` / `force_reason` values when the budget
+   * preview triggered a downgrade.
+   */
+  recordedOverride?: { force_tier?: string; force_reason?: string };
+  /** Counts how many times `previewDecision` was invoked. */
+  previewCalls?: number;
 }
 
 /**
- * Minimal SmartProvider lookalike. Reproduces the two surfaces
- * AgentRunner depends on for routing-event wiring: the `name` marker
- * and the `config.on_decision` / `config.on_fallback` callbacks. We
- * insert an `await Promise.resolve()` before firing on_decision so the
- * test exercises the cross-await path that requires AsyncLocalStorage
- * (a per-runner field would race here).
+ * Minimal SmartProvider lookalike. Reproduces the surfaces AgentRunner
+ * depends on for routing-event wiring AND budget-aware forcing: the
+ * `name` marker, `previewDecision`, the `config.on_decision` /
+ * `config.on_fallback` callbacks, and the `override` second arg on
+ * `chat`. We insert an `await Promise.resolve()` before firing
+ * on_decision so the test exercises the cross-await path that requires
+ * AsyncLocalStorage (a per-runner field would race here).
  */
 class FakeSmartProvider implements LLMProvider {
   readonly name = "smart-router";
@@ -56,15 +72,36 @@ class FakeSmartProvider implements LLMProvider {
 
   constructor(private opts: FakeSmartProviderOptions) {}
 
-  async chat(_req: ChatRequest): Promise<ChatResponse> {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async previewDecision(
+    _req: ChatRequest,
+    _ctx?: { destructive_tool_count?: number },
+  ): Promise<{ estimated_cost_usd: number }> {
+    this.opts.previewCalls = (this.opts.previewCalls ?? 0) + 1;
+    return this.opts.preview ?? { estimated_cost_usd: this.opts.decision.estimated_cost_usd };
+  }
+
+  async chat(
+    _req: ChatRequest,
+    override?: { force_tier?: string; force_reason?: string },
+  ): Promise<ChatResponse> {
+    if (override) this.opts.recordedOverride = { ...override };
     // Simulate the classifier microtask: this awaits before firing
     // on_decision, which is the path that would race a class field.
     await Promise.resolve();
-    this.config.on_decision?.(this.opts.decision);
+    // When forced, real SmartProvider records the override's reason.
+    const decision: RouterDecisionPayload = override?.force_reason
+      ? {
+          ...this.opts.decision,
+          tier: override.force_tier ?? this.opts.decision.tier,
+          reason: override.force_reason,
+        }
+      : this.opts.decision;
+    this.config.on_decision?.(decision);
     if (this.opts.fallback) {
       this.config.on_fallback?.(this.opts.fallback);
       this.config.on_decision?.({
-        ...this.opts.decision,
+        ...decision,
         model: this.opts.fallback.to_model,
         reason: `fallback after error: ${this.opts.fallback.error}`,
       });
@@ -218,6 +255,128 @@ describe("AgentRunner router-event wiring", () => {
     // The second decision (post-fallback) overwrites router_model + reason.
     expect(llmSpan?.attributes.router_model).toBe("fallback-m");
     expect(llmSpan?.attributes.router_reason).toMatch(/^fallback after error:/);
+  });
+
+  it("populates destructive_tool_count from the agent's destructive tools", async () => {
+    const provider = new FakeSmartProvider({ decision: BASE_DECISION });
+    const events = new EventBus();
+    const decisions: Extract<TuttiEvent, { type: "router:decision" }>[] = [];
+    events.on("router:decision", (e) => decisions.push(e));
+
+    const destructiveTool: Tool = {
+      name: "send_email",
+      description: "send",
+      parameters: z.object({}),
+      destructive: true,
+      execute: async () => Promise.resolve({ content: "sent" }),
+    };
+    const safeTool: Tool = {
+      name: "read_file",
+      description: "read",
+      parameters: z.object({}),
+      execute: async () => Promise.resolve({ content: "ok" }),
+    };
+    const agent: AgentConfig = {
+      ...simpleAgent,
+      voices: [
+        {
+          name: "v",
+          tools: [destructiveTool, safeTool],
+          required_permissions: [],
+        },
+      ],
+    };
+
+    const runner = new AgentRunner(provider, events, new InMemorySessionStore());
+    await runner.run(agent, "hi");
+
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.destructive_tool_count).toBe(1);
+  });
+
+  it("emits destructive_tool_count = 0 when the agent has no destructive tools", async () => {
+    const provider = new FakeSmartProvider({ decision: BASE_DECISION });
+    const events = new EventBus();
+    const decisions: Extract<TuttiEvent, { type: "router:decision" }>[] = [];
+    events.on("router:decision", (e) => decisions.push(e));
+
+    const runner = new AgentRunner(provider, events, new InMemorySessionStore());
+    await runner.run(simpleAgent, "hi");
+
+    expect(decisions[0]?.destructive_tool_count).toBe(0);
+  });
+
+  it("forces tier=small with reason=budget-forced when projected cost would exceed max_cost_usd", async () => {
+    const provider = new FakeSmartProvider({
+      decision: BASE_DECISION,
+      // Preview claims this call will cost $0.50 — well above our ceiling.
+      preview: { estimated_cost_usd: 0.5 },
+    });
+    const events = new EventBus();
+    const decisions: Extract<TuttiEvent, { type: "router:decision" }>[] = [];
+    events.on("router:decision", (e) => decisions.push(e));
+
+    const agent: AgentConfig = {
+      ...simpleAgent,
+      budget: { max_cost_usd: 0.0001 },
+    };
+
+    const runner = new AgentRunner(provider, events, new InMemorySessionStore());
+    await runner.run(agent, "hi");
+
+    expect(provider["opts"].previewCalls).toBe(1);
+    expect(provider["opts"].recordedOverride).toEqual({
+      force_tier: "small",
+      force_reason: "budget-forced",
+    });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.reason).toBe("budget-forced");
+    expect(decisions[0]?.tier).toBe("small");
+  });
+
+  it("does not pre-check the budget when no max_cost_usd is configured", async () => {
+    const provider = new FakeSmartProvider({
+      decision: BASE_DECISION,
+      preview: { estimated_cost_usd: 999 },
+    });
+    const events = new EventBus();
+    const decisions: Extract<TuttiEvent, { type: "router:decision" }>[] = [];
+    events.on("router:decision", (e) => decisions.push(e));
+
+    // Budget configured but only with a token cap, no cost ceiling — canAfford
+    // returns true for any cost, so the runner must skip the override path.
+    const agent: AgentConfig = {
+      ...simpleAgent,
+      budget: { max_tokens: 1_000_000 },
+    };
+
+    const runner = new AgentRunner(provider, events, new InMemorySessionStore());
+    await runner.run(agent, "hi");
+
+    expect(provider["opts"].previewCalls).toBe(1);
+    expect(provider["opts"].recordedOverride).toBeUndefined();
+    expect(decisions[0]?.reason).toBe("classified");
+  });
+
+  it("skips preview entirely for non-Smart providers (back-compat: no router events emitted)", async () => {
+    const { createMockProvider } = await import("./helpers/mock-provider.js");
+    const provider = createMockProvider([textResponse("plain")]);
+    const events = new EventBus();
+    const seen: TuttiEvent[] = [];
+    events.on("router:decision", (e) => seen.push(e));
+    events.on("router:fallback", (e) => seen.push(e));
+
+    const agent: AgentConfig = {
+      ...simpleAgent,
+      budget: { max_cost_usd: 0.0001 },
+    };
+
+    const runner = new AgentRunner(provider, events, new InMemorySessionStore());
+    await runner.run(agent, "hi");
+
+    // No router:* events, and the plain provider's chat was called once.
+    expect(seen).toHaveLength(0);
+    expect(provider.chat).toHaveBeenCalledTimes(1);
   });
 
   it("does not emit router events for non-router providers", async () => {
