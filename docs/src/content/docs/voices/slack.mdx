@@ -1,0 +1,104 @@
+---
+title: "Slack Voice"
+description: "@tuttiai/slack — give agents a bot token to read, post, and moderate messages in a workspace"
+sidebar:
+  order: 6
+---
+
+The Slack voice gives agents a bot token they can use to read, post, and moderate messages in a workspace.
+
+Write tools (`post_message`, `update_message`, `delete_message`, `add_reaction`, `send_dm`) are marked `destructive: true`, so HITL-enabled runtimes gate them behind human approval before anything hits the workspace.
+
+## Installation
+
+```bash
+npx tutti-ai add slack
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+| Var | Description |
+| --- | ----------- |
+| `SLACK_BOT_TOKEN` | Bot user OAuth token (starts with `xoxb-`) |
+
+Add to your `.env`:
+
+```bash title=".env"
+SLACK_BOT_TOKEN=xoxb-your-bot-token-here
+```
+
+## App setup
+
+1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**.
+2. **OAuth & Permissions** → **Bot Token Scopes**. Recommended minimum:
+   - `chat:write` — post messages
+   - `channels:read` + `channels:history` — list and read public channels
+   - `groups:read` + `groups:history` — same for private channels (optional)
+   - `reactions:write` — add emoji reactions
+   - `users:read` — list members
+   - `team:read` — workspace metadata
+   - `im:write` — open DM channels (needed by `send_dm`)
+3. **Install to Workspace** and approve the prompt.
+4. Copy the **Bot User OAuth Token** into `SLACK_BOT_TOKEN`.
+5. Invite the bot to each channel: `/invite @your-bot` from inside the channel.
+
+## Configuration
+
+```ts
+// Default: reads SLACK_BOT_TOKEN from env
+new SlackVoice()
+
+// Explicit token
+new SlackVoice({ token: "xoxb-..." })
+```
+
+## Tool reference
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `post_message` | yes | Post to a channel. Optional `thread_ts` to reply in a thread. |
+| `update_message` | yes | Edit a message the bot wrote (Slack only allows bots to edit their own). |
+| `delete_message` | yes | Delete a message the bot posted. |
+| `add_reaction` | yes | React with an emoji name (with or without surrounding `:`). |
+| `send_dm` | yes | Open a DM and send a message in one step. |
+| `list_messages` | no | Recent messages, newest first, with `limit` / `oldest` / `latest`. |
+| `get_message` | no | Full detail on a message by `channel + ts`. |
+| `list_channels` | no | Public (and optionally private) channels with id, name, topic. |
+| `list_members` | no | Workspace members with handle, real name, bot/deleted flags. |
+| `search_messages` | no | Local substring search over the last 200 messages in a channel. |
+| `get_workspace_info` | no | Workspace name, domain, icon URL. |
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { SlackVoice } from "@tuttiai/slack";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    triage: {
+      name: "triage",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You triage incoming messages in #support. Read the channel, classify each message, and propose (but do not execute) a response unless explicitly approved.",
+      voices: [new SlackVoice()],
+      permissions: ["network"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run triage "Catch me up on #support since yesterday"
+```
+
+With a HITL-enabled runtime, any `post_message` / `delete_message` / `send_dm` call pauses for human approval before execution.

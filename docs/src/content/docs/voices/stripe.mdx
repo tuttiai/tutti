@@ -1,0 +1,151 @@
+---
+title: "Stripe Voice"
+description: "@tuttiai/stripe — broad coverage of the Stripe API, with HITL gates on every write"
+sidebar:
+  order: 8
+---
+
+The Stripe voice gives agents broad access to the Stripe API: customers, products, prices, payment links, payment intents, charges, refunds, subscriptions, invoices, disputes, and balance.
+
+Every write tool is marked `destructive: true`, so HITL-enabled runtimes pause for human approval before any state change. **This matters here**: a `create_refund`, `cancel_subscription`, or `void_invoice` against an `sk_live_` key moves real money.
+
+## Installation
+
+```bash
+npx tutti-ai add stripe
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+| Var | Description |
+| --- | ----------- |
+| `STRIPE_SECRET_KEY` | Stripe secret key — strongly prefer `sk_test_...` while developing |
+
+Add to your `.env`:
+
+```bash title=".env"
+STRIPE_SECRET_KEY=sk_test_...
+```
+
+The voice detects the `sk_live_` prefix and stamps `[test]` on every output line for test-mode keys; rely on that visual cue while reviewing.
+
+For least-privilege production deployments, create a [restricted key](https://stripe.com/docs/keys#create-restricted-api-secret-key) granting only the resources the agent needs (e.g. read on customers/charges/invoices, write on refunds).
+
+## Configuration
+
+```ts
+// Default: reads STRIPE_SECRET_KEY from env
+new StripeVoice()
+
+// Explicit key
+new StripeVoice({ api_key: "sk_test_..." })
+```
+
+## Tool reference (27 tools)
+
+### Customers (3)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_customers` | no | List customers, filter by email, paginate. |
+| `get_customer` | no | One customer by id. |
+| `create_customer` | yes | Create a new customer. |
+
+### Products & Prices (4)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_products` | no | List products, filter by active flag. |
+| `create_product` | yes | New product. |
+| `list_prices` | no | List prices, filter by product/active. |
+| `create_price` | yes | New price (one-time or recurring) for a product. |
+
+### Payment Links (1)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `create_payment_link` | yes | Shareable checkout link for one or more prices. |
+
+### Payments (5)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_payment_intents` | no | List intents, filter by customer. |
+| `get_payment_intent` | no | One intent with status, amounts, last error. |
+| `cancel_payment_intent` | yes | Cancel an uncaptured intent. |
+| `list_charges` | no | List charges, filter by customer/payment_intent. |
+| `get_charge` | no | One charge with capture/refund details. |
+
+### Refunds (3)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_refunds` | no | List refunds, filter by charge/payment_intent. |
+| `get_refund` | no | One refund. |
+| `create_refund` | yes | **Refund a charge or intent — moves money back to the customer.** |
+
+### Subscriptions (3)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_subscriptions` | no | List subs, filter by customer/status. |
+| `get_subscription` | no | One sub with period + line items. |
+| `cancel_subscription` | yes | Immediate cancel (with optional `invoice_now` / `prorate`). |
+
+### Invoices (4)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_invoices` | no | List invoices, filter by customer/status. |
+| `get_invoice` | no | One invoice. |
+| `finalize_invoice` | yes | Finalize a draft invoice. |
+| `void_invoice` | yes | Void a finalized invoice. |
+
+### Disputes (2)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_disputes` | no | List disputes, filter by charge. |
+| `get_dispute` | no | One dispute with evidence + due date. |
+
+### Balance (2)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `get_balance` | no | Available + pending balances per currency. |
+| `list_balance_transactions` | no | Recent balance transactions. |
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { StripeVoice } from "@tuttiai/stripe";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    support: {
+      name: "support",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You handle billing-related support tickets. Look up customers, summarise charges and subscriptions, and propose refunds — never execute a refund without explicit human approval.",
+      voices: [new StripeVoice()],
+      permissions: ["network"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run support "Customer alice@acme.com is asking why their last invoice was higher than usual"
+```
+
+With a HITL-enabled runtime, every write call (refund, cancel, void, create) pauses for human approval before execution.

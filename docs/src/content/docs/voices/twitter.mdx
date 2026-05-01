@@ -1,0 +1,101 @@
+---
+title: "Twitter / X Voice"
+description: "@tuttiai/twitter — read tweets, post tweets and threads, with HITL gates on writes"
+sidebar:
+  order: 9
+---
+
+The Twitter voice gives agents the ability to post, read, search, and manage tweets on X (Twitter).
+
+Write tools (`post_tweet`, `post_thread`, `delete_tweet`) are marked `destructive: true`, so HITL-enabled runtimes can gate them behind human approval before anything publishes.
+
+## Installation
+
+```bash
+npx tutti-ai add twitter
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+Get credentials at [developer.x.com](https://developer.x.com).
+
+| Variable | Needed for | Notes |
+| -------- | ---------- | ----- |
+| `TWITTER_BEARER_TOKEN` | Read-only tools | App-only bearer token |
+| `TWITTER_API_KEY` | Write tools | OAuth 1.0a consumer key |
+| `TWITTER_API_SECRET` | Write tools | OAuth 1.0a consumer secret |
+| `TWITTER_ACCESS_TOKEN` | Write tools | OAuth 1.0a user token |
+| `TWITTER_ACCESS_TOKEN_SECRET` | Write tools | OAuth 1.0a user token secret |
+
+If OAuth 1.0a credentials are set, the voice uses them for everything (read + write). If only the bearer token is set, write tools return a clear `is_error` message instead of running.
+
+```bash title=".env"
+TWITTER_BEARER_TOKEN=...
+TWITTER_API_KEY=...
+TWITTER_API_SECRET=...
+TWITTER_ACCESS_TOKEN=...
+TWITTER_ACCESS_TOKEN_SECRET=...
+```
+
+## Configuration
+
+```ts
+// Default: reads credentials from env
+new TwitterVoice()
+
+// Explicit credentials
+new TwitterVoice({
+  bearer_token: "...",
+  api_key: "...",
+  api_secret: "...",
+  access_token: "...",
+  access_token_secret: "...",
+})
+```
+
+## Tool reference
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `post_tweet` | yes | Publish a tweet. Optional `reply_to`, `quote_url`. |
+| `post_thread` | yes | Publish a thread (≥ 2 tweets, each ≤ 280 chars). |
+| `delete_tweet` | yes | Delete one of your tweets by id. |
+| `search_tweets` | no | Search recent tweets by query. `filter: 'recent' \| 'popular'`. |
+| `get_tweet` | no | Fetch one tweet — text, author, likes, retweets, replies. |
+| `list_mentions` | no | List tweets mentioning the authenticated user (requires OAuth 1.0a). |
+| `list_replies` | no | List replies to a tweet via `conversation_id:` search. |
+| `get_user` | no | Fetch a user's bio, follower count, following count, tweet count. |
+| `get_timeline` | no | Recent tweets by a user, or by `@me` if username omitted. |
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { TwitterVoice } from "@tuttiai/twitter";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    marketing: {
+      name: "marketing",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You are a marketing agent. Draft tweets that match our brand voice. Never publish without explicit human approval.",
+      voices: [new TwitterVoice()],
+      permissions: ["network"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run marketing "Draft a launch announcement for the new Studio UI"
+```

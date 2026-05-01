@@ -1,0 +1,114 @@
+---
+title: "RAG Voice"
+description: "@tuttiai/rag — retrieval-augmented generation: ingest documents, search them with embeddings + BM25"
+sidebar:
+  order: 12
+---
+
+The RAG voice lets agents ingest documents into a knowledge base and query it through embeddings + BM25.
+
+## Installation
+
+```bash
+npx tutti-ai add rag
+```
+
+## Required permissions
+
+```ts
+permissions: ["network", "filesystem"]
+```
+
+## Required environment variables
+
+| Var | Description |
+| --- | ----------- |
+| `OPENAI_API_KEY` | OpenAI key for the default `text-embedding-3-small` provider |
+
+```bash title=".env"
+OPENAI_API_KEY=sk-...
+```
+
+Other embedding providers (Voyage, Cohere) and vector stores (Postgres pgvector, in-memory) are configurable.
+
+## Configuration
+
+```ts
+RagVoice({
+  collection: "product-docs",
+  embeddings: {
+    provider: "openai",
+    api_key: process.env.OPENAI_API_KEY!,
+  },
+  storage: { provider: "memory" },
+  default_top_k: 5,
+})
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `collection` | required | Logical name for this knowledge base. |
+| `embeddings` | required | Embedding provider config (OpenAI, Voyage, etc.). |
+| `storage` | `{ provider: "memory" }` | Vector store — `memory` or `pgvector`. |
+| `default_top_k` | `5` | Default number of results returned by `search_knowledge`. |
+| `hyde` | `false` | Hypothetical Document Embeddings — improves recall, requires an `llm` option. |
+
+### Storage providers
+
+```ts
+// Postgres pgvector — persistent, production-ready
+storage: {
+  provider: "pgvector",
+  connection_string: process.env.DATABASE_URL!,
+}
+
+// In-memory — fast, ephemeral, single-process
+storage: { provider: "memory" }
+```
+
+## Tool reference
+
+| Tool | Description |
+| ---- | ----------- |
+| `ingest_document` | Load a document from a path, URL, or GitHub blob URL; chunk, embed, and store it. |
+| `search_knowledge` | Return top-K chunks relevant to a query. Supports optional hybrid (BM25 + vector) fusion. |
+| `list_sources` | Enumerate every ingested source with chunk count and ingest timestamp. |
+| `delete_source` | Drop every chunk for a `source_id` from both the vector store and the keyword index. |
+
+All tool results are JSON-encoded strings so downstream agents can parse them directly.
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { RagVoice } from "@tuttiai/rag";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    researcher: {
+      name: "researcher",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You are a research assistant. Ingest sources with ingest_document, then answer questions using search_knowledge. Always cite the source.",
+      voices: [
+        RagVoice({
+          collection: "product-docs",
+          embeddings: {
+            provider: "openai",
+            api_key: process.env.OPENAI_API_KEY!,
+          },
+          storage: { provider: "memory" },
+        }),
+      ],
+      permissions: ["network", "filesystem"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run researcher "Ingest ./docs/pricing.md then summarise it."
+```

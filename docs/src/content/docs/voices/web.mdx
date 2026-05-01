@@ -1,0 +1,96 @@
+---
+title: "Web Voice"
+description: "@tuttiai/web — search the web, fetch URLs, read sitemaps"
+sidebar:
+  order: 10
+---
+
+The Web voice gives agents web search, page fetching, and sitemap reading.
+
+## Installation
+
+```bash
+npx tutti-ai add web
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+Set one variable to enable a search provider. The voice auto-selects the highest-priority key it finds:
+
+| Priority | Provider | Env var | Free tier |
+| :------: | -------- | ------- | --------- |
+| 1 | **Brave Search** | `BRAVE_SEARCH_API_KEY` | 2,000 queries/month |
+| 2 | **Serper.dev**   | `SERPER_API_KEY`       | 2,500 queries/month |
+| 3 | **DuckDuckGo**   | *(none required)*       | Unlimited (limited results) |
+
+```bash title=".env"
+# Pick one:
+BRAVE_SEARCH_API_KEY=BSA...
+# SERPER_API_KEY=...
+```
+
+## Which provider should I use?
+
+| Scenario | Recommended | Why |
+| -------- | ----------- | --- |
+| Production / research agents | Brave | Best result quality, fast, generous free tier |
+| Google-indexed results needed | Serper | Proxies Google Search |
+| Budget = $0, no API key | DuckDuckGo | Works out of the box |
+| CI / testing | DuckDuckGo or mock | No key management |
+
+## Configuration
+
+```ts
+new WebVoice({
+  provider: "brave",          // 'brave' | 'serper' | 'duckduckgo' | 'auto'
+  max_results: 10,
+  rate_limit: { per_minute: 30 },
+})
+```
+
+## Tool reference
+
+| Tool | Description | Key inputs |
+| ---- | ----------- | ---------- |
+| `web_search` | Search the web for a query. Returns title, URL, snippet, position. | `query`, `limit?` |
+| `fetch_url` | Fetch a single URL and return its text content. | `url`, `mode?` |
+| `fetch_sitemap` | Read a `sitemap.xml` and return the list of URLs. | `url`, `limit?` |
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { WebVoice } from "@tuttiai/web";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    researcher: {
+      name: "researcher",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You are a research assistant. Use web_search to find current information, fetch_url to read full articles, and fetch_sitemap to discover pages on a site.",
+      voices: [
+        new WebVoice({
+          provider: "brave",
+          max_results: 10,
+          rate_limit: { per_minute: 30 },
+        }),
+      ],
+      permissions: ["network"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run researcher "What happened in AI this week?"
+```

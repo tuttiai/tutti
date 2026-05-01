@@ -1,0 +1,85 @@
+---
+title: "MCP Bridge Voice"
+description: "@tuttiai/mcp — wrap any Model Context Protocol server as a Tutti voice"
+sidebar:
+  order: 13
+---
+
+The MCP voice wraps any [Model Context Protocol](https://modelcontextprotocol.io) server as a Tutti voice, exposing its tools to your agents — zero glue code per server.
+
+## Installation
+
+```bash
+npx tutti-ai add mcp
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+(Set additional permissions like `filesystem` or `shell` if the wrapped MCP server needs them.)
+
+## Configuration
+
+```ts
+new McpVoice({
+  // Full shell command for the MCP server — split on whitespace.
+  // First token is the executable, the rest are arguments.
+  server: "npx -y @modelcontextprotocol/server-filesystem /tmp",
+})
+```
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `server` | `string` (required) | Shell command that launches the MCP server. |
+| `args` | `string[]` | Additional CLI arguments appended after the server command. |
+| `env` | `Record<string, string>` | Extra environment variables passed to the server child process. |
+| `name` | `string` | Override the voice name (default: `mcp-<server-name>`). |
+
+## How it works
+
+The voice spawns the MCP server as a child process on `setup()`, discovers its tools via the standard MCP `tools/list` request, and exposes each one as a typed Tutti tool. Tool calls are forwarded; tool results are wrapped through the standard `PromptGuard` before reaching the model.
+
+On `teardown()`, the server child process is stopped cleanly.
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { McpVoice } from "@tuttiai/mcp";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    assistant: {
+      name: "assistant",
+      model: "claude-sonnet-4-20250514",
+      voices: [
+        new McpVoice({
+          server: "npx -y @modelcontextprotocol/server-filesystem /tmp",
+        }),
+      ],
+      permissions: ["network", "filesystem"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run assistant "List the files in the sandbox dir"
+```
+
+## Bridging multiple MCP servers
+
+Add multiple `McpVoice` instances to the same agent — each shows up as its own voice with its own tools:
+
+```ts
+voices: [
+  new McpVoice({ server: "npx -y @modelcontextprotocol/server-filesystem /tmp" }),
+  new McpVoice({ server: "node my-private-mcp-server.js" }),
+],
+```

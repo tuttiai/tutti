@@ -1,0 +1,101 @@
+---
+title: "Discord Voice"
+description: "@tuttiai/discord — give agents a bot that can read, post, and moderate messages on Discord"
+sidebar:
+  order: 5
+---
+
+The Discord voice gives agents a bot account they can use to read, post, and moderate messages.
+
+Write tools (`post_message`, `edit_message`, `delete_message`, `add_reaction`, `send_dm`) are marked `destructive: true`, so HITL-enabled runtimes gate them behind human approval before anything hits a server.
+
+## Installation
+
+```bash
+npx tutti-ai add discord
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+| Var | Description |
+| --- | ----------- |
+| `DISCORD_BOT_TOKEN` | Discord bot token |
+
+Add to your `.env`:
+
+```bash title=".env"
+DISCORD_BOT_TOKEN=your_bot_token_here
+```
+
+## Bot setup
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**.
+2. **Bot** → **Reset Token** → copy into `DISCORD_BOT_TOKEN` (the token is only shown once).
+3. Enable the **Server Members** and **Message Content** privileged gateway intents (needed for `list_members`, `list_messages`, `get_message`, `search_messages`).
+4. **OAuth2** → **URL Generator** — tick `bot` scope plus the permissions you need (minimum: View Channels, Send Messages, Read Message History, Add Reactions; add Manage Messages for `delete_message` on other users' messages).
+5. Open the generated URL and invite the bot to your server.
+
+## Configuration
+
+```ts
+// Default: reads DISCORD_BOT_TOKEN from env
+new DiscordVoice()
+
+// Explicit token
+new DiscordVoice({ token: "..." })
+```
+
+## Tool reference
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `post_message` | yes | Post to a channel. Optional `reply_to_message_id`. |
+| `edit_message` | yes | Edit a message the bot wrote. |
+| `delete_message` | yes | Delete a message (own, or any if the bot has Manage Messages). |
+| `add_reaction` | yes | React with a unicode or custom emoji. |
+| `send_dm` | yes | Direct-message a user by id. |
+| `list_messages` | no | Recent messages, newest first, with `limit` / `before` / `after`. |
+| `get_message` | no | Full detail on a single message. |
+| `list_channels` | no | Text-capable channels with id, name, topic. |
+| `list_members` | no | Guild members with roles + join timestamps. |
+| `search_messages` | no | Local substring search over the last 100 messages in a channel. |
+| `get_guild_info` | no | Name, member count, channel count, icon URL. |
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { DiscordVoice } from "@tuttiai/discord";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    mod: {
+      name: "mod",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You are a community moderator. When users flag content, read the relevant messages, summarise, and propose (but do not execute) moderation actions unless explicitly approved.",
+      voices: [new DiscordVoice()],
+      permissions: ["network"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run mod "Check #reports for new flags"
+```
+
+With a HITL-enabled runtime, any `post_message` / `delete_message` / `send_dm` call pauses for human approval before execution.
+
+## Lifecycle
+
+The voice's discord.js Client is lazily logged in on the first tool call and kept warm for the lifetime of the voice. Call `voice.teardown()` (or `TuttiRuntime.teardown()`) on shutdown to close the gateway connection cleanly.

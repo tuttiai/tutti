@@ -1,0 +1,93 @@
+---
+title: "Sandbox Voice"
+description: "@tuttiai/sandbox — secure code execution with per-session filesystem isolation for TypeScript, Python, and Bash"
+sidebar:
+  order: 11
+---
+
+The Sandbox voice gives agents secure code execution with per-session filesystem isolation, supporting TypeScript, Python 3, and Bash.
+
+## Installation
+
+```bash
+npx tutti-ai add sandbox
+```
+
+Requires `tsx` (for TypeScript) and `python3` (for Python) on the host.
+
+## Required permissions
+
+```ts
+permissions: ["shell"]
+```
+
+## Configuration
+
+```ts
+new SandboxVoice({
+  allowed_languages: ["typescript", "python"],
+  allowed_packages: ["lodash", "zod", "chalk"],
+  timeout_ms: 15_000,
+  max_file_size_bytes: 512_000,
+})
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `allowed_languages` | all three | Restrict `execute_code` to specific runtimes. |
+| `allowed_packages` | all | Allowlist for `install_package`. |
+| `timeout_ms` | `30_000` | Default execution timeout. |
+| `max_file_size_bytes` | `1_048_576` (1 MB) | Max file size for `write_file`. |
+| `env` | — | Extra env vars passed to child processes. |
+| `install_timeout_ms` | `60_000` | Timeout for package installs. |
+
+## Tool reference
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `execute_code` | yes | Execute a snippet in `typescript` / `python` / `bash`. Returns stdout, stderr, exit code. |
+| `write_file` | yes | Write a file to the per-session sandbox dir. |
+| `read_file` | no | Read a previously written file from the sandbox dir. |
+| `install_package` | yes | Install a package from the configured allowlist (npm or pip). |
+
+### `execute_code`
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `code` | `string` | — | Source code to execute |
+| `language` | `"typescript" \| "python" \| "bash"` | — | Runtime |
+| `timeout_ms` | `number` | `30_000` | Wall-clock timeout (max 120 000) |
+
+## Example
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { SandboxVoice } from "@tuttiai/sandbox";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    coder: {
+      name: "coder",
+      model: "claude-sonnet-4-20250514",
+      system_prompt:
+        "You are a coding assistant. Write code to solve problems, execute it to verify, and iterate until correct. You can write files, install packages, and run code in the sandbox.",
+      voices: [
+        new SandboxVoice({
+          allowed_languages: ["typescript", "python"],
+          allowed_packages: ["lodash", "zod", "chalk"],
+          timeout_ms: 15_000,
+          max_file_size_bytes: 512_000,
+        }),
+      ],
+      permissions: ["shell"],
+    },
+  },
+});
+```
+
+Run it:
+
+```bash
+tutti-ai run coder "Write a TS function that computes the first N Fibonacci numbers, test it, and show me the output for N=15."
+```
