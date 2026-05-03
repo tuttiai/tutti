@@ -25,6 +25,7 @@ const score = defineScore({
       model: "claude-sonnet-4-20250514",
       system_prompt: "You are a QA engineer. Test web apps thoroughly.",
       voices: [playwright],
+      permissions: ["network", "browser"],
     },
   },
 });

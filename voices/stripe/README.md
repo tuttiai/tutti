@@ -111,6 +111,7 @@ export default defineScore({
       system_prompt:
         "You handle Stripe support tickets. Look up customers and charges, surface the relevant details, and propose refunds — but DO NOT issue refunds without explicit operator approval.",
       voices: [new StripeVoice()],
+      permissions: ["network"],
     },
   },
 });

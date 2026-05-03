@@ -16,7 +16,7 @@ npx tutti-ai add rag
 ## Required permissions
 
 ```ts
-permissions: ["network", "filesystem"]
+permissions: ["network"]
 ```
 
 ## Required environment variables
@@ -101,7 +101,7 @@ export default defineScore({
           storage: { provider: "memory" },
         }),
       ],
-      permissions: ["network", "filesystem"],
+      permissions: ["network"],
     },
   },
 });

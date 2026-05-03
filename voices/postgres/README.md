@@ -68,6 +68,7 @@ export default defineScore({
       system_prompt:
         "You are a data analyst. The user will ask questions about the connected database. Use list_tables and describe_table before writing queries. Always parameterise values with $1, $2, ...",
       voices: [new PostgresVoice()],
+      permissions: ["network"],
     },
   },
 });

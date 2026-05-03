@@ -34,6 +34,8 @@ packages/types/      @tuttiai/types      Interfaces and Zod schemas (ZERO runtim
 packages/core/       @tuttiai/core       Runtime, agent loop, providers, security
 packages/cli/        @tuttiai/cli        Binary: tutti-ai
 packages/server/     @tuttiai/server     HTTP server: REST API + SSE streaming
+packages/router/     @tuttiai/router     Smart model router (heuristic + LLM classifier)
+packages/telemetry/  @tuttiai/telemetry  OpenTelemetry tracer, cost estimation, exporters
 packages/tutti-ai/   tutti-ai            Thin wrapper re-exporting the CLI binary
 voices/filesystem/   @tuttiai/filesystem 7 file system tools
 voices/github/       @tuttiai/github     10 GitHub API tools
@@ -42,8 +44,11 @@ voices/mcp/          @tuttiai/mcp        MCP bridge — wraps any MCP server
 voices/web/          @tuttiai/web        3 web tools: search, fetch, sitemap
 voices/sandbox/      @tuttiai/sandbox    4 tools: execute, read, write, install
 voices/slack/        @tuttiai/slack      11 Slack workspace tools (chat, reactions, channels, users)
+voices/discord/      @tuttiai/discord    11 Discord tools (messages, channels, members, reactions, DMs)
 voices/postgres/     @tuttiai/postgres   8 Postgres tools (query/execute + introspection)
 voices/stripe/       @tuttiai/stripe     27 Stripe API tools (customers, payments, subs, invoices, balance)
+voices/twitter/      @tuttiai/twitter    9 Twitter / X tools (tweets, threads, mentions, timeline)
+voices/rag/          @tuttiai/rag        4 RAG tools (ingest, search, list sources, delete source)
 docs/                                    Astro Starlight documentation site
 ```
 
@@ -379,7 +384,7 @@ async run(agent_name: string, input: string, session_id?: string): Promise<Agent
 | `chore` | Build, deps, CI config |
 | `ci` | CI pipeline changes |
 
-Scopes: `core`, `cli`, `types`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `voice/slack`, `voice/postgres`, `voice/stripe`, `docs`, `ci`.
+Scopes: `core`, `cli`, `types`, `server`, `router`, `telemetry`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `voice/slack`, `voice/discord`, `voice/postgres`, `voice/stripe`, `voice/twitter`, `voice/rag`, `voice/web`, `voice/sandbox`, `docs`, `ci`.
 
 ### PR checklist (ALL must pass before merge)
 

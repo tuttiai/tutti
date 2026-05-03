@@ -35,6 +35,7 @@ const score = defineScore({
           storage: { provider: "memory" },
         }),
       ],
+      permissions: ["network"],
     },
   },
 });

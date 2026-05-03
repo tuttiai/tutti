@@ -67,6 +67,7 @@ export default defineScore({
       system_prompt:
         "You are a marketing agent. Draft tweets that match our brand voice. Never publish without explicit human approval.",
       voices: [new TwitterVoice()],
+      permissions: ["network"],
     },
   },
 });

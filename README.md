@@ -87,6 +87,7 @@ for the latest published version.
 | [`@tuttiai/core`](packages/core) | Runtime, agent loop, providers, security, memory, telemetry |
 | [`@tuttiai/cli`](packages/cli) | CLI — `init`, `run`, `serve`, `studio`, `schedule`, `eval`, `traces`, `memory`, and more |
 | [`@tuttiai/server`](packages/server) | HTTP server: REST API, SSE streaming, HITL endpoints, Docker support |
+| [`@tuttiai/router`](packages/router) | Smart model router — classifies turns and dispatches to the cheapest tier that can handle them |
 | [`@tuttiai/telemetry`](packages/telemetry) | OpenTelemetry tracer — spans for every run, LLM call, and tool invocation |
 | [`@tuttiai/filesystem`](voices/filesystem) | 7 file tools (read, write, search, etc.) |
 | [`@tuttiai/github`](voices/github) | 10 GitHub tools (issues, PRs, repos, code search) |
@@ -94,7 +95,12 @@ for the latest published version.
 | [`@tuttiai/web`](voices/web) | 3 web tools (search, fetch URL, sitemap) |
 | [`@tuttiai/sandbox`](voices/sandbox) | 4 code execution tools (TS, Python, Bash + file I/O) |
 | [`@tuttiai/mcp`](voices/mcp) | MCP bridge — wraps any MCP server as a voice |
-| [`@tuttiai/rag`](voices/rag) | RAG: ingest, chunk, embed, search |
+| [`@tuttiai/rag`](voices/rag) | 4 RAG tools (ingest, search, list sources, delete source) |
+| [`@tuttiai/discord`](voices/discord) | 11 Discord tools (messages, channels, members, reactions, DMs) |
+| [`@tuttiai/slack`](voices/slack) | 11 Slack tools (channels, threads, DMs, reactions) |
+| [`@tuttiai/postgres`](voices/postgres) | 8 Postgres tools (query/execute + schema introspection) |
+| [`@tuttiai/stripe`](voices/stripe) | 27 Stripe tools (customers, payments, subs, invoices, balance) |
+| [`@tuttiai/twitter`](voices/twitter) | 9 Twitter / X tools (tweets, threads, mentions, timeline) |
 
 ## Features
 
@@ -227,29 +233,62 @@ tutti-ai schedules trigger id  # run one immediately
 
 ```bash
 # Project
-tutti-ai init [project]          # Scaffold a new project
-tutti-ai check [score]           # Validate a score
-tutti-ai info [score]            # Show agents, voices, versions
+tutti-ai init [project]              # Scaffold a new project
+tutti-ai templates                   # List available scaffolding templates
+tutti-ai check [score]               # Validate a score
+tutti-ai doctor [score]              # Diagnose env, deps, and config
+tutti-ai info [score]                # Show agents, voices, versions
 
 # Run
-tutti-ai run [score]             # Run a score interactively (REPL)
-tutti-ai run -p "ask something"  # One-shot: single prompt, prints to stdout
-tutti-ai serve [score]           # Start the HTTP server
-tutti-ai studio [score]          # Launch the web UI
-tutti-ai replay <session-id>     # Time-travel debug a session
+tutti-ai run [score]                 # Run a score interactively (REPL)
+tutti-ai run -p "ask something"      # One-shot: single prompt, prints to stdout
+tutti-ai serve [score]               # Start the HTTP server
+tutti-ai studio [score]              # Launch the web UI
+tutti-ai resume <session-id>         # Resume a previous session
+tutti-ai replay <session-id>         # Time-travel debug a session
 
 # Voices & packages
-tutti-ai add <voice>             # Install a voice
-tutti-ai voices                  # List official voices
-tutti-ai search <query>          # Search the voice registry
-tutti-ai upgrade [voice]         # Upgrade voices to latest
-tutti-ai update                  # Update all @tuttiai packages
-tutti-ai outdated                # Check for newer versions
+tutti-ai add <voice>                 # Install a voice
+tutti-ai voices                      # List official voices
+tutti-ai search <query>              # Search the voice registry
+tutti-ai upgrade [voice]             # Upgrade voices to latest
+tutti-ai update                      # Update all @tuttiai packages
+tutti-ai outdated                    # Check for newer versions
+tutti-ai publish                     # Publish a community voice
 
 # Scheduling
-tutti-ai schedule [score]        # Start the scheduler daemon
-tutti-ai schedules list          # Show all schedules
-tutti-ai schedules trigger <id>  # Trigger a run immediately
+tutti-ai schedule [score]            # Start the scheduler daemon
+tutti-ai schedules list              # Show all schedules
+tutti-ai schedules enable <id>       # Enable a schedule
+tutti-ai schedules disable <id>      # Disable a schedule
+tutti-ai schedules trigger <id>      # Trigger a run immediately
+tutti-ai schedules runs <id>         # List recent runs of a schedule
+
+# Evaluation
+tutti-ai eval suite <suite-file>     # Run a golden-suite evaluation
+tutti-ai eval record <session-id>    # Record a session as a golden case
+tutti-ai eval list                   # List recorded golden cases
+tutti-ai eval run                    # Re-run all recorded golden cases
+
+# Tracing
+tutti-ai traces list                 # List recent traces
+tutti-ai traces show <trace-id>      # Inspect spans for a single run
+tutti-ai traces tail                 # Live-tail traces as they happen
+tutti-ai traces router <trace-id>    # Show router decisions for a trace
+
+# Long-term memory
+tutti-ai memory list                 # List stored memories
+tutti-ai memory search <query>       # Search memories semantically
+tutti-ai memory add <content>        # Add a memory (with --importance)
+tutti-ai memory delete <memory-id>   # Delete a memory
+tutti-ai memory clear                # Wipe the memory store
+tutti-ai memory export               # Export memories to JSON
+
+# Human-in-the-loop
+tutti-ai interrupts list             # List pending tool-call approvals
+tutti-ai interrupts approve <id>     # Approve a pending tool call
+tutti-ai interrupts deny <id>        # Deny a pending tool call
+tutti-ai approve                     # Interactive approval TUI
 ```
 
 ## Architecture

@@ -66,6 +66,7 @@ export default defineScore({
       system_prompt:
         "You triage incoming messages in #support. Read the channel, classify each message, and propose (but do not execute) a response unless explicitly approved.",
       voices: [new SlackVoice()],
+      permissions: ["network"],
     },
   },
 });

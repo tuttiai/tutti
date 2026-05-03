@@ -22,6 +22,7 @@ const score = defineScore({
       model: "claude-sonnet-4-20250514",
       system_prompt: "You are a helpful assistant with filesystem access.",
       voices: [new FilesystemVoice()],
+      permissions: ["filesystem"],
     },
   },
 });

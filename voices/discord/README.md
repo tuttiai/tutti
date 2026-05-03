@@ -62,6 +62,7 @@ export default defineScore({
       system_prompt:
         "You are a community moderator. When users flag content, read the relevant messages, summarise, and propose (but do not execute) moderation actions unless explicitly approved.",
       voices: [new DiscordVoice()],
+      permissions: ["network"],
     },
   },
 });
