@@ -1,5 +1,13 @@
 # @tuttiai/core
 
+## 0.20.1
+
+### Patch Changes
+
+- Add DeployConfig to AgentConfig schema
+- Updated dependencies
+  - @tuttiai/types@0.11.1
+
 ## 0.18.0
 
 ### Minor Changes
