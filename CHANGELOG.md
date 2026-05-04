@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### New
+- **@tuttiai/deploy** (0.1.0) — initial scaffold of the deploy package.
+  - Public types: `DeployTarget`, `DeployConfig`, `DeployManifest`, `DEPLOY_TARGETS`, plus the canonical `DeployConfigSchema` Zod schema.
+  - `buildDeployManifest(scoreFilePath)` loads and validates a Tutti score, picks the single agent that declares a `deploy` block, validates that block, applies defaults (`name` ← agent name, `region` ← `auto`, scale `0..3`, health `/health`/30s), and returns a normalised manifest. Cross-validates env / secrets to reject duplicate names and plaintext API keys. Manifest's `services` block is populated from `score.memory.provider` and per-agent `durable.store` so bundlers don't re-parse the score.
+  - `generateDockerBundle(manifest, outDir)` — emits `Dockerfile`, `.dockerignore`, `docker-compose.yml`, and an executable `deploy.sh`, customised per manifest (port 3000, health-check path/interval, env vars, `NODE_OPTIONS --max-old-space-size` from `scale.memory`, conditional postgres/redis services).
+  - `generateFlyConfig(manifest, outDir)` / `buildFlyConfig(manifest)` — emits a `fly.toml` driven by the manifest (app name, primary region, `[[vm]] memory`, `[env]`, `[[http_service.checks]]`, and a comment block listing `fly secrets set` invocations).
+- **@tuttiai/cli** — new `tutti-ai deploy [--target docker|railway|fly] [--dry-run]` command. Bundles the score and deploys via the matching platform CLI; subcommands `deploy status`, `deploy logs [--tail]`, `deploy rollback` dispatch to the platform's equivalent. Pure plan-builder helpers (`buildDeployPlan`, `formatDryRunPlan`) are exported and unit-tested. Runs `scanForSecrets` + `validateSecrets` before any I/O so missing env-var declarations block the deploy fail-fast; writes `.env.deploy.example` next to the score in real-run mode.
+- **@tuttiai/deploy** — new `scanForSecrets(scoreFilePath)`, `validateSecrets(manifest, required)`, `buildEnvExample(required)`, and `SecretsValidationResult`. Static-scans the score and every imported package's entry file for `process.env.X` reads, filters Node runtime built-ins, and emits errors for undeclared required vars + warnings for secret-shaped names in plaintext `deploy.env`.
+- **@tuttiai/types** — new `DeployTarget` and `DeployConfig` interfaces; `AgentConfig` gains an optional `deploy` field.
+
 ## v0.23.0 — Smart Model Routing
 
 ### New
