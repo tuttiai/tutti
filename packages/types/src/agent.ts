@@ -124,6 +124,53 @@ export interface AgentScheduleConfig {
   max_runs?: number;
 }
 
+/**
+ * Deployment target supported by `@tuttiai/deploy`. Bundlers in that package
+ * consume the resolved manifest and emit a target-specific artefact.
+ */
+export type DeployTarget = "docker" | "cloudflare" | "railway" | "fly";
+
+/**
+ * Per-agent deployment configuration consumed by `@tuttiai/deploy`. Authors
+ * declare `target` and (optionally) a deployment name, region, env vars,
+ * secrets, scale bounds, and health-check settings here; `buildDeployManifest`
+ * fills in defaults and validates the result before any bundler runs.
+ *
+ * Mirror of {@link import("@tuttiai/deploy").DeployConfig} — kept here so
+ * `@tuttiai/types` can stay zero-runtime-dep (only `zod`) while `AgentConfig`
+ * still references the shape directly.
+ */
+export interface DeployConfig {
+  target: DeployTarget;
+  /**
+   * Deployment name — used as the container, worker, app, or service
+   * identifier on the target platform. Lowercase alphanumerics and hyphens,
+   * 1–63 chars, must start and end alphanumeric. Defaults to the agent name
+   * when `buildDeployManifest` resolves the manifest.
+   */
+  name?: string;
+  /** E.g. `'us-east-1'`, `'ams'`, `'auto'` (default). */
+  region?: string;
+  /** Plaintext env vars. API-key-shaped values are rejected — use `secrets`. */
+  env?: Record<string, string>;
+  /** Names of secrets to pull from the platform secret store. */
+  secrets?: string[];
+  scale?: {
+    /** Default 0. */
+    minInstances?: number;
+    /** Default 3. */
+    maxInstances?: number;
+    /** E.g. `'512mb'`, `'1gb'`. */
+    memory?: string;
+  };
+  healthCheck?: {
+    /** Default `/health`. */
+    path?: string;
+    /** Default 30. */
+    intervalSeconds?: number;
+  };
+}
+
 export interface RunContext {
   agent_name: string;
   session_id: string;
@@ -229,6 +276,13 @@ export interface AgentConfig {
    * triggers runs on the configured cron, interval, or one-shot datetime.
    */
   schedule?: AgentScheduleConfig;
+  /**
+   * Deployment configuration consumed by `@tuttiai/deploy`. When set,
+   * `buildDeployManifest` produces a normalised manifest for this agent
+   * which a target-specific bundler (Docker, Cloudflare, Railway, Fly)
+   * turns into a deployable artefact.
+   */
+  deploy?: DeployConfig;
 }
 
 export interface AgentResult {

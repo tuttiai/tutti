@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/types",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Type definitions for the Tutti multi-agent orchestration framework",
   "type": "module",
   "exports": {
@@ -11,7 +11,11 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -20,7 +24,14 @@
   "dependencies": {
     "zod": "3.25.76"
   },
-  "keywords": ["tutti", "ai", "agents", "orchestration", "types", "typescript"],
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "orchestration",
+    "types",
+    "typescript"
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
