@@ -36,6 +36,8 @@ export default defineConfig({
         "src/commands/traces.ts",
         "src/commands/memory.ts",
         "src/commands/interrupts.ts",
+        // deploy.ts has thoroughly-tested pure helpers and orchestrator
+        // branches that spawn real CLIs; the latter are E2E-only.
       ],
       thresholds: {
         lines: 70,

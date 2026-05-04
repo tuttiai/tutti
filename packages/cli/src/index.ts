@@ -63,6 +63,13 @@ import {
   interruptsTUICommand,
   type InterruptsOptions,
 } from "./commands/interrupts.js";
+import {
+  deployCommand,
+  deployStatusCommand,
+  deployLogsCommand,
+  deployRollbackCommand,
+  type DeployOptions,
+} from "./commands/deploy.js";
 
 const program = new Command();
 
@@ -512,6 +519,48 @@ program
   .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
   .action(async (opts: { url?: string; apiKey?: string }) => {
     await interruptsTUICommand(toInterruptsOptions(opts));
+  });
+
+const deployCmd = program
+  .command("deploy")
+  .description("Bundle and deploy the score to docker, railway, or fly")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .option("-t, --target <target>", "Override the score's deploy target: docker | railway | fly")
+  .option("-o, --out-dir <path>", "Output directory for generated files (default: ./.tutti/deploy)")
+  .option("--dry-run", "Generate files and print the commands that would run, without executing them")
+  .action(async (opts: { score?: string; target?: string; outDir?: string; dryRun?: boolean }) => {
+    const resolved: DeployOptions = {
+      ...(opts.score !== undefined ? { score: opts.score } : {}),
+      ...(opts.target !== undefined ? { target: opts.target } : {}),
+      ...(opts.outDir !== undefined ? { outDir: opts.outDir } : {}),
+      ...(opts.dryRun !== undefined ? { dryRun: opts.dryRun } : {}),
+    };
+    await deployCommand(resolved);
+  });
+
+deployCmd
+  .command("status")
+  .description("Show current deployment status from the platform CLI")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (opts: { score?: string }) => {
+    await deployStatusCommand(opts);
+  });
+
+deployCmd
+  .command("logs")
+  .description("Print logs from the deployed service")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .option("--tail", "Stream logs continuously (Ctrl+C to exit)")
+  .action(async (opts: { score?: string; tail?: boolean }) => {
+    await deployLogsCommand(opts);
+  });
+
+deployCmd
+  .command("rollback")
+  .description("Roll back the deployment to the previous release")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (opts: { score?: string }) => {
+    await deployRollbackCommand(opts);
   });
 
 program.parse();

@@ -1,5 +1,20 @@
 # @tuttiai/cli
 
+## 0.19.0
+
+### Minor Changes
+
+- Add `tutti-ai deploy` command with dry-run, status, logs, and rollback subcommands
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - @tuttiai/core@0.20.1
+  - @tuttiai/deploy@0.1.0
+  - @tuttiai/types@0.11.1
+
 ## 0.17.0
 
 ### Minor Changes
