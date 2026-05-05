@@ -80,6 +80,14 @@ export interface TuttiSpanAttributes {
   router_fallback_to?: string;
   /** Error message that triggered the fallback. */
   router_fallback_error?: string;
+  /**
+   * `true` when this call originated from an agent with
+   * `AgentConfig.model === 'auto'`, so the model on the span was picked
+   * by the smart router rather than declared by the score author.
+   * Lets dashboards distinguish score-level SmartProvider use from
+   * the per-agent `'auto'` opt-in.
+   */
+  auto_routed?: boolean;
 
   // ----------------------------------------------------------------- tool
   /** Snake-case tool name (e.g. `"read_file"`). */

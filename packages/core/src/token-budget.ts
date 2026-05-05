@@ -18,15 +18,50 @@ export const PRICING: Record<string, { input: number; output: number }> = {
 export class TokenBudget {
   private used_input = 0;
   private used_output = 0;
+  /** Cost for tokens accumulated via `add()` calls that supplied a
+   *  `model_override`. Kept separately so the constructor model still
+   *  prices any unmodelled tokens. */
+  private override_cost_usd = 0;
+  private override_input = 0;
+  private override_output = 0;
 
   constructor(
     private config: BudgetConfig,
     private model: string,
   ) {}
 
-  add(input_tokens: number, output_tokens: number): void {
+  /**
+   * Accumulate tokens for one LLM call.
+   *
+   * @param input_tokens - Prompt tokens consumed.
+   * @param output_tokens - Completion tokens generated.
+   * @param model_override - The model the call actually ran on. Optional
+   *   override used by `AgentConfig.model === 'auto'` runs where the
+   *   per-call model is decided by a `SmartProvider` and differs from
+   *   the `TokenBudget`'s construction-time model. When supplied with a
+   *   known price, this call's cost is priced at the override rate;
+   *   otherwise it falls back to the constructor model.
+   */
+  add(input_tokens: number, output_tokens: number, model_override?: string): void {
     this.used_input += input_tokens;
     this.used_output += output_tokens;
+    if (model_override !== undefined && model_override !== "") {
+      // `Object.hasOwn` keeps prototype keys (`__proto__` etc.) out of
+      // the lookup — `model_override` originates from the SmartProvider's
+      // last decision and is not user input, but defence in depth costs
+      // nothing here.
+      const prices = Object.hasOwn(PRICING, model_override)
+        ? // eslint-disable-next-line security/detect-object-injection -- ownership-checked above
+          PRICING[model_override]
+        : undefined;
+      if (prices) {
+        this.override_cost_usd +=
+          (input_tokens / 1_000_000) * prices.input +
+          (output_tokens / 1_000_000) * prices.output;
+        this.override_input += input_tokens;
+        this.override_output += output_tokens;
+      }
+    }
   }
 
   get total_tokens(): number {
@@ -34,12 +69,16 @@ export class TokenBudget {
   }
 
   get estimated_cost_usd(): number {
+    // Tokens covered by a per-call override are already priced;
+    // remaining tokens fall back to the construction-time model.
+    const remainingIn = this.used_input - this.override_input;
+    const remainingOut = this.used_output - this.override_output;
     const prices = PRICING[this.model];
-    if (!prices) return 0;
-    return (
-      (this.used_input / 1_000_000) * prices.input +
-      (this.used_output / 1_000_000) * prices.output
-    );
+    const baseCost = prices
+      ? (remainingIn / 1_000_000) * prices.input +
+        (remainingOut / 1_000_000) * prices.output
+      : 0;
+    return this.override_cost_usd + baseCost;
   }
 
   /**
