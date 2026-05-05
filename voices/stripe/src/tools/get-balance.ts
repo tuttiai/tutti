@@ -19,7 +19,7 @@ export function createGetBalanceTool(client: StripeClient): Tool<z.infer<typeof 
       try {
         const c = await client.wrapper.getClient();
         const b = await c.balance.retrieve();
-        const fmt = (entries: Array<{ amount: number; currency: string }>) =>
+        const fmt = (entries: Array<{ amount: number; currency: string }>): string =>
           entries.length === 0
             ? "  (none)"
             : entries.map((e) => `  ${formatAmount(e.amount, e.currency)}`).join("\n");

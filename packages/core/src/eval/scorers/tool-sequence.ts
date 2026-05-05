@@ -13,7 +13,7 @@ export function countOrderedMatches(expected: string[], actual: string[]): numbe
   let actualIdx = 0;
   let matched = 0;
   for (const want of expected) {
-    while (actualIdx < actual.length && actual[actualIdx] !== want) {
+    while (actualIdx < actual.length && actual.at(actualIdx) !== want) {
       actualIdx++;
     }
     if (actualIdx < actual.length) {

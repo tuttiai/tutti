@@ -35,9 +35,7 @@ export function exportMarkdown(session: SessionSummary, turns: ChatMessage[]): s
   lines.push("---");
   lines.push("");
 
-  for (let i = 0; i < turns.length; i++) {
-    const msg = turns[i];
-    if (!msg) continue;
+  for (const [i, msg] of turns.entries()) {
     lines.push(`## Turn ${i} (${msg.role})`);
     lines.push("");
     if (typeof msg.content === "string") {

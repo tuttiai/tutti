@@ -105,15 +105,15 @@ function tuttiAttrsToOTel(
   attrs: TuttiSpanAttributes,
   span: TuttiSpan,
 ): Attributes {
-  const out: Attributes = {};
+  const entries: Array<[string, AttributeValue]> = [];
   for (const [k, v] of Object.entries(attrs)) {
     const av = toAttributeValue(v);
-    if (av !== undefined) out[k] = av;
+    if (av !== undefined) entries.push([k, av]);
   }
   // Surface the tutti-specific `kind` so backends can filter without
   // having to map our names to OTel SpanKind (we only emit INTERNAL).
-  out["tutti.kind"] = span.kind;
-  return out;
+  entries.push(["tutti.kind", span.kind]);
+  return Object.fromEntries(entries);
 }
 
 /** Construct the minimal {@link ReadableSpan} that the JSON serialiser needs. */

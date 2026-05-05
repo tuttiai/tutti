@@ -16,15 +16,34 @@
  * @module
  */
 
-/** Escape every regex metacharacter *except* `*`. */
-function escapeLiteral(s: string): string {
-  return s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Does `pattern` match `text`? `*` is the only special glyph. */
+/**
+ * Does `pattern` match `text`? `*` is the only special glyph. Implemented
+ * with `String.split("*")` + `startsWith` / `endsWith` / `indexOf` —
+ * deliberately no `RegExp`, so there's no ReDoS surface and no escape
+ * function to maintain.
+ */
 export function globMatch(pattern: string, text: string): boolean {
-  const rx = new RegExp("^" + escapeLiteral(pattern).replace(/\*/g, ".*") + "$");
-  return rx.test(text);
+  if (!pattern.includes("*")) return pattern === text;
+  if (pattern === "*") return true;
+
+  const segments = pattern.split("*");
+  const first = segments.shift() ?? "";
+  const last = segments.pop() ?? "";
+
+  if (!text.startsWith(first)) return false;
+  if (!text.endsWith(last)) return false;
+  // The first and last anchors may overlap when the pattern is e.g.
+  // `*foo*` and `text` is shorter than `first + last`.
+  if (text.length < first.length + last.length) return false;
+
+  let cursor = first.length;
+  const upperBound = text.length - last.length;
+  for (const middle of segments) {
+    const idx = text.indexOf(middle, cursor);
+    if (idx === -1 || idx + middle.length > upperBound) return false;
+    cursor = idx + middle.length;
+  }
+  return true;
 }
 
 /** True when `text` matches any of the patterns. Short-circuits on first hit. */

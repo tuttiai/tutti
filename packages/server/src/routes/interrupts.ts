@@ -80,11 +80,14 @@ export function registerInterruptsRoutes(
   runtime: TuttiRuntime,
 ): void {
   // Small helper — every route except `/stream` can bail out the same way.
-  const requireStore = () => {
+  type RequireStoreResult =
+    | { ok: false; error: { error: string; message: string } }
+    | { ok: true; store: NonNullable<TuttiRuntime["interruptStore"]> };
+  const requireStore = (): RequireStoreResult => {
     const store = runtime.interruptStore;
     if (!store) {
       return {
-        ok: false as const,
+        ok: false,
         error: {
           error: "interrupt_store_not_configured",
           message:
@@ -93,7 +96,7 @@ export function registerInterruptsRoutes(
         },
       };
     }
-    return { ok: true as const, store };
+    return { ok: true, store };
   };
 
   // ── GET /sessions/:sessionId/interrupts ──────────────────────

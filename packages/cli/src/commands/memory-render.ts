@@ -11,7 +11,6 @@ import type { UserMemory, UserMemoryImportance } from "@tuttiai/core";
 
 /** Visible width of an ANSI-coloured string. */
 function visibleLen(s: string): number {
-  // eslint-disable-next-line no-control-regex
   return s.replace(/\u001b\[[0-9;]*m/g, "").length;
 }
 

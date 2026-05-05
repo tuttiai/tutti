@@ -144,12 +144,10 @@ export class SmartProvider implements LLMProvider {
     const exact = this.config.tiers.find((t) => t.tier === target);
     if (exact) return exact;
     // Walk down the order to the next configured tier.
-    const idx = TIER_ORDER.indexOf(target);
-    for (let i = idx; i < TIER_ORDER.length; i++) {
-      const candidate = TIER_ORDER[i];
-      const t = this.config.tiers.find((x) => x.tier === candidate);
-      if (t) return t;
-    }
+    const fallback = TIER_ORDER.slice(TIER_ORDER.indexOf(target)).reduce<
+      ModelTier | undefined
+    >((acc, candidate) => acc ?? this.config.tiers.find((x) => x.tier === candidate), undefined);
+    if (fallback) return fallback;
     // Constructor guarantees at least one tier exists.
     const first = this.config.tiers[0];
     if (!first) throw new Error("SmartProvider requires at least one tier");

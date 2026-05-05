@@ -92,10 +92,10 @@ export function layoutGraph(
  */
 function pathToEdgeSet(path: string[]): Set<string> {
   const out = new Set<string>();
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i];
-    const b = path[i + 1];
-    if (a !== undefined && b !== undefined) out.add(edgeKey(a, b));
+  let prev: string | undefined;
+  for (const node of path) {
+    if (prev !== undefined) out.add(edgeKey(prev, node));
+    prev = node;
   }
   return out;
 }

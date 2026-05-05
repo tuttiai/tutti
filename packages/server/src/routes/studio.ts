@@ -1,5 +1,5 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
-import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { createReadStream, statSync } from "node:fs";
+import { extname, isAbsolute, normalize, relative, resolve } from "node:path";
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -57,7 +57,6 @@ function resolveSafe(root: string, requestPath: string): string | undefined {
 
   try {
     // Path is verified to be inside `root` immediately above — safe to stat.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
     const stat = statSync(candidate);
     if (!stat.isFile()) return undefined;
   } catch {
@@ -67,11 +66,10 @@ function resolveSafe(root: string, requestPath: string): string | undefined {
 }
 
 async function sendFile(reply: FastifyReply, file: string): Promise<FastifyReply> {
+  // `file` always comes from `resolveSafe` (or the trusted `indexFile`).
   return reply
     .type(contentType(file))
     .header("cache-control", "no-cache")
-    // `file` always comes from `resolveSafe` (or the trusted `indexFile`).
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
     .send(createReadStream(file));
 }
 
@@ -90,13 +88,14 @@ async function sendFile(reply: FastifyReply, file: string): Promise<FastifyReply
  */
 export function registerStudioRoute(app: FastifyInstance, distDir: string): void {
   const root = resolve(distDir);
-  const indexFile = join(root, "index.html");
 
   // Fail fast at server start if the SPA bundle is missing — every studio
   // request would otherwise 500 once it falls through to `sendFile(indexFile)`.
-  if (!existsSync(indexFile)) {
+  // `resolveSafe` doubles as the existence + sanitiser check.
+  const indexFile = resolveSafe(root, "index.html");
+  if (!indexFile) {
     throw new Error(
-      `Studio dist directory is missing index.html: ${indexFile}. ` +
+      `Studio dist directory is missing index.html: ${resolve(root, "index.html")}. ` +
         `Build @tuttiai/studio (npm -w @tuttiai/studio run build) or unset studio_dist_dir.`,
     );
   }

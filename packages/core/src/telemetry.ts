@@ -111,16 +111,16 @@ async function recordSpan<T>(
  * counterparts. Centralised so the in-process and OTel attribute names
  * stay in sync — change one, change the other.
  */
-const ROUTER_OTEL_KEYS: Record<string, string> = {
-  router_tier: "tutti.router.tier",
-  router_model: "tutti.router.model",
-  router_classifier: "tutti.router.classifier",
-  router_reason: "tutti.router.reason",
-  router_cost_estimate: "tutti.router.cost_estimate",
-  router_fallback_from: "tutti.router.fallback.from_model",
-  router_fallback_to: "tutti.router.fallback.to_model",
-  router_fallback_error: "tutti.router.fallback.error",
-};
+const ROUTER_OTEL_KEYS = new Map<string, string>([
+  ["router_tier", "tutti.router.tier"],
+  ["router_model", "tutti.router.model"],
+  ["router_classifier", "tutti.router.classifier"],
+  ["router_reason", "tutti.router.reason"],
+  ["router_cost_estimate", "tutti.router.cost_estimate"],
+  ["router_fallback_from", "tutti.router.fallback.from_model"],
+  ["router_fallback_to", "tutti.router.fallback.to_model"],
+  ["router_fallback_error", "tutti.router.fallback.error"],
+]);
 
 /**
  * Merge cross-cutting attributes onto the currently active LLM span on
@@ -142,14 +142,14 @@ export function setActiveLlmAttributes(attrs: Partial<TuttiSpanAttributes>): voi
 
   const otelSpan = trace.getActiveSpan();
   if (!otelSpan) return;
-  const otelAttrs: Record<string, string | number> = {};
+  const otelAttrs = new Map<string, string | number>();
   for (const [k, v] of Object.entries(attrs)) {
     if (v === undefined) continue;
-    const otelKey = ROUTER_OTEL_KEYS[k];
+    const otelKey = ROUTER_OTEL_KEYS.get(k);
     if (!otelKey) continue;
-    if (typeof v === "string" || typeof v === "number") otelAttrs[otelKey] = v;
+    if (typeof v === "string" || typeof v === "number") otelAttrs.set(otelKey, v);
   }
-  if (Object.keys(otelAttrs).length > 0) otelSpan.setAttributes(otelAttrs);
+  if (otelAttrs.size > 0) otelSpan.setAttributes(Object.fromEntries(otelAttrs));
 }
 
 /**

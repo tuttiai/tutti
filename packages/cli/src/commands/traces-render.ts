@@ -15,7 +15,6 @@ import type {
 
 /** Visible width of an ANSI-coloured string. */
 function visibleLen(s: string): number {
-  // eslint-disable-next-line no-control-regex
   return s.replace(/\u001b\[[0-9;]*m/g, "").length;
 }
 
@@ -184,9 +183,7 @@ export function renderRouterSummary(spans: readonly TuttiSpan[]): string {
 
   let totalCost = 0;
   let anyCost = false;
-  for (let i = 0; i < decisions.length; i++) {
-    const span = decisions[i];
-    if (!span) continue;
+  for (const [i, span] of decisions.entries()) {
     const a = span.attributes;
     const tier = a.router_tier ?? chalk.dim("—");
     const classifier = a.router_classifier ?? chalk.dim("—");

@@ -4,6 +4,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import type {
   AgentConfig,
   AgentResult,
+  AgentUserMemoryConfig,
   ChatMessage,
   ChatRequest,
   ChatResponse,
@@ -411,7 +412,9 @@ export class AgentRunner {
    * from `agent.memory.user_memory` config on first use. Returns
    * `undefined` when the agent has no user-memory configuration.
    */
-  private getUserMemoryStore(agent: AgentConfig): UserMemoryStore | undefined {
+  private getUserMemoryStore(
+    agent: AgentConfig,
+  ): { store: UserMemoryStore; cfg: AgentUserMemoryConfig } | undefined {
     const cfg = agent.memory?.user_memory;
     if (!cfg) return undefined;
     let store = this.userMemoryStores.get(agent.name);
@@ -419,7 +422,7 @@ export class AgentRunner {
       store = createUserMemoryStore(cfg);
       this.userMemoryStores.set(agent.name, store);
     }
-    return store;
+    return { store, cfg };
   }
 
   private async safeHook<T>(fn: (() => Promise<T> | T | undefined) | undefined): Promise<T | undefined> {
@@ -594,13 +597,12 @@ export class AgentRunner {
       // prompt so they persist for every subsequent turn. Search uses the
       // raw input so the most contextually relevant memories surface.
       // No-op when either user_id or per-agent user_memory config is absent.
-      const userMemoryStore = this.getUserMemoryStore(agent);
+      const userMemory = this.getUserMemoryStore(agent);
       let injectedUserMemories: UserMemory[] = [];
-      if (userId && userMemoryStore) {
-        const cfg = agent.memory!.user_memory!;
-        const limit = cfg.inject_limit ?? 10;
+      if (userId && userMemory) {
+        const limit = userMemory.cfg.inject_limit ?? 10;
         try {
-          injectedUserMemories = await userMemoryStore.search(userId, guardedInput, limit);
+          injectedUserMemories = await userMemory.store.search(userId, guardedInput, limit);
         } catch (err) {
           // User-memory failures are non-fatal — log and continue with
           // an empty memory set rather than aborting the whole run.
@@ -783,8 +785,8 @@ export class AgentRunner {
         // userId is implicit — tool code does not pass it on every call.
         // Defaults to importance: 3 (high) since explicit `remember()`
         // calls from tool code reflect deliberate intent.
-        if (userId && userMemoryStore) {
-          const store = userMemoryStore;
+        if (userId && userMemory) {
+          const store = userMemory.store;
           toolContext.user_memory = {
             remember: async (content, options) => {
               const stored = await store.store(userId, content, {
@@ -1007,16 +1009,12 @@ export class AgentRunner {
       // Auto-infer user memories from the conversation when enabled. Best
       // effort — failures are logged and swallowed so a flaky inference
       // pass never breaks the run for the caller.
-      if (
-        userId &&
-        userMemoryStore &&
-        agent.memory?.user_memory?.auto_infer === true
-      ) {
+      if (userId && userMemory && userMemory.cfg.auto_infer === true) {
         await this.inferAndStoreUserMemories(
           agent,
           userId,
           messages,
-          userMemoryStore,
+          userMemory.store,
         );
       }
 

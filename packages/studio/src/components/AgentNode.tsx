@@ -15,17 +15,20 @@ export interface AgentNodeData extends Record<string, unknown> {
   on_path?: boolean;
 }
 
-const VARIANT_BORDER: Record<AgentNodeData["variant"], string> = {
-  entrypoint: "#2563eb",
-  regular: "#94a3b8",
-  end: "#16a34a",
-};
+const VARIANT_BORDER = new Map<AgentNodeData["variant"], string>([
+  ["entrypoint", "#2563eb"],
+  ["regular", "#94a3b8"],
+  ["end", "#16a34a"],
+]);
 
-const VARIANT_BG: Record<AgentNodeData["variant"], string> = {
-  entrypoint: "#eff6ff",
-  regular: "#ffffff",
-  end: "#ecfdf5",
-};
+const VARIANT_BG = new Map<AgentNodeData["variant"], string>([
+  ["entrypoint", "#eff6ff"],
+  ["regular", "#ffffff"],
+  ["end", "#ecfdf5"],
+]);
+
+const FALLBACK_BORDER = "#94a3b8";
+const FALLBACK_BG = "#ffffff";
 
 interface RunVisuals {
   border: string;
@@ -71,8 +74,8 @@ function resolveRunVisuals(
     };
   }
   return {
-    border: VARIANT_BORDER[variant],
-    background: VARIANT_BG[variant],
+    border: VARIANT_BORDER.get(variant) ?? FALLBACK_BORDER,
+    background: VARIANT_BG.get(variant) ?? FALLBACK_BG,
     badge: null,
     className: onPath ? "agent-node--on-path" : "",
   };

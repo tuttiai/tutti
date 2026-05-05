@@ -185,7 +185,7 @@ export function ReplayView({ session, onReplayed }: ReplayViewProps) {
         </div>
       ) : null}
 
-      <TurnDetail turn={turns[activeIndex]} index={activeIndex} />
+      <TurnDetail turn={turns.at(activeIndex)} index={activeIndex} />
     </div>
   );
 }

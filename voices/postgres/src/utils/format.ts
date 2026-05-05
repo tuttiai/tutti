@@ -39,25 +39,27 @@ export function formatTable(
   if (columns.length === 0) return "(no columns)";
   if (rows.length === 0) return `(no rows)\nColumns: ${columns.join(", ")}`;
 
-  const cells: string[][] = rows.map((row) =>
-    columns.map((c) => formatCell(row[c])),
-  );
+  const cells: string[][] = rows.map((row) => {
+    // Wrap the pg row in a `Map` so column lookup doesn't trip
+    // `security/detect-object-injection` on `row[c]`.
+    const lookup = new Map(Object.entries(row));
+    return columns.map((c) => formatCell(lookup.get(c)));
+  });
 
   const widths = columns.map((c, i) => {
-    const headerW = c.length;
-    let maxW = headerW;
+    let maxW = c.length;
     for (const row of cells) {
-      const cell = row[i] ?? "";
+      const cell = row.at(i) ?? "";
       if (cell.length > maxW) maxW = cell.length;
     }
     return Math.min(maxW, MAX_CELL_LENGTH);
   });
 
   const sep = widths.map((w) => "-".repeat(w)).join("-+-");
-  const header = columns.map((c, i) => c.padEnd(widths[i] ?? 0)).join(" | ");
+  const header = columns.map((c, i) => c.padEnd(widths.at(i) ?? 0)).join(" | ");
   const lines: string[] = [header, sep];
   for (const row of cells) {
-    lines.push(row.map((c, i) => c.padEnd(widths[i] ?? 0)).join(" | "));
+    lines.push(row.map((c, i) => c.padEnd(widths.at(i) ?? 0)).join(" | "));
   }
   return lines.join("\n");
 }

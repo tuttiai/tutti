@@ -18,8 +18,20 @@ const DeployTargetSchema = z.enum(DEPLOY_TARGETS);
  * across every target. The intersection of the platforms' rules: lowercase
  * alphanumerics and hyphens, must start and end with an alphanumeric, 1–63
  * characters long.
+ *
+ * Implemented as a Zod refinement using simple character-class checks rather
+ * than one regex with overlapping character classes — keeps the validator
+ * trivially linear (no backtracking surface) and explicit about each rule.
  */
-const DEPLOY_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const NAME_CHARSET = /^[a-z0-9-]+$/;
+const NAME_ALNUM = /^[a-z0-9]$/;
+function isValidDeployName(s: string): boolean {
+  if (s.length === 0 || s.length > 63) return false;
+  if (!NAME_CHARSET.test(s)) return false;
+  const first = s.charAt(0);
+  const last = s.charAt(s.length - 1);
+  return NAME_ALNUM.test(first) && NAME_ALNUM.test(last);
+}
 
 /**
  * Env var and secret names follow the POSIX-style convention used elsewhere in
@@ -47,8 +59,8 @@ const NameSchema = z
   .string()
   .min(1, "name cannot be empty")
   .max(63, "name cannot be longer than 63 characters")
-  .regex(
-    DEPLOY_NAME_PATTERN,
+  .refine(
+    isValidDeployName,
     "name must be lowercase alphanumeric with hyphens (e.g. 'my-agent')",
   );
 
@@ -176,7 +188,7 @@ export interface DeployManifest {
  * manifest builder uses without re-deriving the regexes.
  */
 export const __INTERNAL = {
-  DEPLOY_NAME_PATTERN,
+  isValidDeployName,
   ENV_NAME_PATTERN,
   SECRET_LIKE_PATTERNS,
   DEFAULT_SCALE,

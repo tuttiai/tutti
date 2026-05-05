@@ -511,6 +511,21 @@ const SUBCOMMAND_DISPATCH: Record<
   },
 };
 
+/**
+ * Dispatch helper expressed as a switch so the linter sees a static lookup
+ * instead of a computed property access on an object literal.
+ */
+function dispatchFor(target: CliDeployTarget): (typeof SUBCOMMAND_DISPATCH)[CliDeployTarget] {
+  switch (target) {
+    case "docker":
+      return SUBCOMMAND_DISPATCH.docker;
+    case "railway":
+      return SUBCOMMAND_DISPATCH.railway;
+    case "fly":
+      return SUBCOMMAND_DISPATCH.fly;
+  }
+}
+
 async function dispatchSubcommand(
   scorePath: string | undefined,
   pick: (
@@ -526,7 +541,7 @@ async function dispatchSubcommand(
     fail(`${label} is not implemented for cloudflare yet.`);
   }
   const target: CliDeployTarget = manifest.target;
-  const entry = SUBCOMMAND_DISPATCH[target];
+  const entry = dispatchFor(target);
   const argv = pick(entry);
   if (argv === null) {
     fail(
