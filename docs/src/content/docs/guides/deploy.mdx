@@ -1,0 +1,129 @@
+---
+title: "Deploying to production"
+description: "Bundle a Tutti score and ship it to Docker, Railway, or Fly with one command."
+sidebar:
+  order: 8
+---
+
+Tutti ships a deploy bundler — `@tuttiai/deploy` — and a CLI front-end on it. One command takes a score from `tutti-ai run` to a containerised service running on your platform of choice. The bundle includes a Dockerfile, `docker-compose.yml`, and platform-specific config (`fly.toml`, `railway.json`) generated from a `DeployConfig` block on your agent.
+
+## Prerequisites
+
+- A Tutti score that runs locally with `tutti-ai run` or `tutti-ai serve`
+- The platform CLI installed:
+  - Docker — `docker compose` (built in)
+  - Railway — `npm i -g @railway/cli && railway login`
+  - Fly — `curl -L https://fly.io/install.sh | sh && fly auth login`
+
+## Step 1: Add a `deploy` block to one agent
+
+Pick the agent you want to ship and add a `deploy` block. Exactly one agent in the score should declare it — that's the deploy entrypoint.
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { GitHubVoice } from "@tuttiai/github";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    api: {
+      name: "api",
+      model: "claude-sonnet-4-6",
+      system_prompt: "You are a customer-facing API agent.",
+      voices: [new GitHubVoice()],
+      permissions: ["network"],
+      deploy: {
+        target: "fly",                              // optional — --target wins
+        region: "auto",
+        scale: { min: 0, max: 3, memory: "512MB" },
+        health: { path: "/health", interval_seconds: 30 },
+        env: { LOG_LEVEL: "info" },                  // plaintext config
+        secrets: ["ANTHROPIC_API_KEY", "GITHUB_TOKEN"], // names of required env vars
+      },
+    },
+  },
+});
+```
+
+The `secrets` array names every env var the runtime needs — the deploy bundler emits a matching `.env.deploy.example` next to your score so missing-vars are obvious before the platform rejects them.
+
+## Step 2: Pre-flight check
+
+```bash
+tutti-ai deploy --target railway --dry-run
+```
+
+The dry run prints the deploy plan without invoking the platform CLI. Two static analyses run before any I/O:
+
+1. **`scanForSecrets()`** walks your score and every imported package's entry file for `process.env.X` reads. It filters Node built-ins (`PATH`, `HOME`, `NODE_ENV`, etc.) and emits errors for undeclared required vars. If your code reads `process.env.STRIPE_SECRET_KEY` but `deploy.secrets` doesn't list it, the deploy fails fast with a clear message.
+
+2. **`validateSecrets()`** warns on secret-shaped names (`*_KEY`, `*_TOKEN`, `*_SECRET`) sitting in plaintext `deploy.env`. Plaintext API keys block the deploy fail-fast — the platform's secret store is the right place for them, not your score file.
+
+If the dry-run is green, drop `--dry-run` to deploy for real.
+
+## Step 3: Deploy
+
+```bash
+tutti-ai deploy --target railway     # bundle + railway up
+```
+
+Tutti generates the bundle in `./tutti-deploy/`, writes `.env.deploy.example`, and dispatches to the platform CLI. On success it prints the deploy URL; on failure it surfaces the platform's error and exits non-zero.
+
+### Targets
+
+| Target | Generated files | Platform command dispatched |
+| --- | --- | --- |
+| `docker` | `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `deploy.sh` | `docker compose build && docker compose up -d` |
+| `railway` | All Docker files + `railway.json` | `railway up` |
+| `fly` | All Docker files + `fly.toml` | `fly deploy` |
+
+The Docker bundle runs as non-root user `tutti` (uid 1001), exposes port 3000 (configurable), and includes a healthcheck against the `health.path` you set. `NODE_OPTIONS --max-old-space-size` is computed from `scale.memory` so the runtime won't OOM under platform-imposed memory caps.
+
+### Conditional services
+
+The bundler reads your score's `memory.provider` and per-agent `durable.store` to decide whether to add `postgres` or `redis` services:
+
+- `memory.provider: "postgres"` → adds a postgres service to `docker-compose.yml`, sets `DATABASE_URL` in env.
+- `durable.store: "redis"` → adds a redis service, sets `TUTTI_REDIS_URL`.
+
+You can override either by setting the env var explicitly in `deploy.env` or by attaching a managed equivalent on the platform side.
+
+## Step 4: Operate
+
+Once shipped, the same CLI manages day-to-day operations:
+
+```bash
+tutti-ai deploy status              # platform-equivalent status check
+tutti-ai deploy logs --tail         # follow logs
+tutti-ai deploy rollback            # roll back to the previous release
+```
+
+Each subcommand dispatches to the matching platform command (`fly status`, `railway logs`, etc.) so you don't need to remember the platform's exact verbs.
+
+## Cost monitoring after deploy
+
+Once your service is running, configure a `RunCostStore` so the cost-analysis CLI can read live data:
+
+```ts
+import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+
+const runtime = new TuttiRuntime(score, {
+  runCostStore: new PostgresRunCostStore({
+    connection_string: process.env.DATABASE_URL!,
+  }),
+});
+```
+
+Then from your laptop:
+
+```bash
+tutti-ai analyze costs --last 7d --url https://api.example.com
+```
+
+Top runs by cost, daily-spend sparkline, and burn-rate optimisation hints. See [the CLI reference](/cli/reference#tutti-ai-analyze-costs) for the full command surface.
+
+## What's not yet shipped
+
+- **AWS / GCP / Azure** — not yet. The bundler is structured around platforms with a single deploy verb; the cloud providers need an opinion about ECS vs Lambda vs Fargate, GKE vs Cloud Run, etc., that we haven't picked yet. For now use the Docker bundle and ship via your existing infra-as-code.
+- **Multi-region** — `region: "auto"` picks one region. Multi-region active-active is platform-specific (Fly supports it natively, others don't) and not abstracted yet.
+- **Blue/green** — rollback is single-step, not slot-based. We rely on the platform's release history rather than maintaining two deployments.

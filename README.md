@@ -75,6 +75,45 @@ provider: new SmartProvider({
 
 See [`packages/router/README.md`](packages/router/README.md) for classifier strategies, policies, fallback chains, and budget-driven downgrades.
 
+## Production Ship
+
+Four pieces shipped in v0.24 that turn Tutti from "great in dev" to "ready in prod":
+
+- **`tutti-ai deploy --target docker|railway|fly`** — bundles your score and ships it. Pre-flight secrets scanning, plan-builder helpers, and `deploy status / logs / rollback` subcommands. Writes a `.env.deploy.example` next to your score so missing env vars block the deploy fail-fast.
+- **Tutti Studio** — TypeScript-native visual agent IDE. Web SPA on `localhost:4747` via `tutti-ai studio`. Score graph, live execution stream, replay.
+- **Realtime voice** — OpenAI Realtime API integration. Per-agent gating, `SecretsManager` redaction of tool args, `InterruptStore`-gated approval, durable logging. New `@tuttiai/realtime` package and `--realtime` flag on `tutti-ai serve`.
+- **Hard cost budgets** — per-run, daily, and monthly USD ceilings throw `BudgetExceededError`. `model: 'auto'` per-agent sentinel for smart routing. Postgres-backed `RunCostStore` for multi-process deployments. `tutti-ai analyze costs` / `report costs` / `budgets` for visibility.
+
+```ts
+import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+
+const runtime = new TuttiRuntime(score, {
+  runCostStore: new PostgresRunCostStore({ connection_string: process.env.DATABASE_URL! }),
+});
+```
+
+```ts
+agents: {
+  triage: {
+    name: "triage",
+    model: "auto",                             // route per turn via SmartProvider
+    voices: [],
+    budget: {
+      max_cost_usd: 0.05,                      // hard per-run cap
+      max_cost_usd_per_day: 5.00,              // hard daily cap (requires RunCostStore)
+      max_cost_usd_per_month: 50.00,           // hard monthly cap
+    },
+  },
+}
+```
+
+```bash
+tutti-ai deploy --target railway              # bundle + deploy in one command
+tutti-ai analyze costs --last 7d              # top runs, daily sparkline, optimisation hints
+tutti-ai studio                                # visual IDE on localhost:4747
+tutti-ai serve --realtime                     # WebSocket + audio surface
+```
+
 ## Packages
 
 Published on npm — run `tutti-ai outdated` in your project for the
@@ -85,9 +124,12 @@ for the latest published version.
 | ------- | ----------- |
 | [`@tuttiai/types`](packages/types) | Type definitions and Zod schemas (zero runtime deps) |
 | [`@tuttiai/core`](packages/core) | Runtime, agent loop, providers, security, memory, telemetry |
-| [`@tuttiai/cli`](packages/cli) | CLI — `init`, `run`, `serve`, `studio`, `schedule`, `eval`, `traces`, `memory`, and more |
-| [`@tuttiai/server`](packages/server) | HTTP server: REST API, SSE streaming, HITL endpoints, Docker support |
+| [`@tuttiai/cli`](packages/cli) | CLI — `init`, `run`, `serve`, `studio`, `deploy`, `schedule`, `eval`, `traces`, `memory`, `analyze costs`, and more |
+| [`@tuttiai/server`](packages/server) | HTTP server: REST API, SSE streaming, HITL endpoints, cost routes, realtime WebSocket, Docker support |
 | [`@tuttiai/router`](packages/router) | Smart model router — classifies turns and dispatches to the cheapest tier that can handle them |
+| [`@tuttiai/deploy`](packages/deploy) | Deploy bundlers — Docker / Railway / Fly manifest builders with secrets scanner |
+| [`@tuttiai/studio`](packages/studio) | Visual agent IDE — graph view, live execution stream, replay, served by `@tuttiai/server` |
+| [`@tuttiai/realtime`](packages/realtime) | OpenAI Realtime API client + tool bridge with `SecretsManager` redaction and `InterruptStore` gating |
 | [`@tuttiai/telemetry`](packages/telemetry) | OpenTelemetry tracer — spans for every run, LLM call, and tool invocation |
 | [`@tuttiai/filesystem`](voices/filesystem) | 7 file tools (read, write, search, etc.) |
 | [`@tuttiai/github`](voices/github) | 10 GitHub tools (issues, PRs, repos, code search) |
@@ -243,9 +285,23 @@ tutti-ai info [score]                # Show agents, voices, versions
 tutti-ai run [score]                 # Run a score interactively (REPL)
 tutti-ai run -p "ask something"      # One-shot: single prompt, prints to stdout
 tutti-ai serve [score]               # Start the HTTP server
-tutti-ai studio [score]              # Launch the web UI
+tutti-ai serve --realtime            # Start the HTTP server with the realtime WebSocket
+tutti-ai studio [score]              # Launch the web UI on localhost:4747
 tutti-ai resume <session-id>         # Resume a previous session
 tutti-ai replay <session-id>         # Time-travel debug a session
+
+# Deploy
+tutti-ai deploy [--target docker|railway|fly] [--dry-run]
+                                     # Bundle the score and deploy
+tutti-ai deploy status               # Platform-equivalent status check
+tutti-ai deploy logs [--tail]        # Stream platform logs
+tutti-ai deploy rollback             # Roll back to the previous deploy
+
+# Cost analysis
+tutti-ai analyze costs [--last 7d]   # Top runs, daily sparkline, optimisation hints
+tutti-ai report costs [--format text|json|csv]
+                                     # Exportable cost report
+tutti-ai budgets [--agent <id>]      # Per-agent budget config + current spend
 
 # Voices & packages
 tutti-ai add <voice>                 # Install a voice
@@ -353,7 +409,7 @@ One-click deploy configs for [Railway](scripts/deploy/railway.json) and
 
 ## Testing
 
-460+ tests across 40+ files. 96% line coverage on core.
+1,800+ tests across 132 files. 96% line coverage on core.
 
 ```bash
 npx vitest run              # all tests

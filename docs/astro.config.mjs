@@ -51,6 +51,7 @@ export default defineConfig({
             { label: "Memory & Sessions", slug: "guides/memory-sessions" },
             { label: "Tool Result Caching", slug: "guides/tool-caching" },
             { label: "Security", slug: "guides/security" },
+            { label: "Deploying to Production", slug: "guides/deploy" },
           ],
         },
         {
@@ -68,6 +69,7 @@ export default defineConfig({
             { label: "Web", slug: "voices/web" },
             { label: "Sandbox", slug: "voices/sandbox" },
             { label: "RAG", slug: "voices/rag" },
+            { label: "Realtime", slug: "voices/realtime" },
             { label: "MCP bridge", slug: "voices/mcp" },
           ],
         },

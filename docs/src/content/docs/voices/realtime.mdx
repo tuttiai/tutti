@@ -1,0 +1,129 @@
+---
+title: "Realtime Voice"
+description: "@tuttiai/realtime — OpenAI Realtime API client + tool bridge with HITL gating and SecretsManager redaction"
+sidebar:
+  order: 12
+---
+
+The Realtime voice gives agents a low-latency voice-in / voice-out surface backed by the OpenAI Realtime API. The bridge wires Tutti's existing tool-execution machinery into the realtime session so a model speaking out loud still flows through the runtime's secret-redaction, permission, and HITL approval layers.
+
+## Installation
+
+```bash
+npx tutti-ai add realtime
+```
+
+## Required permissions
+
+```ts
+required_permissions: ["network"]
+```
+
+## Score wiring
+
+Two places to set up: the agent gets a `realtime` block, and the score includes `RealtimeVoice()` in its voices list. Both are required — the `realtime` block is what the server checks before accepting the WebSocket; the voice is what loads the `start_realtime_session` tool.
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { RealtimeVoice } from "@tuttiai/realtime";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    talker: {
+      name: "talker",
+      model: "claude-sonnet-4-6",
+      system_prompt: "You are a helpful voice assistant. Keep replies short.",
+      voices: [RealtimeVoice({ voice: "shimmer" })],
+      permissions: ["network"],
+      realtime: {
+        voice: "shimmer",                  // OpenAI voice id
+        instructions: "Be concise.",        // overrides system_prompt for the realtime turn
+        server_vad: { silence_ms: 500 },    // server-side VAD config
+      },
+    },
+  },
+});
+```
+
+Then start the server with realtime support:
+
+```bash
+OPENAI_API_KEY=sk-... tutti-ai serve --realtime
+```
+
+## Connecting from a browser
+
+Open `http://localhost:3847/realtime-demo` for a built-in demo page (mic capture via `AudioWorklet`, base64 PCM round-trip, Web Audio playback, transcript log). Or connect directly:
+
+```ts
+const ws = new WebSocket(
+  `ws://localhost:3847/realtime?api_key=${TUTTI_API_KEY}`
+);
+
+ws.onopen = () => ws.send(JSON.stringify({ type: "text", text: "hello" }));
+```
+
+Auth is inline against `?api_key=...` because browsers cannot set `Authorization` on `new WebSocket(url)`.
+
+## Frame protocol
+
+JSON-encoded both ways.
+
+**Inbound** (browser → server):
+
+| `type` | Payload | Description |
+| --- | --- | --- |
+| `audio` | `{ data: base64 }` | One PCM chunk. Append to the audio buffer. |
+| `audio_commit` | — | End-of-turn marker. Server kicks off response generation. |
+| `text` | `{ text }` | Send a typed message instead of audio. |
+| `interrupt:resolve` | `{ id, decision: "approved" \| "denied", reason? }` | Operator response to an HITL pause. |
+
+**Outbound** (server → browser):
+
+| `type` | Payload | Description |
+| --- | --- | --- |
+| `ready` | `{ session_id }` | Session opened. |
+| `audio` | `{ data: base64 }` | One audio chunk. Decode and play. |
+| `transcript` | `{ text, role }` | Live transcription as the model speaks. |
+| `tool:call` | `{ tool, args }` | Tool invocation about to execute. Args are already secret-redacted. |
+| `tool:result` | `{ tool, content, is_error? }` | Tool completed. |
+| `interrupt` | `{ id, tool, args }` | Destructive tool call awaiting approval. |
+| `error` | `{ code, message }` | Fatal error — connection will close. |
+| `end` | — | Session closed cleanly. |
+
+## How tool calls work mid-session
+
+`registerTools(client, tools, config)` advertises every Tutti tool to the realtime session via `session.update`. When the model calls a tool, the bridge:
+
+1. **Intercepts** `response.function_call_arguments.done`.
+2. **Redacts** the arguments through `SecretsManager.redactObject` before the call appears in any log or event.
+3. **Gates** if `requireApproval` matches the tool name or the tool is marked `destructive: true` — emits `interrupt` to the WebSocket and waits for `interrupt:resolve`.
+4. **Executes** the tool through the standard Tutti runtime (so permission scopes, prompt-injection guards, and tool-result truncation all still apply).
+5. **Writes back** `conversation.item.create` with the result + `response.create` so the model can continue.
+
+If the tool throws, the bridge writes back `{ is_error: true, content: "<message>" }` instead of leaking a stack trace into the audio stream.
+
+## Connection-rejection codes
+
+| Code | Reason | Fix |
+| --- | --- | --- |
+| `4404 / realtime_disabled_for_agent` | The agent's `realtime` config is `undefined` or `false`. | Add a `realtime` block to the agent. |
+| `4500 / missing_openai_api_key` | `OPENAI_API_KEY` is unset on the server. | `export OPENAI_API_KEY=sk-...` before starting `tutti-ai serve`. |
+| `4401 / unauthorized` | Bad or missing `?api_key=`. | Pass the same key as `TUTTI_API_KEY` on the server. |
+
+## Public types
+
+`@tuttiai/realtime` exports:
+
+- **Session**: `RealtimeClient`, `RealtimeSession`, `RealtimeVoice` factory
+- **Config**: `RealtimeConfig`, `ServerVadConfig`, `RegisterToolsOptions`, `RealtimeSessionOptions`
+- **Events**: `RealtimeEvent`, `RealtimeEventHandler`, `RealtimeConnectionState`, `RealtimeFunctionCall`, `RealtimeSessionEvents`, `RealtimeSessionEventName`
+- **Codec helpers**: `parseFunctionCallDone`, `buildToolsSessionUpdate`, `buildFunctionCallOutput`, `buildResponseCreate`, `toolToFunctionDefinition`
+- **Transport**: `REALTIME_URL`, `SUBPROTOCOL_BETA`, `SUBPROTOCOL_PREFIX_API_KEY`, `buildAuthSubprotocols`, `resolveGlobalWebSocket`
+
+## What's not yet shipped
+
+- **Provider parity** — only OpenAI's Realtime API is supported. Anthropic and Gemini realtime equivalents will be added when their public APIs stabilise.
+- **Multi-modal** — text + audio. Vision is not yet plumbed.
+- **Recording** — the bridge does not durably save audio. Transcripts pass through the standard event stream and can be persisted there; raw PCM is fire-and-forget.
