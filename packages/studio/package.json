@@ -1,0 +1,43 @@
+{
+  "name": "@tuttiai/studio",
+  "version": "0.1.0",
+  "description": "Tutti Studio — web-based visual IDE for Tutti agents",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --port 5173"
+  },
+  "devDependencies": {
+    "@types/dagre": "^0.7.52",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@xyflow/react": "^12.3.0",
+    "dagre": "^0.8.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^6.0.0"
+  },
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "studio",
+    "visual-ide"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "packages/studio"
+  },
+  "homepage": "https://tutti-ai.com"
+}
