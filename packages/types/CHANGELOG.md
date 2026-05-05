@@ -1,5 +1,11 @@
 # @tuttiai/types
 
+## 0.11.3
+
+### Patch Changes
+
+- `BudgetConfig` gains `max_cost_usd_per_day?: number` and `max_cost_usd_per_month?: number`. `budget:warning` and `budget:exceeded` events gain optional `scope: 'run' | 'day' | 'month'` and numeric `limit`. All additions are non-breaking.
+
 ## [Unreleased]
 
 ### Patch Changes

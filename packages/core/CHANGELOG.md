@@ -1,5 +1,24 @@
 # @tuttiai/core
 
+## 0.21.0
+
+### Minor Changes
+
+- Add hard cost-budget enforcement and `model: 'auto'` agent-level smart-routing.
+
+  - Per-run, daily, and monthly USD ceilings (`max_cost_usd`, `max_cost_usd_per_day`, `max_cost_usd_per_month`) now throw `BudgetExceededError` instead of soft-stopping. Pre-call check throws when the prior turn already breached any cap; post-call check throws on breach and emits `budget:exceeded` with `scope` (`'run' | 'day' | 'month'`) and `limit`. The configured `warn_at_percent` (default 80) fires `budget:warning` per-scope. Token-based `max_tokens` keeps its original soft-break-and-return semantics.
+  - `BudgetExceededError` accepts a structured `{ scope, limit, current, tokens? }` payload and exposes `.scope`, `.limit`, `.current`, `.tokens` as typed fields. The legacy positional constructor still works and defaults `scope` to `'run'`.
+  - New `model: 'auto'` agent-level sentinel — when set, the runtime delegates per-call model selection to the score's `SmartProvider` (from `@tuttiai/router`). Throws a clear error at run start when no `SmartProvider` is configured. Mixed-mode scores (one agent on `'auto'`, another on a fixed model) work natively. Cost budgets price each call at the chosen tier, so caps behave identically across fixed-model and auto-routed runs.
+  - New `PostgresRunCostStore` backend (idempotent `tutti_run_costs` schema with `(started_at)` index, 90-day default retention swept on every write). Wire via `new TuttiRuntime(score, { runCostStore })`. `TuttiRuntime.runCostStore` exposed as a public readonly getter.
+  - `TokenBudget.add(input, output, model_override?)` now accepts a per-call model whose pricing supersedes the construction-time model for that call's cost.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @tuttiai/telemetry@0.4.0
+  - @tuttiai/types@0.11.3
+
 ## [Unreleased]
 
 ### Minor Changes

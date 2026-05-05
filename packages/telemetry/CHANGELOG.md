@@ -1,5 +1,15 @@
 # @tuttiai/telemetry
 
+## 0.4.0
+
+### Minor Changes
+
+- Add `RunCostStore` interface, `InMemoryRunCostStore`, and the `getDailyCost(store, now?)` / `getMonthlyCost(store, now?)` aggregation helpers (UTC calendar buckets). Pairs with the new daily/monthly budget enforcement in `@tuttiai/core`. Exported alongside the existing `getRunCost`. The interface stays here (zero infra deps); the Postgres backend lives in `@tuttiai/core` for the same reason `PostgresCheckpointStore` does.
+
+  `RunCostStore` gains `list({ since?, until?, agent_name?, limit?, order? })` for cost-analysis aggregation, on both `InMemoryRunCostStore` and `PostgresRunCostStore`. Additive interface change.
+
+  `TuttiSpanAttributes` gains optional `auto_routed: boolean`, set on `llm.completion` spans for calls that originated from a `model: 'auto'` agent.
+
 ## [Unreleased]
 
 ### Minor Changes

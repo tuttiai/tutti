@@ -1,5 +1,14 @@
 # @tuttiai/server
 
+## 0.5.0
+
+### Minor Changes
+
+- Add cost-analysis HTTP routes backing the new CLI cost commands.
+
+  - `GET /cost/runs` and `GET /cost/budgets` — read from `TuttiRuntime.runCostStore`. Return `{ store_missing: true, runs: [] }` when no `RunCostStore` is configured so the CLI can render a friendly message instead of 500-ing.
+  - `GET /cost/tools` — aggregates `tool.call` spans from the in-memory tracer into per-tool call counts and proxy average tokens. Bounded by the tracer's ring buffer (default 1000 spans, lost on restart); response includes `window_started_at` + `window_span_count` so the CLI can render explicit live-window framing.
+
 ## [Unreleased]
 
 ### Minor Changes
