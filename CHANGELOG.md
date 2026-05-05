@@ -159,6 +159,40 @@ The four-headline release that takes Tutti from "great in dev" to "ready in prod
 - `search_messages` does a local case-insensitive substring scan over the last 200 messages of one channel via `conversations.history`. The workspace-wide `search.messages` endpoint requires a user token (`xoxp-`) which standard bot installs do not have, so we never reach for it — same approach as the discord voice.
 - 66 unit tests covering happy path, auth gating for every write tool, lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), and every documented Slack error code branch (`not_authed`, `invalid_auth`, `missing_scope`, `channel_not_found`, `user_not_found`, `not_in_channel`, `message_not_found`, `cant_update_message`, `cant_delete_message`, `ratelimited`, `msg_too_long`, `is_archived`, `no_text`). Line coverage 97.79 %, function coverage 97.22 %, branch coverage 82.70 % — all voice thresholds met.
 
+## v0.22.0 — Destructive-Tool HITL by Default + Twitter / Discord voices
+
+The release that closes the most-requested safety hole: any tool whose voice author marks `destructive: true` now pauses for operator approval automatically, with no per-agent wiring. Plus two messaging voices (Twitter / Discord), one-shot CLI mode, and four Dependabot advisories cleared.
+
+### New
+- **`Tool.destructive`** + automatic HITL gating — see "destructive flag" section below.
+- **`@tuttiai/twitter`** (0.1.0) — 9 tools (3 destructive write + 6 read), OAuth 1.0a or bearer-token auth.
+- **`@tuttiai/discord`** (0.1.0) — 11 tools (5 destructive write + 6 read), bot-token auth, Server Members + Message Content intent guidance in the README.
+- **`tutti-ai run -p "<prompt>"`** — one-shot non-interactive mode for scripts, CI smoke tests, shell pipelines.
+- **`tutti-ai info`** — now resolves *installed* package versions from `node_modules/<name>/package.json` instead of echoing back `*` / `^x.y.z` / `workspace:*`.
+
+### Security
+- `fastify` → `5.8.5` (body-schema validation bypass via leading-space `Content-Type`, high).
+- `protobufjs` → `7.5.5` via lockfile (arbitrary code execution, critical, transitive through `@opentelemetry/auto-instrumentations-node`).
+- `hono` → `4.12.14` via lockfile (JSX attribute HTML-injection in `hono/jsx` SSR, moderate, transitive through `@modelcontextprotocol/sdk`).
+- `npm audit --audit-level=high` clean across the monorepo.
+
+### Fixed
+- Typing `exit` / `quit` in `tutti-ai run` no longer leaves the terminal in raw mode — single `shutdown()` path explicitly calls `setRawMode(false)` + `pause()` before `process.exit(0)`. Idempotent on re-entry from SIGINT.
+
+---
+
+### Full release detail
+
+#### Added — `@tuttiai/discord` voice (11 tools)
+- New official voice at `voices/discord/`, published as `@tuttiai/discord@0.1.0`. Built on `discord.js@14.16.3`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
+- 11 tools — 5 write (destructive) + 6 read:
+  - `post_message { channel_id, content, reply_to_message_id? }`, `edit_message { channel_id, message_id, content }`, `delete_message { channel_id, message_id }`, `add_reaction { channel_id, message_id, emoji }`, `send_dm { user_id, content }` — all marked `destructive: true` so HITL-enabled runtimes gate them behind operator approval automatically.
+  - `list_messages`, `get_message`, `list_channels`, `list_members`, `search_messages`, `get_guild_info` — read-only.
+- Auth resolution is lazy and fail-soft: missing `DISCORD_BOT_TOKEN` returns a `kind: "missing"` client; tool calls short-circuit with `is_error` and a hint pointing at the Developer Portal plus the privileged-intent toggles needed (`Server Members`, `Message Content`). Construction never throws.
+- `search_messages` does a local case-insensitive substring scan over the last 100 messages in one channel — the workspace-wide search endpoint Discord exposes is not available to bot tokens, so we don't reach for it (same approach as the slack voice).
+- `add_reaction` accepts unicode emoji or `name:id` custom-emoji shorthand and normalises before calling the API.
+- README ships with full bot-setup walkthrough (Developer Portal → bot creation → privileged intents → OAuth2 URL generator → invite to server) so the first run after `tutti-ai add discord` is a fifteen-minute path, not a Discord-API research project.
+
 #### Added — `@tuttiai/twitter` voice (9 tools)
 - New official voice at `voices/twitter/`, published as `@tuttiai/twitter@0.1.0`. Built on `twitter-api-v2@1.29.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
 - 9 tools — 3 write (destructive) + 6 read:
@@ -200,6 +234,14 @@ The four-headline release that takes Tutti from "great in dev" to "ready in prod
 #### Fixed — `tutti-ai info` resolves installed package versions
 - `tutti-ai info` now reads `node_modules/<name>/package.json` to show the actual installed version of each `@tuttiai/*` dependency instead of echoing back the spec string (e.g. `0.18.3` instead of `*`, `^1.0.0`, or `workspace:*`). Falls back to the spec when the package isn't installed or its manifest is unreadable.
 - `resolveInstalledVersion(name, spec, cwd?)` exported from `packages/cli/src/commands/info.ts` — pure helper with 4 unit tests covering installed / missing / malformed manifest / missing-version cases.
+
+### Package versions
+- @tuttiai/types — gains optional `Tool.destructive` field (additive)
+- @tuttiai/core — `needsApproval` consults the `destructive` flag; `AgentRunner` forwards it at the existing gate site
+- @tuttiai/cli — `tutti-ai run -p` one-shot mode; `tutti-ai info` resolves installed versions
+- @tuttiai/twitter 0.1.0 (new package — 9 tools)
+- @tuttiai/discord 0.1.0 (new package — 11 tools)
+- @tuttiai/server — fastify 5.8.5 (security)
 
 ## [0.21.0] - 2026-04-15
 
