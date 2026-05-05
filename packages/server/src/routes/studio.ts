@@ -1,5 +1,5 @@
 import { createReadStream, statSync } from "node:fs";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -29,17 +29,20 @@ function contentType(file: string): string {
 }
 
 /**
- * Resolve a request path to an absolute file inside `root`. Rejects any
- * resolved path that escapes the root (defence in depth against path
- * traversal). Returns `undefined` when the candidate is not a regular file.
+ * Resolve a request path to an absolute file inside `root`. Returns
+ * `undefined` for any request that escapes the root or doesn't point at
+ * a regular file.
+ *
+ * Two layered barriers — both are also the sanitiser shapes CodeQL's
+ * `js/path-injection` query recognises:
+ *  1. Reject inputs whose components contain `..` or NUL bytes before we
+ *     touch the filesystem.
+ *  2. After `resolve()`, recompute the path relative to `root` and reject
+ *     anything that goes upwards (`..`) or escapes to an absolute path.
  */
 function resolveSafe(root: string, requestPath: string): string | undefined {
   const trimmed = requestPath.replace(/^\/+/, "");
 
-  // Reject traversal segments and NUL bytes before touching the filesystem.
-  // The post-resolve `startsWith` check below is sufficient on its own, but
-  // an up-front segment filter is the sanitiser shape CodeQL recognises for
-  // js/path-injection — and gives us a second barrier in depth.
   const segments = trimmed.split(/[\\/]/);
   if (segments.includes("..") || trimmed.includes("\0")) {
     return undefined;
@@ -47,8 +50,8 @@ function resolveSafe(root: string, requestPath: string): string | undefined {
 
   const candidate = resolve(root, normalize(trimmed));
 
-  const rootWithSep = root.endsWith(sep) ? root : root + sep;
-  if (candidate !== root && !candidate.startsWith(rootWithSep)) {
+  const rel = relative(root, candidate);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
     return undefined;
   }
 
