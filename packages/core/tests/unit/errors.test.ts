@@ -80,7 +80,7 @@ describe("PermissionError", () => {
 });
 
 describe("BudgetExceededError", () => {
-  it("has code BUDGET_EXCEEDED with tokens and cost", () => {
+  it("has code BUDGET_EXCEEDED with tokens and cost (legacy form)", () => {
     const err = new BudgetExceededError(50000, 0.15, "max_tokens: 40000");
 
     expect(err.code).toBe("BUDGET_EXCEEDED");
@@ -88,6 +88,57 @@ describe("BudgetExceededError", () => {
     expect(err.context.tokens).toBe(50000);
     expect(err.context.cost_usd).toBe(0.15);
     expect(err.context.limit).toBe("max_tokens: 40000");
+  });
+
+  it("legacy form defaults scope to 'run'", () => {
+    const err = new BudgetExceededError(50000, 0.15, "max_tokens: 40000");
+    expect(err.scope).toBe("run");
+    expect(err.tokens).toBe(50000);
+    expect(err.current).toBe(0.15);
+  });
+
+  it("structured form exposes scope, limit, and current as numeric fields", () => {
+    const err = new BudgetExceededError({
+      scope: "day",
+      limit: 1.5,
+      current: 1.62,
+      tokens: 12000,
+    });
+
+    expect(err.code).toBe("BUDGET_EXCEEDED");
+    expect(err.scope).toBe("day");
+    expect(err.limit).toBe(1.5);
+    expect(err.current).toBe(1.62);
+    expect(err.tokens).toBe(12000);
+    expect(err.context.scope).toBe("day");
+    expect(err.context.limit).toBe(1.5);
+    expect(err.context.current).toBe(1.62);
+    // Legacy `cost_usd` mirror so old consumers keep working.
+    expect(err.context.cost_usd).toBe(1.62);
+  });
+
+  it("structured form formats the message with the scope label", () => {
+    const dayErr = new BudgetExceededError({
+      scope: "day",
+      limit: 5,
+      current: 5.42,
+    });
+    expect(dayErr.message).toContain("daily");
+    expect(dayErr.message).toContain("$5.42");
+
+    const monthErr = new BudgetExceededError({
+      scope: "month",
+      limit: 100,
+      current: 101,
+    });
+    expect(monthErr.message).toContain("monthly");
+
+    const runErr = new BudgetExceededError({
+      scope: "run",
+      limit: 0.01,
+      current: 0.012,
+    });
+    expect(runErr.message).toContain("per-run");
   });
 });
 

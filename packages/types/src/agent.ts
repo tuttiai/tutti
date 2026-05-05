@@ -8,8 +8,20 @@ import type { TuttiHooks } from "./hooks.js";
 
 export interface BudgetConfig {
   max_tokens?: number;
+  /** Hard USD limit for a single run. Pre-call enforcement throws
+   *  `BudgetExceededError` when the projected cost would exceed this. */
   max_cost_usd?: number;
-  /** Percentage at which to emit a warning (default 80). */
+  /** Hard USD limit aggregated across every run that started since
+   *  the start of the current UTC day. Enforced via the runtime's
+   *  `RunCostStore` — daily totals snapshot at run start, plus this
+   *  run's accumulating cost. Requires a configured `RunCostStore`. */
+  max_cost_usd_per_day?: number;
+  /** Hard USD limit aggregated across every run that started since
+   *  the first of the current UTC calendar month. Same enforcement
+   *  semantics as `max_cost_usd_per_day`. */
+  max_cost_usd_per_month?: number;
+  /** Percentage at which to emit a warning (default 80). Applied to
+   *  every configured ceiling — per-run, per-day, per-month. */
   warn_at_percent?: number;
 }
 

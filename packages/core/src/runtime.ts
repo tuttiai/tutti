@@ -3,6 +3,7 @@ import {
   JsonFileExporter,
   OTLPExporter,
   configureExporter,
+  type RunCostStore,
   type SpanExporter,
 } from "@tuttiai/telemetry";
 import { AgentRunner } from "./agent-runner.js";
@@ -96,6 +97,15 @@ export interface TuttiRuntimeOptions {
    * any agent in the score sets `requireApproval`.
    */
   interruptStore?: InterruptStore;
+  /**
+   * Attach a {@link RunCostStore} so the runtime can enforce
+   * `max_cost_usd_per_day` / `max_cost_usd_per_month` budgets. Each
+   * run records its aggregate cost on completion; the start of every
+   * subsequent run reads daily/monthly totals from the same store.
+   * For multi-process deployments use `PostgresRunCostStore` so every
+   * worker sees a consistent total.
+   */
+  runCostStore?: RunCostStore;
 }
 
 export class TuttiRuntime {
@@ -131,6 +141,7 @@ export class TuttiRuntime {
       this.toolCache,
       options.checkpointStore,
       options.interruptStore,
+      options.runCostStore,
     );
 
     if (score.telemetry) {

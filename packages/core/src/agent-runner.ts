@@ -37,17 +37,19 @@ import type {
 } from "./memory/user/types.js";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
-import { getRunCost } from "@tuttiai/telemetry";
+import { getDailyCost, getMonthlyCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { needsApproval } from "./interrupt/index.js";
 import {
+  BudgetExceededError,
   InterruptDeniedError,
   ToolTimeoutError,
   ProviderError,
   RateLimitError,
   StructuredOutputError,
+  type BudgetScope,
 } from "./errors.js";
 
 /**
@@ -111,6 +113,52 @@ const hitlRequestSchema = z.object({
   timeout_seconds: z.number().optional().describe("How long to wait before timing out (default 300)"),
 });
 
+/**
+ * Build the per-scope cost-check rows the runner uses to emit warnings
+ * and detect breaches. Each row is included only when its underlying
+ * limit is configured. `daily.current` and `monthly.current` add the
+ * caller-provided snapshots to this run's accumulated cost.
+ */
+function costBudgetChecks(
+  cfg: { max_cost_usd?: number; max_cost_usd_per_day?: number; max_cost_usd_per_month?: number },
+  runCostUsd: number,
+  dailySnapshotUsd: number,
+  monthlySnapshotUsd: number,
+): Array<{ scope: BudgetScope; current: number; limit: number }> {
+  const checks: Array<{ scope: BudgetScope; current: number; limit: number }> = [];
+  if (cfg.max_cost_usd !== undefined && cfg.max_cost_usd > 0) {
+    checks.push({ scope: "run", current: runCostUsd, limit: cfg.max_cost_usd });
+  }
+  if (cfg.max_cost_usd_per_day !== undefined && cfg.max_cost_usd_per_day > 0) {
+    checks.push({
+      scope: "day",
+      current: dailySnapshotUsd + runCostUsd,
+      limit: cfg.max_cost_usd_per_day,
+    });
+  }
+  if (cfg.max_cost_usd_per_month !== undefined && cfg.max_cost_usd_per_month > 0) {
+    checks.push({
+      scope: "month",
+      current: monthlySnapshotUsd + runCostUsd,
+      limit: cfg.max_cost_usd_per_month,
+    });
+  }
+  return checks;
+}
+
+/** Return the first scope already over its limit, or `null` when none. */
+function checkCostBudgetBreach(
+  cfg: { max_cost_usd?: number; max_cost_usd_per_day?: number; max_cost_usd_per_month?: number },
+  runCostUsd: number,
+  dailySnapshotUsd: number,
+  monthlySnapshotUsd: number,
+): { scope: BudgetScope; current: number; limit: number } | null {
+  for (const c of costBudgetChecks(cfg, runCostUsd, dailySnapshotUsd, monthlySnapshotUsd)) {
+    if (c.current >= c.limit) return c;
+  }
+  return null;
+}
+
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -168,6 +216,7 @@ export class AgentRunner {
     private toolCache?: ToolCache,
     private checkpointStore?: CheckpointStore,
     private interruptStore?: InterruptStore,
+    private runCostStore?: RunCostStore,
   ) {
     this.installRouterEventHooks();
   }
@@ -556,6 +605,59 @@ export class AgentRunner {
       const budget = agent.budget
         ? new TokenBudget(agent.budget, agent.model ?? "")
         : undefined;
+
+      // Snapshot daily / monthly cost from the run-cost store at run
+      // start. We add this run's accumulating cost to the snapshot for
+      // every check; concurrent runs in other processes can over-spend
+      // by at most one run's worth — accepted to avoid hammering the
+      // store on every turn.
+      //
+      // Daily/monthly enforcement only activates when a store is
+      // attached. Without persistence the values are incoherent (a
+      // "daily total" of just this run's cost is meaningless), so we
+      // skip them rather than silently mis-enforce.
+      const rawCfg = agent.budget;
+      const wantsDaily =
+        rawCfg?.max_cost_usd_per_day !== undefined && rawCfg.max_cost_usd_per_day > 0;
+      const wantsMonthly =
+        rawCfg?.max_cost_usd_per_month !== undefined && rawCfg.max_cost_usd_per_month > 0;
+      const runStartedAt = new Date();
+      let dailySnapshotUsd = 0;
+      let monthlySnapshotUsd = 0;
+      if (!this.runCostStore && (wantsDaily || wantsMonthly)) {
+        logger.warn(
+          { agent: agent.name },
+          "Agent has max_cost_usd_per_day/_per_month set but the runtime has no RunCostStore — skipping daily/monthly enforcement",
+        );
+      }
+      if (this.runCostStore && (wantsDaily || wantsMonthly)) {
+        try {
+          if (wantsDaily) {
+            dailySnapshotUsd = await getDailyCost(this.runCostStore, runStartedAt);
+          }
+          if (wantsMonthly) {
+            monthlySnapshotUsd = await getMonthlyCost(this.runCostStore, runStartedAt);
+          }
+        } catch (err) {
+          // A flaky cost store should not block runs. Log and assume
+          // zero spend so far — the per-run cap still applies.
+          logger.warn(
+            { error: err instanceof Error ? err.message : String(err), agent: agent.name },
+            "RunCostStore snapshot failed — proceeding with zero daily/monthly history",
+          );
+        }
+      }
+      // Strip daily/monthly limits from the cfg the loop sees when no
+      // store is configured, so post-call checks ignore them too.
+      const cfg = rawCfg
+        ? this.runCostStore
+          ? rawCfg
+          : {
+              ...(rawCfg.max_tokens !== undefined ? { max_tokens: rawCfg.max_tokens } : {}),
+              ...(rawCfg.max_cost_usd !== undefined ? { max_cost_usd: rawCfg.max_cost_usd } : {}),
+              ...(rawCfg.warn_at_percent !== undefined ? { warn_at_percent: rawCfg.warn_at_percent } : {}),
+            }
+        : undefined;
       const totalUsage: TokenUsage =
         resuming && checkpoint
           ? {
@@ -626,6 +728,35 @@ export class AgentRunner {
       // Agentic loop
       while (turns < maxTurns) {
         turns++;
+
+        // Pre-call hard enforcement on cost budgets. Catches "previous
+        // turn just pushed us over" and "we started the run already
+        // past today's cap" without making another paid call. Token-
+        // based limits keep their soft-break semantics below.
+        if (budget && cfg) {
+          const breach = checkCostBudgetBreach(
+            cfg,
+            budget.estimated_cost_usd,
+            dailySnapshotUsd,
+            monthlySnapshotUsd,
+          );
+          if (breach) {
+            this.events.emit({
+              type: "budget:exceeded",
+              agent_name: agent.name,
+              tokens: budget.total_tokens,
+              cost_usd: budget.estimated_cost_usd,
+              scope: breach.scope,
+              limit: breach.limit,
+            });
+            throw new BudgetExceededError({
+              scope: breach.scope,
+              limit: breach.limit,
+              current: breach.current,
+              tokens: budget.total_tokens,
+            });
+          }
+        }
 
         logger.info({ agent: agent.name, session: session.id, turn: turns }, "Turn started");
 
@@ -708,22 +839,17 @@ export class AgentRunner {
         totalUsage.input_tokens += response.usage.input_tokens;
         totalUsage.output_tokens += response.usage.output_tokens;
 
-        // Check token budget
+        // Check budget. Token limits keep their soft-break semantics
+        // (event + return partial result). Cost limits — per-run,
+        // daily, monthly — emit warning at the configured threshold and
+        // hard-throw on breach so callers cannot keep paying for an
+        // over-cap run.
         if (budget) {
           budget.add(response.usage.input_tokens, response.usage.output_tokens);
-          const status = budget.check();
-          if (status === "warning") {
-            logger.warn(
-              { agent: agent.name, tokens: budget.total_tokens, cost_usd: budget.estimated_cost_usd },
-              "Approaching token budget limit",
-            );
-            this.events.emit({
-              type: "budget:warning",
-              agent_name: agent.name,
-              tokens: budget.total_tokens,
-              cost_usd: budget.estimated_cost_usd,
-            });
-          } else if (status === "exceeded") {
+
+          // Token-based path: preserves the historical event-and-break
+          // behaviour the integration tests assert.
+          if (cfg?.max_tokens && budget.total_tokens >= cfg.max_tokens) {
             logger.warn(
               { agent: agent.name, tokens: budget.total_tokens, cost_usd: budget.estimated_cost_usd },
               "Token budget exceeded",
@@ -736,6 +862,66 @@ export class AgentRunner {
             });
             messages.push({ role: "assistant", content: response.content });
             break;
+          }
+          if (cfg?.max_tokens) {
+            const warnAt = (cfg.warn_at_percent ?? 80) / 100;
+            if (budget.total_tokens >= cfg.max_tokens * warnAt) {
+              this.events.emit({
+                type: "budget:warning",
+                agent_name: agent.name,
+                tokens: budget.total_tokens,
+                cost_usd: budget.estimated_cost_usd,
+              });
+            }
+          }
+
+          // Cost-based path: per-scope warnings + hard throw on breach.
+          if (cfg) {
+            const checks = costBudgetChecks(
+              cfg,
+              budget.estimated_cost_usd,
+              dailySnapshotUsd,
+              monthlySnapshotUsd,
+            );
+            const warnAt = (cfg.warn_at_percent ?? 80) / 100;
+            for (const c of checks) {
+              if (c.current >= c.limit) {
+                logger.warn(
+                  {
+                    agent: agent.name,
+                    scope: c.scope,
+                    current: c.current,
+                    limit: c.limit,
+                  },
+                  "Cost budget exceeded",
+                );
+                this.events.emit({
+                  type: "budget:exceeded",
+                  agent_name: agent.name,
+                  tokens: budget.total_tokens,
+                  cost_usd: budget.estimated_cost_usd,
+                  scope: c.scope,
+                  limit: c.limit,
+                });
+                messages.push({ role: "assistant", content: response.content });
+                throw new BudgetExceededError({
+                  scope: c.scope,
+                  limit: c.limit,
+                  current: c.current,
+                  tokens: budget.total_tokens,
+                });
+              }
+              if (c.current >= c.limit * warnAt) {
+                this.events.emit({
+                  type: "budget:warning",
+                  agent_name: agent.name,
+                  tokens: budget.total_tokens,
+                  cost_usd: budget.estimated_cost_usd,
+                  scope: c.scope,
+                  limit: c.limit,
+                });
+              }
+            }
           }
         }
 
@@ -992,6 +1178,30 @@ export class AgentRunner {
         ...totalUsage,
         ...(runCost !== null ? { cost_usd: runCost } : {}),
       };
+
+      // Persist this run's cost so future runs can enforce daily and
+      // monthly caps. Best-effort: store failures must not invalidate
+      // the run that just completed successfully.
+      if (this.runCostStore) {
+        const storedCost =
+          runCost ??
+          (budget ? budget.estimated_cost_usd : 0);
+        try {
+          await this.runCostStore.record({
+            run_id: trace_id ?? `${session.id}:${runStartedAt.toISOString()}`,
+            agent_name: agent.name,
+            started_at: runStartedAt,
+            cost_usd: storedCost,
+            total_tokens: totalUsage.input_tokens + totalUsage.output_tokens,
+          });
+        } catch (err) {
+          logger.warn(
+            { error: err instanceof Error ? err.message : String(err), agent: agent.name },
+            "RunCostStore.record failed — daily/monthly aggregation may be incomplete",
+          );
+        }
+      }
+
       const agentResult: AgentResult = {
         session_id: session.id,
         output,
