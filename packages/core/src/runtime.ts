@@ -6,6 +6,8 @@ import {
   type SpanExporter,
 } from "@tuttiai/telemetry";
 import { AgentRunner } from "./agent-runner.js";
+import { TuttiGraph } from "./graph/index.js";
+import type { GraphConfig } from "./graph/types.js";
 import type {
   AgentRunOptions,
   UserMemoryStore,
@@ -147,6 +149,22 @@ export class TuttiRuntime {
     }
 
     logger.info({ score: score.name, agents: Object.keys(score.agents) }, "Runtime initialized");
+  }
+
+  /**
+   * Construct a {@link TuttiGraph} bound to this runtime's
+   * {@link AgentRunner}. Use this when a score-author writes a
+   * {@link GraphConfig} (via `defineGraph(...).build()`) but doesn't
+   * have access to the runtime's private runner.
+   *
+   * The returned graph shares the runtime's EventBus indirectly
+   * (each node executes through the same `AgentRunner` so `agent:start`,
+   * `tool:start`, etc. still appear on `runtime.events`). Subscribe to
+   * the graph itself via {@link TuttiGraph.subscribe} for graph-shaped
+   * events (`node:start`, `node:end`, `node:error`, etc.).
+   */
+  createGraph(config: GraphConfig): TuttiGraph {
+    return new TuttiGraph(config, this._runner);
   }
 
   /**

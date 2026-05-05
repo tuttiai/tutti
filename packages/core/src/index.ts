@@ -223,6 +223,7 @@ export type {
   GraphConfig,
   GraphEdge,
   GraphEvent,
+  GraphEventHandler,
   GraphNode,
   GraphRunResult,
   NodeResult,

@@ -40,6 +40,7 @@ import type {
 } from "./types.js";
 import { GraphValidationError } from "./errors.js";
 import { executeGraph } from "./engine.js";
+import { logger } from "../logger.js";
 
 /** @internal Default loop cap — used by run()/stream() implementation. */
 export const DEFAULT_MAX_NODE_VISITS = 10;
@@ -54,11 +55,15 @@ export const DEFAULT_MAX_NODE_VISITS = 10;
  * configs throw {@link GraphValidationError} immediately rather than
  * failing at runtime.
  */
+/** Handler signature for {@link TuttiGraph.subscribe}. */
+export type GraphEventHandler = (event: GraphEvent) => void;
+
 export class TuttiGraph {
   /** @internal Retained for implementation — the validated graph config. */
   readonly config: GraphConfig;
 
   private readonly runner: AgentRunner;
+  private readonly subscribers = new Set<GraphEventHandler>();
 
   /**
    * Create a new graph. Validates the config and throws
@@ -72,6 +77,46 @@ export class TuttiGraph {
     this.config = config;
     this.runner = runner;
     this.validate();
+  }
+
+  /**
+   * Subscribe to {@link GraphEvent}s emitted by every {@link run} call
+   * on this graph instance. Returns an unsubscribe function.
+   *
+   * Subscribers receive the same events that {@link stream} yields,
+   * stamped with `session_id` when one was passed in {@link RunOptions}.
+   * A thrown handler is logged and the others continue — the run is
+   * never affected by a misbehaving subscriber.
+   *
+   * @example
+   * ```typescript
+   * const unsubscribe = graph.subscribe((e) => {
+   *   if (e.type === "node:start") console.log("started", e.node_id);
+   * });
+   * // ... later
+   * unsubscribe();
+   * ```
+   */
+  subscribe(handler: GraphEventHandler): () => void {
+    this.subscribers.add(handler);
+    return (): void => {
+      this.subscribers.delete(handler);
+    };
+  }
+
+  /** @internal Fan an event out to every active subscriber. */
+  private dispatch(event: GraphEvent): void {
+    for (const handler of this.subscribers) {
+      try {
+        handler(event);
+      } catch (err) {
+        // Subscriber crashes must not break the run.
+        logger.warn(
+          { error: err instanceof Error ? err.message : String(err), event: event.type },
+          "Graph event subscriber threw (non-fatal)",
+        );
+      }
+    }
   }
 
   /**
@@ -91,7 +136,9 @@ export class TuttiGraph {
    * @throws {GuardrailError}    When a node's guardrail hook aborts the run.
    */
   async run(input: string, options?: RunOptions): Promise<GraphRunResult> {
-    return executeGraph(this.config, this.runner, input, options);
+    return executeGraph(this.config, this.runner, input, options, (e) =>
+      this.dispatch(e),
+    );
   }
 
   /**
@@ -113,7 +160,10 @@ export class TuttiGraph {
       this.runner,
       input,
       options,
-      (event) => events.push(event),
+      (event) => {
+        events.push(event);
+        this.dispatch(event);
+      },
     );
 
     for (const event of events) {
@@ -123,7 +173,9 @@ export class TuttiGraph {
     // Ensure graph:end is always the last event
     const hasEnd = events.some((e) => e.type === "graph:end");
     if (!hasEnd) {
-      yield { type: "graph:end", result };
+      const endEvent: GraphEvent = { type: "graph:end", result };
+      this.dispatch(endEvent);
+      yield endEvent;
     }
   }
 

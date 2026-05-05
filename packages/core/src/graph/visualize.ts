@@ -27,6 +27,12 @@ interface VisEdge {
   target: string;
   label?: string;
   parallel?: boolean;
+  /**
+   * `true` when the source edge had a `condition` predicate. The function
+   * itself cannot be serialised, so we surface only this flag — frontends
+   * use it to render conditional edges differently (e.g. dashed).
+   */
+  has_condition?: boolean;
 }
 
 /**
@@ -53,8 +59,9 @@ function extractVisData(config: GraphConfig): { nodes: VisNode[]; edges: VisEdge
   const edges: VisEdge[] = config.edges.map((e) => ({
     source: e.from,
     target: e.to,
-    label: e.label,
-    parallel: e.parallel,
+    ...(e.label !== undefined ? { label: e.label } : {}),
+    ...(e.parallel !== undefined ? { parallel: e.parallel } : {}),
+    ...(e.condition !== undefined ? { has_condition: true } : {}),
   }));
 
   return { nodes, edges };

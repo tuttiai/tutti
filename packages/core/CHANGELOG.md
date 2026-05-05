@@ -1,5 +1,17 @@
 # @tuttiai/core
 
+## [Unreleased]
+
+### Minor Changes
+
+- Add `TuttiGraph.subscribe(handler)` for receiving the same `GraphEvent`s `stream()` yields, without holding an async iterator open. Multiple subscribers are supported; a throwing subscriber is logged and the run continues. Also exposes `GraphEventHandler` from the package root.
+- Add `TuttiRuntime.createGraph(config)` factory — constructs a `TuttiGraph` bound to the runtime's private `AgentRunner`, so score authors don't have to thread the runner manually.
+- `GraphEvent` now includes a new `node:error` variant (with `node_id`, `error`, `duration_ms`) emitted before a node failure propagates. `node:end` carries `duration_ms`. Every event is stamped with `session_id` when one was passed via `RunOptions.session_id`.
+
+### Patch Changes
+
+- `graphToJSON` now exposes `has_condition` on each serialised edge (derived from `GraphEdge.condition`) so visualisation frontends can render conditional edges differently. The function value itself remains stripped — only the boolean flag is emitted.
+
 ## 0.20.1
 
 ### Patch Changes

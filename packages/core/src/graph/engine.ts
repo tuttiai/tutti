@@ -210,8 +210,15 @@ export async function executeGraph(
     state = { ...options.initial_state };
   }
 
+  // Stamp every emitted event with the run's session_id (when one was
+  // provided) so a global subscriber can correlate events with a run.
+  const sessionId = options.session_id;
   const emit = (event: GraphEvent): void => {
-    onEvent?.(event);
+    if (sessionId !== undefined && event.session_id === undefined) {
+      onEvent?.({ ...event, session_id: sessionId });
+    } else {
+      onEvent?.(event);
+    }
   };
 
   emit({ type: "graph:start", entrypoint: config.entrypoint });
@@ -234,14 +241,26 @@ export async function executeGraph(
     logger.debug({ node: currentNodeId, visit: count }, "Graph node executing");
     emit({ type: "node:start", node_id: currentNodeId, input: currentInput });
 
-    // Execute node
-    const { nodeResult, usage } = await runNode(
-      node,
-      currentInput,
-      state,
-      hasStateSchema,
-      runner,
-    );
+    // Execute node — wrap in try/catch so observers see a `node:error`
+    // before the throw bubbles up. Re-throw so existing run() callers
+    // still get the exception.
+    const nodeStartedAt = Date.now();
+    let nodeResult: NodeResult;
+    let usage: TokenUsage;
+    try {
+      const r = await runNode(node, currentInput, state, hasStateSchema, runner);
+      nodeResult = r.nodeResult;
+      usage = r.usage;
+    } catch (err) {
+      emit({
+        type: "node:error",
+        node_id: currentNodeId,
+        error: err instanceof Error ? err.message : String(err),
+        duration_ms: Date.now() - nodeStartedAt,
+      });
+      throw err;
+    }
+    const nodeDuration = Date.now() - nodeStartedAt;
 
     totalUsage.input_tokens += usage.input_tokens;
     totalUsage.output_tokens += usage.output_tokens;
@@ -255,7 +274,12 @@ export async function executeGraph(
       emit({ type: "state:update", node_id: currentNodeId, state: { ...state } });
     }
 
-    emit({ type: "node:end", node_id: currentNodeId, result: nodeResult });
+    emit({
+      type: "node:end",
+      node_id: currentNodeId,
+      result: nodeResult,
+      duration_ms: nodeDuration,
+    });
 
     // ── Edge evaluation ────────────────────────────────────────
     const outgoing = edgesBySource.get(currentNodeId) ?? [];
@@ -284,7 +308,20 @@ export async function executeGraph(
 
           emit({ type: "node:start", node_id: targetId, input: branchInput });
 
-          const branch = await runNode(targetNode, branchInput, state, hasStateSchema, runner);
+          const branchStartedAt = Date.now();
+          let branch: { nodeResult: NodeResult; usage: TokenUsage };
+          try {
+            branch = await runNode(targetNode, branchInput, state, hasStateSchema, runner);
+          } catch (err) {
+            emit({
+              type: "node:error",
+              node_id: targetId,
+              error: err instanceof Error ? err.message : String(err),
+              duration_ms: Date.now() - branchStartedAt,
+            });
+            throw err;
+          }
+          const branchDuration = Date.now() - branchStartedAt;
 
           totalUsage.input_tokens += branch.usage.input_tokens;
           totalUsage.output_tokens += branch.usage.output_tokens;
@@ -297,7 +334,12 @@ export async function executeGraph(
             emit({ type: "state:update", node_id: targetId, state: { ...state } });
           }
 
-          emit({ type: "node:end", node_id: targetId, result: branch.nodeResult });
+          emit({
+            type: "node:end",
+            node_id: targetId,
+            result: branch.nodeResult,
+            duration_ms: branchDuration,
+          });
 
           return { id: targetId, result: branch.nodeResult };
         }),

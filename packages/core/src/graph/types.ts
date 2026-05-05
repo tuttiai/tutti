@@ -167,12 +167,28 @@ export interface RunOptions {
  * Follows the same discriminated-union pattern as {@link TuttiEvent}.
  * The `type` field discriminates the union; consumers match on it.
  */
-export type GraphEvent =
+export type GraphEvent = (
   | { type: "graph:start"; entrypoint: string }
   | { type: "graph:end"; result: GraphRunResult }
   | { type: "node:start"; node_id: string; input: string }
-  | { type: "node:end"; node_id: string; result: NodeResult }
+  | { type: "node:end"; node_id: string; result: NodeResult; duration_ms: number }
+  | {
+      type: "node:error";
+      node_id: string;
+      error: string;
+      duration_ms: number;
+    }
   | { type: "node:skip"; node_id: string; reason: string }
   | { type: "edge:evaluate"; from: string; to: string; label?: string; taken: boolean }
   | { type: "edge:traverse"; from: string; to: string; label?: string }
-  | { type: "state:update"; node_id: string; state: Record<string, unknown> };
+  | { type: "state:update"; node_id: string; state: Record<string, unknown> }
+) & {
+  /**
+   * Run identifier — present when the graph was executed with
+   * `RunOptions.session_id`. Lets a single global subscriber correlate
+   * events with the run that produced them (e.g. the studio SSE bus
+   * fans events out to every connected client without losing track of
+   * which run each event belongs to).
+   */
+  session_id?: string;
+};
