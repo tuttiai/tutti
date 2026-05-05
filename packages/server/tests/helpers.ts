@@ -7,8 +7,8 @@
  */
 
 import { vi } from "vitest";
-import { MemoryInterruptStore, TuttiRuntime } from "@tuttiai/core";
-import type { InterruptStore } from "@tuttiai/core";
+import { InMemoryRunCostStore, MemoryInterruptStore, TuttiRuntime } from "@tuttiai/core";
+import type { InterruptStore, RunCostStore } from "@tuttiai/core";
 import type {
   AgentConfig,
   ChatResponse,
@@ -91,6 +91,12 @@ export interface BuildTestServerOptions {
    * the default so callers can add `requireApproval`, voices, etc.
    */
   agent?: Partial<AgentConfig>;
+  /**
+   * Attach a {@link RunCostStore} to the runtime. Pass `"memory"` to
+   * auto-construct a fresh {@link InMemoryRunCostStore}; pass a concrete
+   * instance to seed records before the test runs.
+   */
+  runCostStore?: RunCostStore | "memory";
 }
 
 /**
@@ -129,8 +135,14 @@ export async function buildTestServer(
       ? new MemoryInterruptStore()
       : options.interruptStore;
 
+  const runCostStore: RunCostStore | undefined =
+    options.runCostStore === "memory"
+      ? new InMemoryRunCostStore()
+      : options.runCostStore;
+
   const runtime = new TuttiRuntime(score, {
     ...(interruptStore !== undefined ? { interruptStore } : {}),
+    ...(runCostStore !== undefined ? { runCostStore } : {}),
   });
 
   const app = await createServer({
@@ -148,7 +160,12 @@ export async function buildTestServer(
 /** Structural check: do we have the new options shape or the legacy one? */
 function isBuildOptions(v: unknown): v is BuildTestServerOptions {
   if (typeof v !== "object" || v === null) return false;
-  return "config" in v || "interruptStore" in v || "agent" in v;
+  return (
+    "config" in v ||
+    "interruptStore" in v ||
+    "agent" in v ||
+    "runCostStore" in v
+  );
 }
 
 export { AGENT_NAME, API_KEY };

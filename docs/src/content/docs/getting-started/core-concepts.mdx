@@ -39,7 +39,7 @@ An **agent** is an LLM-powered worker. Each agent has:
 | `max_turns` | No | Max agentic loop iterations (default: 10) |
 | `max_tool_calls` | No | Max tool calls per run (default: 20) |
 | `tool_timeout_ms` | No | Per-tool timeout in ms (default: 30000) |
-| `budget` | No | Token/cost budget for this agent |
+| `budget` | No | Token + per-run / daily / monthly USD limits for this agent |
 | `memory` | No | Long-term memory (`{ semantic_memory?, user_memory? }`). See [Memory](#memory). |
 | `streaming` | No | Enable token-by-token streaming (default: false) |
 | `delegates` | No | Agent IDs this orchestrator can delegate to |
@@ -64,6 +64,36 @@ An **agent** is an LLM-powered worker. Each agent has:
   },
 }
 ```
+
+`budget` accepts:
+
+| Field | Effect |
+| ----- | ------ |
+| `max_tokens` | Soft stop — emits `budget:exceeded` and returns the partial result. |
+| `max_cost_usd` | Hard stop — throws `BudgetExceededError` with `scope: 'run'` once the run's accumulated cost crosses the cap. |
+| `max_cost_usd_per_day` | Hard daily cap — aggregates across every run that started since 00:00 UTC. Requires a `RunCostStore` on the runtime. |
+| `max_cost_usd_per_month` | Hard monthly cap — aggregates across every run that started since the 1st of the current UTC month. Requires a `RunCostStore`. |
+| `warn_at_percent` | Threshold (default 80) at which `budget:warning` fires. Applied per-scope. |
+
+Wire the store on the runtime to enable daily/monthly enforcement:
+
+```ts
+import { TuttiRuntime, InMemoryRunCostStore, PostgresRunCostStore } from "@tuttiai/core";
+
+// Single-process / dev:
+const runtime = new TuttiRuntime(score, {
+  runCostStore: new InMemoryRunCostStore(),
+});
+
+// Multi-process / prod — every worker shares one daily total:
+const runtime = new TuttiRuntime(score, {
+  runCostStore: new PostgresRunCostStore({
+    connection_string: process.env.DATABASE_URL!,
+  }),
+});
+```
+
+Without a store, daily/monthly limits log a one-time warning per run and are skipped (the per-run cap still applies). Use Postgres in any deployment with more than one worker — the in-memory backend cannot coordinate across processes.
 
 ## Voices
 
@@ -130,7 +160,8 @@ tutti.events.on("tool:start", (e) => {
 });
 
 tutti.events.on("budget:warning", (e) => {
-  console.log(`Budget warning: ${e.tokens} tokens, $${e.cost_usd}`);
+  // e.scope is 'run' | 'day' | 'month' (absent on token-only warnings).
+  console.log(`Budget warning [${e.scope ?? "run"}]: $${e.cost_usd} of $${e.limit ?? "?"}`);
 });
 
 tutti.events.onAny((e) => {

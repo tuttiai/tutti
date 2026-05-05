@@ -85,10 +85,13 @@ export {
   MODEL_PRICES,
   JsonFileExporter,
   OTLPExporter,
+  InMemoryRunCostStore,
   buildTraceSummaries,
   configureExporter,
   estimateCost,
   getActiveExporter,
+  getDailyCost,
+  getMonthlyCost,
   getRunCost,
   registerModelPrice,
 } from "@tuttiai/telemetry";
@@ -104,9 +107,15 @@ export type {
   ModelPrice,
   OTLPExporterOptions,
   RunCost,
+  RunCostRecord,
+  RunCostStore,
   SpanExporter,
   TraceSummary,
 } from "@tuttiai/telemetry";
+export {
+  PostgresRunCostStore,
+  type PostgresRunCostStoreOptions,
+} from "./run-cost/index.js";
 export { initTelemetry, shutdownTelemetry } from "./telemetry-setup.js";
 
 // Runtime

@@ -27,6 +27,17 @@ export {
 } from "./cost.js";
 
 export {
+  InMemoryRunCostStore,
+  getDailyCost,
+  getMonthlyCost,
+  startOfUtcDay,
+  startOfUtcMonth,
+  type RunCostQuery,
+  type RunCostRecord,
+  type RunCostStore,
+} from "./run-cost-store.js";
+
+export {
   JsonFileExporter,
   OTLPExporter,
   configureExporter,

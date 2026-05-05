@@ -3,6 +3,7 @@ import {
   JsonFileExporter,
   OTLPExporter,
   configureExporter,
+  type RunCostStore,
   type SpanExporter,
 } from "@tuttiai/telemetry";
 import { AgentRunner } from "./agent-runner.js";
@@ -96,6 +97,15 @@ export interface TuttiRuntimeOptions {
    * any agent in the score sets `requireApproval`.
    */
   interruptStore?: InterruptStore;
+  /**
+   * Attach a {@link RunCostStore} so the runtime can enforce
+   * `max_cost_usd_per_day` / `max_cost_usd_per_month` budgets. Each
+   * run records its aggregate cost on completion; the start of every
+   * subsequent run reads daily/monthly totals from the same store.
+   * For multi-process deployments use `PostgresRunCostStore` so every
+   * worker sees a consistent total.
+   */
+  runCostStore?: RunCostStore;
 }
 
 export class TuttiRuntime {
@@ -109,6 +119,15 @@ export class TuttiRuntime {
    * when no store was configured.
    */
   readonly interruptStore: InterruptStore | undefined;
+  /**
+   * The run-cost store injected via {@link TuttiRuntimeOptions.runCostStore},
+   * exposed so the HTTP server's `/cost/*` routes (and any custom
+   * dashboards) can query daily/monthly totals and the per-run history
+   * without reaching into the runner. Undefined when no store was
+   * configured — daily/monthly enforcement and the analyze/report CLI
+   * commands degrade to empty results in that case.
+   */
+  readonly runCostStore: RunCostStore | undefined;
   private _sessions: SessionStore;
   private _runner: AgentRunner;
   private _score: ScoreConfig;
@@ -122,6 +141,7 @@ export class TuttiRuntime {
     this.semanticMemory = new InMemorySemanticStore();
     this.toolCache = new InMemoryToolCache();
     this.interruptStore = options.interruptStore;
+    this.runCostStore = options.runCostStore;
     this._runner = new AgentRunner(
       score.provider,
       this.events,
@@ -131,6 +151,7 @@ export class TuttiRuntime {
       this.toolCache,
       options.checkpointStore,
       options.interruptStore,
+      options.runCostStore,
     );
 
     if (score.telemetry) {

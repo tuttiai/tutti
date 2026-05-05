@@ -13,6 +13,7 @@ import { registerStreamRoute } from "./routes/stream.js";
 import { registerSessionsRoute } from "./routes/sessions.js";
 import { registerGraphRoute } from "./routes/graph.js";
 import { registerTracesRoutes } from "./routes/traces.js";
+import { registerCostRoutes } from "./routes/cost.js";
 import { registerInterruptsRoutes } from "./routes/interrupts.js";
 import { registerStudioRoute } from "./routes/studio.js";
 import { registerStudioEventsRoute } from "./routes/studio-events.js";
@@ -113,6 +114,7 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
   );
   registerGraphRoute(app, config.graph_runner?.config ?? config.graph);
   registerTracesRoutes(app);
+  registerCostRoutes(app, config.runtime);
   registerInterruptsRoutes(app, config.runtime);
   if (config.studio_dist_dir) {
     registerStudioRoute(app, config.studio_dist_dir);

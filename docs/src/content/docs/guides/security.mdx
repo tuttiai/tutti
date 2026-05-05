@@ -103,7 +103,7 @@ tutti.events.on("security:injection_detected", (e) => {
 The PromptGuard does not block content — it wraps it with markers that instruct the LLM to treat it as data, not instructions. The original content is preserved.
 :::
 
-## Token budget
+## Budgets
 
 Set per-agent budgets to prevent runaway costs:
 
@@ -111,17 +111,54 @@ Set per-agent budgets to prevent runaway costs:
 {
   assistant: {
     budget: {
-      max_tokens: 50_000,       // hard limit on total tokens
-      max_cost_usd: 1.00,       // hard limit on estimated cost
-      warn_at_percent: 80,       // emit warning at 80% (default)
+      max_tokens: 50_000,             // soft cap on total tokens (event + return partial)
+      max_cost_usd: 1.00,             // hard per-run USD cap (throws BudgetExceededError)
+      max_cost_usd_per_day: 50.00,    // hard daily cap, aggregated across all runs
+      max_cost_usd_per_month: 500.00, // hard monthly cap
+      warn_at_percent: 80,             // emit warning at 80% per scope (default)
     },
   },
 }
 ```
 
+Two enforcement modes:
+
+| Limit | Mode | Behaviour on breach |
+| ----- | ---- | ------------------- |
+| `max_tokens` | Soft | Emits `budget:exceeded`, returns the partial run result. |
+| `max_cost_usd` | Hard | Throws `BudgetExceededError` with `scope: 'run'`. |
+| `max_cost_usd_per_day` | Hard | Throws with `scope: 'day'`. Requires a `RunCostStore` on the runtime. |
+| `max_cost_usd_per_month` | Hard | Throws with `scope: 'month'`. Requires a `RunCostStore` on the runtime. |
+
+Daily/monthly caps query a `RunCostStore` at run start and add this run's accumulating cost to the snapshot. Use `PostgresRunCostStore` in any deployment with more than one worker so every process shares the same total — `InMemoryRunCostStore` is for dev and tests.
+
+```ts
+import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+
+const runtime = new TuttiRuntime(score, {
+  runCostStore: new PostgresRunCostStore({
+    connection_string: process.env.DATABASE_URL!,
+  }),
+});
+```
+
 Events:
-- `budget:warning` — emitted when usage crosses the `warn_at_percent` threshold
-- `budget:exceeded` — emitted when the limit is hit; the agent loop stops
+- `budget:warning` — emitted when usage crosses `warn_at_percent`. Carries `scope: 'run' | 'day' | 'month'` and numeric `limit`.
+- `budget:exceeded` — emitted on breach. Same `scope` / `limit` fields. The hard-throw caps additionally throw `BudgetExceededError` (catch it on `runtime.run()`).
+
+```ts
+import { BudgetExceededError } from "@tuttiai/core";
+
+try {
+  await runtime.run("assistant", "do the thing");
+} catch (err) {
+  if (err instanceof BudgetExceededError) {
+    console.log(`Stopped: ${err.scope} budget hit ($${err.current} of $${err.limit})`);
+  } else {
+    throw err;
+  }
+}
+```
 
 ## Tool rate limiting
 

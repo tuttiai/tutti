@@ -53,13 +53,93 @@ export class PermissionError extends TuttiError {
 
 // ── Budget ─────────────────────────────────────────────────────
 
+/**
+ * Which aggregation window the breached limit applies to. `run` is the
+ * traditional per-run cap; `day`/`month` are aggregated across the
+ * runtime's `RunCostStore`.
+ */
+export type BudgetScope = "run" | "day" | "month";
+
+/** Structured form of the budget-exceeded payload. Preferred over the
+ *  legacy positional form for new throw sites. */
+export interface BudgetExceededInfo {
+  scope: BudgetScope;
+  /** USD ceiling the run breached. */
+  limit: number;
+  /** Current accumulated USD spend at the moment of the breach. */
+  current: number;
+  /** Optional token total — present for run-scope breaches that
+   *  enforce both `max_tokens` and `max_cost_usd`. */
+  tokens?: number;
+}
+
+/**
+ * Thrown when an agent run would exceed any configured budget — the
+ * per-run `max_cost_usd`, the daily `max_cost_usd_per_day`, or the
+ * monthly `max_cost_usd_per_month`. Carries structured fields
+ * (`scope`, `limit`, `current`) so callers can decide how to react
+ * without parsing the message.
+ *
+ * Two construction forms are supported:
+ *  - Structured: `new BudgetExceededError({ scope, limit, current, tokens })`
+ *  - Legacy: `new BudgetExceededError(tokens, costUsd, limit)`
+ *
+ * The legacy form is kept for backwards compatibility with existing
+ * call sites and tests; defaults to `scope: 'run'`.
+ */
 export class BudgetExceededError extends TuttiError {
-  constructor(tokens: number, costUsd: number, limit: string) {
-    super(
-      "BUDGET_EXCEEDED",
-      `Token budget exceeded: ${tokens.toLocaleString()} tokens, $${costUsd.toFixed(4)} (limit: ${limit}).`,
-      { tokens, cost_usd: costUsd, limit },
-    );
+  public readonly scope: BudgetScope;
+  public readonly limit: number | string;
+  public readonly current: number;
+  public readonly tokens: number | undefined;
+
+  constructor(info: BudgetExceededInfo);
+  constructor(tokens: number, costUsd: number, limit: string);
+  constructor(
+    arg1: BudgetExceededInfo | number,
+    arg2?: number,
+    arg3?: string,
+  ) {
+    if (typeof arg1 === "object") {
+      const info = arg1;
+      const scopeLabel =
+        info.scope === "run"
+          ? "per-run"
+          : info.scope === "day"
+            ? "daily"
+            : "monthly";
+      super(
+        "BUDGET_EXCEEDED",
+        `${scopeLabel} cost budget exceeded: $${info.current.toFixed(4)} (limit: $${info.limit.toFixed(4)}).`,
+        {
+          scope: info.scope,
+          limit: info.limit,
+          current: info.current,
+          ...(info.tokens !== undefined ? { tokens: info.tokens } : {}),
+          // Mirror the legacy `cost_usd` key so old consumers that
+          // read `err.context.cost_usd` keep working.
+          cost_usd: info.current,
+        },
+      );
+      this.scope = info.scope;
+      this.limit = info.limit;
+      this.current = info.current;
+      this.tokens = info.tokens;
+    } else {
+      // Legacy positional form — kept for back-compat.
+      const tokens = arg1;
+      const costUsd = arg2 ?? 0;
+      const limit = arg3 ?? "";
+      super(
+        "BUDGET_EXCEEDED",
+        `Token budget exceeded: ${tokens.toLocaleString()} tokens, $${costUsd.toFixed(4)} (limit: ${limit}).`,
+        { tokens, cost_usd: costUsd, limit },
+      );
+      this.scope = "run";
+      this.limit = limit;
+      this.current = costUsd;
+      this.tokens = tokens;
+    }
   }
 }
 

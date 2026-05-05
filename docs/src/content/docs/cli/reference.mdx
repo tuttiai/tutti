@@ -580,6 +580,92 @@ tutti-ai traces tail                   # live-tail spans (Ctrl+C to exit)
 
 ---
 
+## Cost analysis
+
+The `analyze`, `report`, and `budgets` commands all talk to a running `tutti-ai serve` process and read from the runtime's `RunCostStore`. Configure one when constructing the runtime:
+
+```ts
+import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+
+const runtime = new TuttiRuntime(score, {
+  runCostStore: new PostgresRunCostStore({
+    connection_string: process.env.DATABASE_URL!,
+  }),
+});
+```
+
+Without a store the commands print a friendly "configure a RunCostStore" message instead of failing.
+
+### `tutti-ai analyze costs`
+
+Top runs by cost, daily-spend sparkline, and burn-rate optimisation hints.
+
+```bash
+tutti-ai analyze costs                         # last 7 days, all agents
+tutti-ai analyze costs --last 12h              # last 12 hours
+tutti-ai analyze costs --last 30d --agent triage
+```
+
+Output:
+
+```
+Cost analysis since 2026-04-28
+Daily spend: ▁▂▅█▃▁▂ (7 days)
+Total: $4.2310 · 142.0k tokens · 87 runs
+
+Top runs by cost
+  RUN       AGENT             STARTED           TOKENS    COST
+  ────────────────────────────────────────────────────────────
+  abc12345  evaluator         2026-05-04 14:22  12.3k     $0.4521
+  ...
+
+Top tools (live window)
+  Live window: 247 spans collected since 2026-05-05T14:00
+  TOOL                    CALLS     AVG TOK/CALL    TOTAL TOKENS
+  ──────────────────────────────────────────────────────────────────────
+  read_file               47        1.0k            47.0k
+  search_repo             8         800             6.4k
+
+Hints
+• Agent "triage" is burning $0.1234/day on average — at this rate the monthly $5.00 cap will be hit in ~28.4 days.
+• Tool "read_file" was called 47 times in the live tracer window (since 2026-05-05T14:00). Repeated identical calls — consider enabling `cache: { enabled: true }` on the agent.
+• 78% of recent tool-driven turns ran on small inputs (<800 avg tokens/call). Consider `model: 'auto'` plus a SmartProvider so cheap turns route to a smaller tier.
+```
+
+The "Top tools" section and the last two hints come from the in-memory tracer (`/cost/tools`), which is bounded to ~1000 spans and lost on server restart — the live-window line names the boundary so the numbers can't be misread as authoritative all-time totals. The "burning $X/day" hint comes from the persistent `RunCostStore` and is accurate over the full `--last` window.
+
+### `tutti-ai report costs`
+
+Exportable cost report.
+
+```bash
+tutti-ai report costs                          # text summary
+tutti-ai report costs --format json --last 30d > costs.json
+tutti-ai report costs --format csv  --last 7d  > costs.csv
+```
+
+CSV columns: `run_id, agent_name, started_at, total_tokens, cost_usd`. JSON output includes a `totals` block with run count, token total, and aggregate USD.
+
+### `tutti-ai budgets`
+
+Per-agent budget config and current spend.
+
+```bash
+tutti-ai budgets                               # every agent with a budget
+tutti-ai budgets --agent triage                # one agent
+```
+
+Output:
+
+```
+Agent: triage
+  Per-run budget:       $0.0200
+  Daily budget:         $5.0000 | today: $1.2400 (24.8%)
+  Monthly budget:       $50.0000 | this month: $18.3000 (36.6%)
+```
+
+---
+
 ## Memory
 
 ### `tutti-ai memory`

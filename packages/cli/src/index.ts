@@ -49,6 +49,14 @@ import {
   type TracesTailOptions,
 } from "./commands/traces.js";
 import {
+  analyzeCostsCommand,
+  budgetsCommand,
+  reportCostsCommand,
+  type AnalyzeCostsOptions,
+  type BudgetsOptions,
+  type ReportCostsOptions,
+} from "./commands/cost.js";
+import {
   memoryAddCommand,
   memoryClearCommand,
   memoryDeleteCommand,
@@ -395,6 +403,82 @@ tracesCmd
       ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
     };
     await tracesRouterCommand(traceId, resolved);
+  });
+
+// ── Cost analysis ────────────────────────────────────────────────
+
+const analyzeCmd = program
+  .command("analyze")
+  .description("Inspect run-cost history collected by `tutti-ai serve`");
+
+analyzeCmd
+  .command("costs")
+  .description("Top runs, daily sparkline, and optimisation hints")
+  .option("--last <window>", "Time window: <N>d or <N>h (default: 7d)")
+  .option("--agent <id>", "Filter to one agent")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(
+    async (opts: { last?: string; agent?: string; url?: string; apiKey?: string }) => {
+      const resolved: AnalyzeCostsOptions = {
+        ...(opts.last !== undefined ? { last: opts.last } : {}),
+        ...(opts.agent !== undefined ? { agent: opts.agent } : {}),
+        ...(opts.url !== undefined ? { url: opts.url } : {}),
+        ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
+      };
+      await analyzeCostsCommand(resolved);
+    },
+  );
+
+const reportCmd = program
+  .command("report")
+  .description("Export cost data for spreadsheets or billing tools");
+
+reportCmd
+  .command("costs")
+  .description("Cost report in text, JSON, or CSV format")
+  .option("--last <window>", "Time window: <N>d or <N>h (default: 7d)")
+  .option("--agent <id>", "Filter to one agent")
+  .option("--format <fmt>", "Output format: text | json | csv (default: text)", "text")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(
+    async (opts: {
+      last?: string;
+      agent?: string;
+      format?: string;
+      url?: string;
+      apiKey?: string;
+    }) => {
+      const fmt = opts.format;
+      if (fmt !== undefined && fmt !== "text" && fmt !== "json" && fmt !== "csv") {
+        console.error('Invalid --format: "' + fmt + '". Expected text | json | csv.');
+        process.exit(1);
+      }
+      const resolved: ReportCostsOptions = {
+        ...(opts.last !== undefined ? { last: opts.last } : {}),
+        ...(opts.agent !== undefined ? { agent: opts.agent } : {}),
+        ...(fmt !== undefined ? { format: fmt } : {}),
+        ...(opts.url !== undefined ? { url: opts.url } : {}),
+        ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
+      };
+      await reportCostsCommand(resolved);
+    },
+  );
+
+program
+  .command("budgets")
+  .description("Show per-agent budget config and current daily/monthly spend")
+  .option("--agent <id>", "Show one agent only")
+  .option("-u, --url <url>", "Server URL (default: http://127.0.0.1:3847)")
+  .option("-k, --api-key <key>", "Bearer token (default: TUTTI_API_KEY env)")
+  .action(async (opts: { agent?: string; url?: string; apiKey?: string }) => {
+    const resolved: BudgetsOptions = {
+      ...(opts.agent !== undefined ? { agent: opts.agent } : {}),
+      ...(opts.url !== undefined ? { url: opts.url } : {}),
+      ...(opts.apiKey !== undefined ? { apiKey: opts.apiKey } : {}),
+    };
+    await budgetsCommand(resolved);
   });
 
 const memoryCmd = program
