@@ -1,4 +1,4 @@
-import type { TuttiRuntime, GraphConfig } from "@tuttiai/core";
+import type { TuttiRuntime, GraphConfig, TuttiGraph } from "@tuttiai/core";
 
 /**
  * Default HTTP port for the Tutti server.
@@ -72,4 +72,27 @@ export interface ServerConfig {
   timeout_ms?: number;
   /** Optional graph config — when provided, `GET /graph` returns its JSON representation. */
   graph?: GraphConfig;
+  /**
+   * Live {@link TuttiGraph} instance that powers `POST /run` and the
+   * `GET /studio/events` SSE stream when set.
+   *
+   * - `POST /run` delegates to `graph_runner.run(input, { session_id })`
+   *   instead of `runtime.run(agent, ...)` so the entrypoint is the
+   *   graph, not a single agent.
+   * - `GET /studio/events` subscribes to `graph_runner.subscribe(...)`
+   *   and writes execution events to every connected client.
+   *
+   * The runner shares an `AgentRunner` with `runtime` (built via
+   * `runtime.createGraph(config)`) so the existing `runtime.events`
+   * bus also receives `agent:start`, `tool:start`, etc.
+   */
+  graph_runner?: TuttiGraph;
+  /**
+   * Mount the Tutti Studio SPA at `/studio/*`. Pass an absolute path to
+   * the built `dist/` directory of `@tuttiai/studio` (the CLI resolves
+   * this for you when `tutti-ai serve --studio` is used).
+   *
+   * The entire `/studio` subtree is exempt from bearer auth.
+   */
+  studio_dist_dir?: string;
 }

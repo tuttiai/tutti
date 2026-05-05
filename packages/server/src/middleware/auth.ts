@@ -22,6 +22,13 @@ export interface AuthOptions {
    * Compared by exact match against `request.url` minus any query string.
    */
   public_paths?: readonly string[];
+  /**
+   * Path prefixes whose entire subtree skips authentication. A request
+   * URL is bypassed when it equals a prefix exactly or starts with
+   * `<prefix>/`. Used for static asset trees like `/studio` where every
+   * sub-path is public UI.
+   */
+  public_path_prefixes?: readonly string[];
 }
 
 const DEFAULT_PUBLIC_PATHS = ["/health"] as const;
@@ -75,9 +82,14 @@ function stripQuery(url: string): string {
 export function registerAuth(app: FastifyInstance, options: AuthOptions): void {
   const expected = options.api_key;
   const publicPaths = new Set(options.public_paths ?? DEFAULT_PUBLIC_PATHS);
+  const publicPrefixes = options.public_path_prefixes ?? [];
 
   app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (publicPaths.has(stripQuery(request.url))) return;
+    const path = stripQuery(request.url);
+    if (publicPaths.has(path)) return;
+    for (const prefix of publicPrefixes) {
+      if (path === prefix || path.startsWith(prefix + "/")) return;
+    }
 
     if (expected === undefined) {
       await reply.code(401).send({ error: "server_not_configured" });

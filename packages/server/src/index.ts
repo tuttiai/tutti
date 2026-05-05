@@ -13,6 +13,9 @@ import { registerSessionsRoute } from "./routes/sessions.js";
 import { registerGraphRoute } from "./routes/graph.js";
 import { registerTracesRoutes } from "./routes/traces.js";
 import { registerInterruptsRoutes } from "./routes/interrupts.js";
+import { registerStudioRoute } from "./routes/studio.js";
+import { registerStudioEventsRoute } from "./routes/studio-events.js";
+import { SessionsRegistry } from "./sessions-registry.js";
 
 export {
   DEFAULT_HOST,
@@ -64,20 +67,46 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
     await registerRateLimit(app, rl);
   }
 
-  // 4. Auth
-  registerAuth(app, { api_key: resolveApiKey(config.api_key) });
+  // 4. Auth — the `/studio` subtree (SPA assets + the SSE event stream)
+  // is auth-bypassed whenever either the studio SPA or the live event
+  // stream is mounted, so `EventSource` connections from the browser
+  // (no Authorization header support) can still subscribe.
+  const studioEnabled = config.studio_dist_dir !== undefined || config.graph_runner !== undefined;
+  registerAuth(app, {
+    api_key: resolveApiKey(config.api_key),
+    ...(studioEnabled ? { public_path_prefixes: ["/studio"] } : {}),
+  });
 
   // 5. Global error handler
   registerErrorHandler(app);
 
+  // Live directory of sessions seen during this server's lifetime.
+  // Subscribed before any routes register so `/sessions` reflects every
+  // run that happens after server boot.
+  const sessions = new SessionsRegistry(config.runtime);
+  // eslint-disable-next-line @typescript-eslint/require-await -- Fastify hooks must be async, but `close` is synchronous.
+  app.addHook("onClose", async () => {
+    sessions.close();
+  });
+
   // 6. Routes
   registerHealthRoute(app);
-  registerRunRoute(app, config.runtime, config.agent_name, timeoutMs);
+  registerRunRoute(app, config.runtime, config.agent_name, timeoutMs, config.graph_runner);
   registerStreamRoute(app, config.runtime, config.agent_name);
-  registerSessionsRoute(app, config.runtime);
-  registerGraphRoute(app, config.graph);
+  registerSessionsRoute(
+    app,
+    config.runtime,
+    sessions,
+    config.agent_name,
+    config.graph_runner,
+  );
+  registerGraphRoute(app, config.graph_runner?.config ?? config.graph);
   registerTracesRoutes(app);
   registerInterruptsRoutes(app, config.runtime);
+  if (config.studio_dist_dir) {
+    registerStudioRoute(app, config.studio_dist_dir);
+  }
+  registerStudioEventsRoute(app, config.graph_runner);
 
   return app;
 }

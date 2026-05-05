@@ -10,8 +10,13 @@ import { graphToJSON } from "@tuttiai/core";
  * labels and structural information are preserved. Useful for external
  * visualization tools and the Tutti Studio frontend.
  *
+ * When no graph is configured the route returns an empty graph
+ * (`{ nodes: [], edges: [] }`) rather than 404, so polling frontends
+ * (e.g. the studio canvas) can render an empty state without
+ * special-casing the absence of a graph.
+ *
  * @param app   - Fastify instance.
- * @param graph - Optional graph config. When absent the route returns 404.
+ * @param graph - Optional graph config.
  */
 export function registerGraphRoute(
   app: FastifyInstance,
@@ -19,13 +24,8 @@ export function registerGraphRoute(
 ): void {
   app.get("/graph", (_request, reply) => {
     if (!graph) {
-      return reply.status(404).send({
-        error: "No graph configured",
-        message: "This server was started without a TuttiGraph. " +
-          "Set ServerConfig.graph to enable this endpoint.",
-      });
+      return reply.send({ nodes: [], edges: [] });
     }
-
     return reply.send(graphToJSON(graph));
   });
 }
