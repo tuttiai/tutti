@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { TwitterApi } from "twitter-api-v2";
 import type { ToolContext } from "@tuttiai/types";
 import { TwitterVoice } from "../src/index.js";
 import type { TwitterClient } from "../src/client.js";
@@ -54,8 +55,9 @@ function createMockApi(): { v2: MockV2 } {
 }
 
 function readyClient(can_write = true): TwitterClient & { api: { v2: MockV2 } } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { kind: "ready", api: createMockApi() as any, can_write };
+  // Mock only exposes the `v2` methods the tools call — `unknown`-cast keeps
+  // the unsafe assertion explicit while satisfying the structural shape.
+  return { kind: "ready", api: createMockApi() as unknown as TwitterApi, can_write };
 }
 
 let client: ReturnType<typeof readyClient>;
