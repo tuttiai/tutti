@@ -25,6 +25,7 @@ export interface ServeOptions {
   agent?: string;
   watch?: boolean;
   studio?: boolean;
+  realtime?: boolean;
 }
 
 /**
@@ -168,6 +169,7 @@ export async function serveCommand(
     studioDistDir,
     initialGraphConfig,
     initialGraphRunner,
+    options.realtime === true ? score : undefined,
   );
 
   // ── Watch mode ──────────────────────────────────────────────
@@ -198,6 +200,7 @@ export async function serveCommand(
             studioDistDir,
             nextGraphConfig,
             nextGraphRunner,
+            options.realtime === true ? nextScore : undefined,
           );
 
           await app.close();
@@ -226,7 +229,16 @@ export async function serveCommand(
   // ── Start listening ─────────────────────────────────────────
   await app.listen({ port, host });
 
-  printBanner(port, host, agentName, score, file, options.watch, studioDistDir !== undefined);
+  printBanner(
+    port,
+    host,
+    agentName,
+    score,
+    file,
+    options.watch,
+    studioDistDir !== undefined,
+    options.realtime === true,
+  );
 
   // ── Graceful shutdown ───────────────────────────────────────
   const shutdown = async (signal: string): Promise<void> => {
@@ -271,6 +283,7 @@ async function buildApp(
   studioDistDir: string | undefined,
   graph: GraphConfig | undefined,
   graphRunner: TuttiGraph | undefined,
+  realtimeScore: ScoreConfig | undefined,
 ): Promise<FastifyInstance> {
   return createServer({
     port,
@@ -281,6 +294,7 @@ async function buildApp(
     ...(studioDistDir !== undefined ? { studio_dist_dir: studioDistDir } : {}),
     ...(graph !== undefined ? { graph } : {}),
     ...(graphRunner !== undefined ? { graph_runner: graphRunner } : {}),
+    ...(realtimeScore !== undefined ? { realtime: true, score: realtimeScore } : {}),
   });
 }
 
@@ -292,6 +306,7 @@ function printBanner(
   file: string,
   watch: boolean | undefined,
   studioEnabled: boolean,
+  realtimeEnabled: boolean,
 ): void {
   const display = host === "0.0.0.0" || host === "::" ? "localhost" : host;
   const url = "http://" + display + ":" + port;
@@ -312,9 +327,17 @@ function printBanner(
   console.log(chalk.dim("    POST  ") + url + "/run/stream");
   console.log(chalk.dim("    GET   ") + url + "/sessions/:id");
   console.log(chalk.dim("    GET   ") + url + "/health");
+  if (realtimeEnabled) {
+    console.log(chalk.dim("    GET   ") + url + "/realtime  " + chalk.dim("(WebSocket)"));
+    console.log(chalk.dim("    GET   ") + url + "/realtime-demo");
+  }
   if (studioEnabled) {
     console.log();
     console.log(chalk.bold("  Studio available at " + url + "/studio"));
+  }
+  if (realtimeEnabled) {
+    console.log();
+    console.log(chalk.bold("  Realtime demo at " + url + "/realtime-demo"));
   }
   console.log();
 }

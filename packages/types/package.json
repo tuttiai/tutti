@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/types",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Type definitions for the Tutti multi-agent orchestration framework",
   "type": "module",
   "exports": {

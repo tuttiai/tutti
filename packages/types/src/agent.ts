@@ -125,6 +125,39 @@ export interface AgentScheduleConfig {
 }
 
 /**
+ * Realtime session config consumed by `@tuttiai/realtime`. When set on
+ * an {@link AgentConfig}, the server-side `/realtime` WebSocket endpoint
+ * exposes a voice/audio surface for that agent and `RealtimeVoice` is
+ * loaded automatically alongside the agent's other voices when a
+ * realtime session opens.
+ *
+ * Mirror of {@link import("@tuttiai/realtime").RealtimeConfig} — kept
+ * here so `@tuttiai/types` can stay zero-runtime-dep (only `zod`) while
+ * `AgentConfig` references the shape directly. Same pattern as
+ * {@link DeployConfig}.
+ */
+export interface RealtimeAgentConfig {
+  /** Realtime model identifier, e.g. `gpt-4o-realtime-preview`. */
+  model: string;
+  /** Synthesised voice for assistant audio output. */
+  voice: "alloy" | "echo" | "shimmer" | "ash" | "coral" | "sage";
+  /** Turn-detection strategy. Only `server_vad` is supported today. */
+  turnDetection: {
+    type: "server_vad";
+    /** Activation probability threshold, 0–1. */
+    threshold?: number;
+    /** Silence in milliseconds before the server commits a turn. */
+    silenceDurationMs?: number;
+  };
+  /** Override the agent's `system_prompt` for the realtime session. */
+  instructions?: string;
+  /** Sampling temperature, 0–2. */
+  temperature?: number;
+  /** Hard cap on response tokens per assistant turn. */
+  maxResponseTokens?: number;
+}
+
+/**
  * Deployment target supported by `@tuttiai/deploy`. Bundlers in that package
  * consume the resolved manifest and emit a target-specific artefact.
  */
@@ -283,6 +316,15 @@ export interface AgentConfig {
    * turns into a deployable artefact.
    */
   deploy?: DeployConfig;
+  /**
+   * Realtime / voice session configuration consumed by
+   * `@tuttiai/realtime`. When set to a {@link RealtimeAgentConfig}, the
+   * Tutti server exposes a `GET /realtime` WebSocket endpoint for this
+   * agent and auto-loads `RealtimeVoice` when a session opens. Pass
+   * `false` to explicitly disable the realtime endpoint for this agent
+   * (overrides any score-level default).
+   */
+  realtime?: RealtimeAgentConfig | false;
 }
 
 export interface AgentResult {

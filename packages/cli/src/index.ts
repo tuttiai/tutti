@@ -119,6 +119,10 @@ program
   .option("-a, --agent <name>", "Agent to expose (default: score entry or first agent)")
   .option("-w, --watch", "Reload the score on file changes")
   .option("--studio", "Mount the Tutti Studio web UI at /studio")
+  .option(
+    "--realtime",
+    "Enable the /realtime WebSocket endpoint and /realtime-demo HTML page (requires OPENAI_API_KEY)",
+  )
   .action(async (score: string | undefined, opts: ServeOptions) => {
     await serveCommand(score, opts);
   });

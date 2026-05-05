@@ -33,6 +33,7 @@ export type {
   AgentScheduleConfig,
   DeployTarget,
   DeployConfig,
+  RealtimeAgentConfig,
   RunContext,
   GuardrailHook,
   AgentConfig,

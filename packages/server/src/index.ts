@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import websocketPlugin from "@fastify/websocket";
 
 import { DEFAULT_TIMEOUT_MS } from "./config.js";
 import { registerRequestId } from "./middleware/request-id.js";
@@ -15,6 +16,10 @@ import { registerTracesRoutes } from "./routes/traces.js";
 import { registerInterruptsRoutes } from "./routes/interrupts.js";
 import { registerStudioRoute } from "./routes/studio.js";
 import { registerStudioEventsRoute } from "./routes/studio-events.js";
+import {
+  REALTIME_PUBLIC_PATHS,
+  registerRealtimeRoutes,
+} from "./routes/realtime.js";
 import { SessionsRegistry } from "./sessions-registry.js";
 
 export {
@@ -70,11 +75,17 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
   // 4. Auth — the `/studio` subtree (SPA assets + the SSE event stream)
   // is auth-bypassed whenever either the studio SPA or the live event
   // stream is mounted, so `EventSource` connections from the browser
-  // (no Authorization header support) can still subscribe.
+  // (no Authorization header support) can still subscribe. The
+  // `/realtime` and `/realtime-demo` paths are likewise exempt (the
+  // realtime route does its own bearer check against `?api_key=`).
   const studioEnabled = config.studio_dist_dir !== undefined || config.graph_runner !== undefined;
+  const realtimeEnabled = config.realtime === true;
+  const publicPrefixes: string[] = [];
+  if (studioEnabled) publicPrefixes.push("/studio");
+  if (realtimeEnabled) publicPrefixes.push(...REALTIME_PUBLIC_PATHS);
   registerAuth(app, {
     api_key: resolveApiKey(config.api_key),
-    ...(studioEnabled ? { public_path_prefixes: ["/studio"] } : {}),
+    ...(publicPrefixes.length > 0 ? { public_path_prefixes: publicPrefixes } : {}),
   });
 
   // 5. Global error handler
@@ -107,6 +118,21 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
     registerStudioRoute(app, config.studio_dist_dir);
   }
   registerStudioEventsRoute(app, config.graph_runner);
+
+  if (realtimeEnabled) {
+    if (!config.score) {
+      throw new Error(
+        "createServer: `realtime: true` requires a `score` so the realtime route can read each agent's `realtime` config.",
+      );
+    }
+    await app.register(websocketPlugin);
+    registerRealtimeRoutes(app, {
+      runtime: config.runtime,
+      score: config.score,
+      agentName: config.agent_name,
+      apiKey: resolveApiKey(config.api_key),
+    });
+  }
 
   return app;
 }

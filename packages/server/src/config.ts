@@ -1,4 +1,5 @@
 import type { TuttiRuntime, GraphConfig, TuttiGraph } from "@tuttiai/core";
+import type { ScoreConfig } from "@tuttiai/types";
 
 /**
  * Default HTTP port for the Tutti server.
@@ -95,4 +96,25 @@ export interface ServerConfig {
    * The entire `/studio` subtree is exempt from bearer auth.
    */
   studio_dist_dir?: string;
+  /**
+   * When `true`, mount the realtime voice/audio surface:
+   *
+   * - `GET /realtime` — WebSocket; proxies the OpenAI Realtime API
+   *   to a connecting browser. Auth is checked inline against
+   *   `?api_key=...` (browsers cannot set `Authorization` on
+   *   `new WebSocket(url)`).
+   * - `GET /realtime-demo` — public HTML page that exercises the
+   *   endpoint with `getUserMedia` + Web Audio.
+   *
+   * Both routes are exempt from the global bearer-auth hook. The agent
+   * exposed at `agent_name` must declare a `realtime` config or every
+   * connection is rejected with `realtime_disabled_for_agent`. The
+   * server reads the OpenAI key from `OPENAI_API_KEY` at connect time.
+   */
+  realtime?: boolean;
+  /**
+   * Loaded score, used by the realtime endpoint to read each agent's
+   * `realtime` config. Required when `realtime` is `true`.
+   */
+  score?: ScoreConfig;
 }

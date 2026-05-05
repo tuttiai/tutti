@@ -1,5 +1,11 @@
 # @tuttiai/server
 
+## 0.4.0
+
+### Minor Changes
+
+- Add /realtime WebSocket endpoint and /realtime-demo browser demo page
+
 ## 0.3.0
 
 ### Minor Changes
