@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## v0.24.0 — Production Ship: Deploy, Studio, Realtime, Cost Optimisation
+
+The four-headline release that takes Tutti from "great in dev" to "ready in prod":
+
+- **`tutti-ai deploy`** — production deployment in one command. Bundles your score and ships to Docker, Railway, or Fly with `--target docker|railway|fly`. Plan-builder helpers, pre-flight secrets scanning, and `deploy status / logs / rollback` subcommands.
+- **Tutti Studio** — first TypeScript-native visual agent IDE. Web SPA served by `@tuttiai/server`, live execution stream, replay, score graph at `localhost:4747` via `tutti-ai studio`.
+- **Realtime voice** — OpenAI Realtime API integration with proper security (per-agent gating, `SecretsManager` redaction of tool args, `InterruptStore`-gated approval) and durable logging. New `@tuttiai/realtime` package + `--realtime` flag on `tutti-ai serve`.
+- **Cost optimisation** — `model: 'auto'` agent-level smart routing, hard `costBudget` enforcement (run / day / month) via `BudgetExceededError`, Postgres-backed `RunCostStore` for multi-process deployments, and `tutti-ai analyze costs` / `report costs` / `budgets` CLI commands with optimisation hints.
+
 ### Security
 - **@tuttiai/core** — bump `node-cron` 3.0.3 → 4.2.1 to clear `GHSA-w5hq-g745-h8pq` (uuid buffer-bounds-check moderate). API surface used (`schedule`, `validate`, `task.stop`) is unchanged. Will ship in the next `@tuttiai/core` patch release.
 - Repo-wide `npm audit` now returns 0 vulnerabilities at the root and in `@tuttiai/core`. Two more advisories closed:
@@ -50,6 +59,16 @@
 - **@tuttiai/cli** — new `tutti-ai deploy [--target docker|railway|fly] [--dry-run]` command. Bundles the score and deploys via the matching platform CLI; subcommands `deploy status`, `deploy logs [--tail]`, `deploy rollback` dispatch to the platform's equivalent. Pure plan-builder helpers (`buildDeployPlan`, `formatDryRunPlan`) are exported and unit-tested. Runs `scanForSecrets` + `validateSecrets` before any I/O so missing env-var declarations block the deploy fail-fast; writes `.env.deploy.example` next to the score in real-run mode.
 - **@tuttiai/deploy** — new `scanForSecrets(scoreFilePath)`, `validateSecrets(manifest, required)`, `buildEnvExample(required)`, and `SecretsValidationResult`. Static-scans the score and every imported package's entry file for `process.env.X` reads, filters Node runtime built-ins, and emits errors for undeclared required vars + warnings for secret-shaped names in plaintext `deploy.env`.
 - **@tuttiai/types** — new `DeployTarget` and `DeployConfig` interfaces; `AgentConfig` gains an optional `deploy` field.
+
+### Package versions
+- @tuttiai/core 0.20.0 → 0.21.0 (cost-budget enforcement + `model: 'auto'`)
+- @tuttiai/cli 0.20.0 → 0.21.0 (deploy + cost-analysis commands)
+- @tuttiai/server 0.4.0 → 0.5.0 (cost routes + studio SPA + realtime WebSocket)
+- @tuttiai/telemetry 0.3.0 → 0.4.0 (`RunCostStore`, `getDailyCost` / `getMonthlyCost`)
+- @tuttiai/types 0.11.2 → 0.11.3 (additive `BudgetConfig` / event-scope fields)
+- @tuttiai/deploy 0.1.0 (new package — Docker / Railway / Fly bundlers, secrets scanner)
+- @tuttiai/studio 0.1.0 (new package — visual agent IDE SPA)
+- @tuttiai/realtime 0.1.0 (new package — OpenAI Realtime API client + tool bridge)
 
 ## v0.23.0 — Smart Model Routing
 
