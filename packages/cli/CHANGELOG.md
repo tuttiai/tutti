@@ -1,5 +1,13 @@
 # @tuttiai/cli
 
+## [Unreleased]
+
+### Minor Changes
+
+- Add `--studio` flag to `tutti-ai serve` and rewrite `tutti-ai studio` to mount the new `@tuttiai/studio` Vite/React SPA at `/studio` on the Fastify server. The `studio` command spawns `serve --studio` under the hood and opens the browser after a 1-second delay.
+- `tutti-ai serve` now reads an optional `graph` field off the loaded score (a `TuttiGraph` instance or raw `GraphConfig`) and forwards it to the server so `GET /graph` returns the live graph definition. Powers the studio's `GraphCanvas`.
+- When `score.graph` is present, `serve` constructs a `TuttiGraph` via `runtime.createGraph(config)` and passes it as `graph_runner` to the server. This makes `POST /run` execute the graph (with live `node:start` / `node:complete` / `node:error` events on `/studio/events`) and is what powers the studio canvas's live execution visualisation.
+
 ## 0.19.0
 
 ### Minor Changes

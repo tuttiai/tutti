@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 import chalk from "chalk";
 import {
   TuttiRuntime,
@@ -10,6 +11,7 @@ import {
   SecretsManager,
   InMemorySessionStore,
 } from "@tuttiai/core";
+import type { GraphConfig, TuttiGraph } from "@tuttiai/core";
 import type { ScoreConfig, SessionStore } from "@tuttiai/types";
 import { createServer, DEFAULT_PORT, SERVER_VERSION } from "@tuttiai/server";
 import type { FastifyInstance } from "fastify";
@@ -22,6 +24,55 @@ export interface ServeOptions {
   apiKey?: string;
   agent?: string;
   watch?: boolean;
+  studio?: boolean;
+}
+
+/**
+ * Pull a {@link GraphConfig} off a loaded score, if one was attached as
+ * `score.graph`.
+ *
+ * The score schema uses `.passthrough()` so unknown fields like `graph`
+ * survive validation. This duck-types two shapes — a raw `GraphConfig`
+ * object (with `nodes`/`edges` arrays) and a constructed `TuttiGraph`
+ * instance (which exposes its config under `.config`). Returns
+ * `undefined` when neither shape matches, so the studio canvas falls
+ * back to its empty state.
+ */
+function extractGraphConfig(score: ScoreConfig): GraphConfig | undefined {
+  const candidate = (score as unknown as { graph?: unknown }).graph;
+  if (candidate === undefined || candidate === null) return undefined;
+  if (typeof candidate !== "object") return undefined;
+
+  const obj = candidate as Record<string, unknown>;
+  // TuttiGraph instances expose the validated config on `.config`.
+  if (obj["config"] && typeof obj["config"] === "object") {
+    const inner = obj["config"] as Record<string, unknown>;
+    if (Array.isArray(inner["nodes"]) && Array.isArray(inner["edges"])) {
+      return obj["config"] as GraphConfig;
+    }
+  }
+  // Or callers may attach a raw GraphConfig directly.
+  if (Array.isArray(obj["nodes"]) && Array.isArray(obj["edges"])) {
+    return candidate as GraphConfig;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the absolute path to the built `@tuttiai/studio` SPA. Returns
+ * `undefined` when the package is not installed or has not been built —
+ * the caller is expected to surface a friendly error in that case.
+ */
+function resolveStudioDistDir(): string | undefined {
+  try {
+    const require = createRequire(import.meta.url);
+    const pkgPath = require.resolve("@tuttiai/studio/package.json");
+    const distDir = resolve(dirname(pkgPath), "dist");
+    if (!existsSync(resolve(distDir, "index.html"))) return undefined;
+    return distDir;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function serveCommand(
@@ -84,6 +135,18 @@ export async function serveCommand(
   const port = parsePort(options.port);
   const host = options.host ?? "0.0.0.0";
 
+  // ── Resolve studio dist (if --studio) ───────────────────────
+  let studioDistDir: string | undefined;
+  if (options.studio) {
+    studioDistDir = resolveStudioDistDir();
+    if (!studioDistDir) {
+      logger.error(
+        "Cannot enable --studio: @tuttiai/studio is not installed or has not been built. Run `npm install @tuttiai/studio` and `npm run build -w @tuttiai/studio`.",
+      );
+      process.exit(1);
+    }
+  }
+
   // ── Build runtime and server ────────────────────────────────
   // Watch mode keeps a shared session store so hot-reloads don't
   // discard in-flight sessions.
@@ -92,7 +155,20 @@ export async function serveCommand(
     : undefined;
 
   let runtime = buildRuntime(score, sharedSessions);
-  let app = await buildApp(runtime, agentName, port, host, options.apiKey);
+  const initialGraphConfig = extractGraphConfig(score);
+  const initialGraphRunner: TuttiGraph | undefined = initialGraphConfig
+    ? runtime.createGraph(initialGraphConfig)
+    : undefined;
+  let app = await buildApp(
+    runtime,
+    agentName,
+    port,
+    host,
+    options.apiKey,
+    studioDistDir,
+    initialGraphConfig,
+    initialGraphRunner,
+  );
 
   // ── Watch mode ──────────────────────────────────────────────
   let reactive: ReactiveScore | undefined;
@@ -109,7 +185,20 @@ export async function serveCommand(
           const nextScore = reactive?.current;
           if (!nextScore) return;
           const nextRuntime = buildRuntime(nextScore, sharedSessions);
-          const nextApp = await buildApp(nextRuntime, agentName, port, host, options.apiKey);
+          const nextGraphConfig = extractGraphConfig(nextScore);
+          const nextGraphRunner = nextGraphConfig
+            ? nextRuntime.createGraph(nextGraphConfig)
+            : undefined;
+          const nextApp = await buildApp(
+            nextRuntime,
+            agentName,
+            port,
+            host,
+            options.apiKey,
+            studioDistDir,
+            nextGraphConfig,
+            nextGraphRunner,
+          );
 
           await app.close();
           runtime = nextRuntime;
@@ -137,7 +226,7 @@ export async function serveCommand(
   // ── Start listening ─────────────────────────────────────────
   await app.listen({ port, host });
 
-  printBanner(port, host, agentName, score, file, options.watch);
+  printBanner(port, host, agentName, score, file, options.watch, studioDistDir !== undefined);
 
   // ── Graceful shutdown ───────────────────────────────────────
   const shutdown = async (signal: string): Promise<void> => {
@@ -179,6 +268,9 @@ async function buildApp(
   port: number,
   host: string,
   apiKey: string | undefined,
+  studioDistDir: string | undefined,
+  graph: GraphConfig | undefined,
+  graphRunner: TuttiGraph | undefined,
 ): Promise<FastifyInstance> {
   return createServer({
     port,
@@ -186,6 +278,9 @@ async function buildApp(
     runtime,
     agent_name: agentName,
     api_key: apiKey,
+    ...(studioDistDir !== undefined ? { studio_dist_dir: studioDistDir } : {}),
+    ...(graph !== undefined ? { graph } : {}),
+    ...(graphRunner !== undefined ? { graph_runner: graphRunner } : {}),
   });
 }
 
@@ -196,6 +291,7 @@ function printBanner(
   score: ScoreConfig,
   file: string,
   watch: boolean | undefined,
+  studioEnabled: boolean,
 ): void {
   const display = host === "0.0.0.0" || host === "::" ? "localhost" : host;
   const url = "http://" + display + ":" + port;
@@ -216,5 +312,9 @@ function printBanner(
   console.log(chalk.dim("    POST  ") + url + "/run/stream");
   console.log(chalk.dim("    GET   ") + url + "/sessions/:id");
   console.log(chalk.dim("    GET   ") + url + "/health");
+  if (studioEnabled) {
+    console.log();
+    console.log(chalk.bold("  Studio available at " + url + "/studio"));
+  }
   console.log();
 }

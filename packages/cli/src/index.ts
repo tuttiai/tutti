@@ -118,6 +118,7 @@ program
   .option("-k, --api-key <key>", "API key for bearer auth (or set TUTTI_API_KEY)")
   .option("-a, --agent <name>", "Agent to expose (default: score entry or first agent)")
   .option("-w, --watch", "Reload the score on file changes")
+  .option("--studio", "Mount the Tutti Studio web UI at /studio")
   .action(async (score: string | undefined, opts: ServeOptions) => {
     await serveCommand(score, opts);
   });
@@ -176,8 +177,13 @@ program
 program
   .command("studio [score]")
   .description("Launch Tutti Studio — local web UI for inspecting agent runs")
-  .action(async (score?: string) => {
-    await studioCommand(score);
+  .option("-p, --port <number>", "Port to listen on (default: 3847)")
+  .option("-H, --host <address>", "Host to bind to (default: 0.0.0.0)")
+  .option("-k, --api-key <key>", "API key for bearer auth (or set TUTTI_API_KEY)")
+  .option("-a, --agent <name>", "Agent to expose (default: score entry or first agent)")
+  .option("-w, --watch", "Reload the score on file changes")
+  .action(async (score: string | undefined, opts: ServeOptions) => {
+    await studioCommand(score, opts);
   });
 
 program
