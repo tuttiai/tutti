@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Security
+- **@tuttiai/core** — bump `node-cron` 3.0.3 → 4.2.1 to clear `GHSA-w5hq-g745-h8pq` (uuid buffer-bounds-check moderate). API surface used (`schedule`, `validate`, `task.stop`) is unchanged. Will ship in the next `@tuttiai/core` patch release.
+- Repo-wide `npm audit` now returns 0 vulnerabilities at the root and in `@tuttiai/core`. Two more advisories closed:
+  - `postcss <8.5.10` (XSS via unescaped `</style>`, `GHSA-qx2v-qp2m-jg93`) — pinned via root `overrides` to `^8.5.10`.
+  - `vitest 2.x` chain (esbuild dev-server `GHSA-67mh-4wv8-2f99`) — bumped `docs/devDependencies.vitest` to `3.2.4` (matches the rest of the monorepo).
+- Three moderate advisories remain in the docs build chain (`astro <6.1.6` / `@astrojs/mdx` / `@astrojs/starlight`) — fix requires migrating Starlight from `0.33.x` to `0.38.x` along with `astro@^6`, which is a breaking content/sidebar change. Deferred — the docs site is a private workspace, the XSS advisory is for `define:vars` which our content does not use.
+
 ### New
 - **@tuttiai/server** — new realtime voice/audio surface gated behind `tutti-ai serve --realtime` (or `ServerConfig.realtime: true`).
   - `GET /realtime` — WebSocket endpoint that proxies the OpenAI Realtime API to a browser. Auth is inline against `?api_key=...` because browsers can't set `Authorization` on `new WebSocket(url)`. Connections are rejected with `4404 / realtime_disabled_for_agent` when the agent's `realtime` config is `undefined` or `false`, and `4500 / missing_openai_api_key` when `OPENAI_API_KEY` is unset. `RealtimeVoice(config).tools` auto-load alongside the agent's existing voices' tools.

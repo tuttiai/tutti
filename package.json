@@ -37,5 +37,8 @@
   "packageManager": "npm@11.11.1",
   "engines": {
     "node": ">=24"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }
