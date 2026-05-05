@@ -37,7 +37,7 @@ import type {
 } from "./memory/user/types.js";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
-import { getDailyCost, getMonthlyCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
+import { estimateCost, getDailyCost, getMonthlyCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
@@ -98,6 +98,16 @@ interface SmartProviderSurface {
     request: ChatRequest,
     override?: { force_tier?: "small" | "medium" | "large" | "fallback"; force_reason?: string },
   ) => Promise<ChatResponse>;
+  /**
+   * Last routing decision the provider made on this process. Used by the
+   * runner after a call to discover the actual model the SmartProvider
+   * picked — needed to price `model: 'auto'` runs correctly via
+   * {@link TokenBudget.add}'s `model_override` and to mark the
+   * `llm.completion` span with `auto_routed: true` plus the resolved
+   * model name. Optional in the surface: older fakes may omit it; the
+   * runner degrades gracefully when it returns `undefined`.
+   */
+  getLastDecision?: () => { model: string } | undefined;
 }
 
 const DEFAULT_MAX_TURNS = 10;
@@ -499,6 +509,16 @@ export class AgentRunner {
     session_id?: string,
     options?: AgentRunOptions,
   ): Promise<AgentResult> {
+    // `model: 'auto'` opts an agent into per-call routing via the score's
+    // SmartProvider. Validate up front so the failure surfaces at run
+    // start rather than partway through a turn.
+    if (agent.model === "auto" && !this.asSmartProvider()) {
+      throw new Error(
+        `Agent "${agent.name}" sets model: 'auto' but the score's provider is not a SmartProvider.\n` +
+          `Configure a SmartProvider from @tuttiai/router on your score, or set an explicit model on the agent.`,
+      );
+    }
+
     // session_id can come either from the positional arg (legacy) or the
     // options bag (new). Positional wins on conflict for back-compat.
     const resolvedSessionId = session_id ?? options?.session_id;
@@ -814,11 +834,37 @@ export class AgentRunner {
 
         const response = await Tracing.llmCall(
           agent.model ?? "unknown",
-          () => withRetry(() =>
-            agent.streaming
-              ? this.streamToResponse(routerScope, request)
-              : this.callProviderChat(routerScope, request, budget),
-          ),
+          async () => {
+            const r = await withRetry(() =>
+              agent.streaming
+                ? this.streamToResponse(routerScope, request)
+                : this.callProviderChat(routerScope, request, budget),
+            );
+            // For `model: 'auto'`, mirror the SmartProvider's chosen
+            // model onto the still-open span and recompute cost at the
+            // resolved tier's rate. Without this, the span carries
+            // `model: 'auto'` (no PRICING entry → cost_usd missing),
+            // which would silently break run-cost-store accounting.
+            if (agent.model === "auto") {
+              const sp = this.asSmartProvider();
+              const resolved = sp?.getLastDecision?.()?.model;
+              if (resolved) {
+                const cost = estimateCost(
+                  resolved,
+                  r.usage.input_tokens,
+                  r.usage.output_tokens,
+                );
+                setActiveLlmAttributes({
+                  auto_routed: true,
+                  model: resolved,
+                  ...(cost !== null ? { cost_usd: cost } : {}),
+                });
+              } else {
+                setActiveLlmAttributes({ auto_routed: true });
+              }
+            }
+            return r;
+          },
         );
 
         logger.debug(
@@ -839,13 +885,26 @@ export class AgentRunner {
         totalUsage.input_tokens += response.usage.input_tokens;
         totalUsage.output_tokens += response.usage.output_tokens;
 
+        // For `model: 'auto'` runs, price this call at the SmartProvider's
+        // chosen tier rather than the 'auto' sentinel (which has no
+        // PRICING entry). Span attribution already happened inside the
+        // llmCall callback above.
+        const resolvedModel =
+          agent.model === "auto"
+            ? this.asSmartProvider()?.getLastDecision?.()?.model
+            : undefined;
+
         // Check budget. Token limits keep their soft-break semantics
         // (event + return partial result). Cost limits — per-run,
         // daily, monthly — emit warning at the configured threshold and
         // hard-throw on breach so callers cannot keep paying for an
         // over-cap run.
         if (budget) {
-          budget.add(response.usage.input_tokens, response.usage.output_tokens);
+          budget.add(
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+            resolvedModel,
+          );
 
           // Token-based path: preserves the historical event-and-break
           // behaviour the integration tests assert.

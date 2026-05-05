@@ -29,6 +29,28 @@ export default defineScore({
 
 That's it. Every call your agents make now picks a tier automatically.
 
+## Per-agent opt-in: `model: 'auto'`
+
+`SmartProvider` routes every call your score makes. To route some agents but not others, set `model: 'auto'` on the agents you want routed and a fixed model on the rest:
+
+```ts
+export default defineScore({
+  provider: new SmartProvider({ tiers: [/* small | medium | large */] }),
+  agents: {
+    triage:    { name: "triage",    model: "auto",                   system_prompt: "...", voices: [] },
+    evaluator: { name: "evaluator", model: "claude-opus-4-7",        system_prompt: "...", voices: [] },
+  },
+});
+```
+
+`triage` picks a tier per turn. `evaluator` always runs on Opus. Both share the same `SmartProvider`.
+
+A few things to know:
+
+- The runtime throws at run start if an agent sets `model: 'auto'` but the score's provider is not a `SmartProvider`. There's no silent fallback.
+- Spans on `auto` runs carry `auto_routed: true` plus the resolved model — easy to filter for in dashboards.
+- Cost budgets price each call at the chosen tier's rate, not at `'auto'`. So a per-run `max_cost_usd` cap behaves the same whether you set the model explicitly or use `'auto'`.
+
 ## How routing works
 
 On every `provider.chat(...)` call, Tutti runs three steps:
