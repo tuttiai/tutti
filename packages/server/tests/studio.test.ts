@@ -88,6 +88,27 @@ describe("GET /studio", () => {
     }
   });
 
+  it("rejects embedded `..` segments and NUL bytes without serving the target", async () => {
+    ({ app } = await buildTestServer([textResponse("unused")], {
+      config: { studio_dist_dir: distDir },
+    }));
+
+    for (const url of [
+      "/studio/assets/../../etc/passwd",
+      "/studio/assets/app.js%00.png",
+    ]) {
+      const res = await app.inject({ method: "GET", url });
+      // Either Fastify normalises and the route doesn't match (4xx), or the
+      // sanitiser rejects and the SPA fallback serves index.html — both safe.
+      // The point is /etc/passwd or app.js%00 contents are never served.
+      if (res.statusCode === 200) {
+        expect(res.body).toContain("STUDIO");
+      } else {
+        expect(res.statusCode).toBeGreaterThanOrEqual(400);
+      }
+    }
+  });
+
   it("still requires auth on non-studio routes", async () => {
     ({ app } = await buildTestServer([textResponse("unused")], {
       config: { studio_dist_dir: distDir },

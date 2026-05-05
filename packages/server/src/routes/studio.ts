@@ -35,6 +35,16 @@ function contentType(file: string): string {
  */
 function resolveSafe(root: string, requestPath: string): string | undefined {
   const trimmed = requestPath.replace(/^\/+/, "");
+
+  // Reject traversal segments and NUL bytes before touching the filesystem.
+  // The post-resolve `startsWith` check below is sufficient on its own, but
+  // an up-front segment filter is the sanitiser shape CodeQL recognises for
+  // js/path-injection — and gives us a second barrier in depth.
+  const segments = trimmed.split(/[\\/]/);
+  if (segments.includes("..") || trimmed.includes("\0")) {
+    return undefined;
+  }
+
   const candidate = resolve(root, normalize(trimmed));
 
   const rootWithSep = root.endsWith(sep) ? root : root + sep;
