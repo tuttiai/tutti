@@ -7,7 +7,8 @@
 - Repo-wide `npm audit` now returns 0 vulnerabilities at the root and in `@tuttiai/core`. Two more advisories closed:
   - `postcss <8.5.10` (XSS via unescaped `</style>`, `GHSA-qx2v-qp2m-jg93`) — pinned via root `overrides` to `^8.5.10`.
   - `vitest 2.x` chain (esbuild dev-server `GHSA-67mh-4wv8-2f99`) — bumped `docs/devDependencies.vitest` to `3.2.4` (matches the rest of the monorepo).
-- Three moderate advisories remain in the docs build chain (`astro <6.1.6` / `@astrojs/mdx` / `@astrojs/starlight`) — fix requires migrating Starlight from `0.33.x` to `0.38.x` along with `astro@^6`, which is a breaking content/sidebar change. Deferred — the docs site is a private workspace, the XSS advisory is for `define:vars` which our content does not use.
+- **docs** — closed the previously-deferred `astro <6.1.6` chain (`GHSA` define:vars `</script>` XSS, moderate). Bumped `astro` `^5.0.0 → ^6.1.6` (resolves to `6.2.2`) and `@astrojs/starlight` `^0.33.0 → ^0.38.0`; migrated `src/content.config.ts` to the `docsLoader()` API required by Starlight ≥ 0.34. `npm audit` in `docs/` now reports 0 vulnerabilities; site builds 33 pages on the new chain.
+- **@tuttiai/server** — closed CodeQL `js/path-injection` (high) on the studio static file route. `resolveSafe()` in [packages/server/src/routes/studio.ts](packages/server/src/routes/studio.ts) now rejects request paths containing `..` segments or NUL bytes before resolving (in addition to the existing post-resolve `startsWith(root)` bound). New traversal coverage in [packages/server/tests/studio.test.ts](packages/server/tests/studio.test.ts).
 
 ### New
 - **@tuttiai/server** — new realtime voice/audio surface gated behind `tutti-ai serve --realtime` (or `ServerConfig.realtime: true`).
