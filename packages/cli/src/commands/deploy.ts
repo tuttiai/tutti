@@ -525,7 +525,7 @@ async function dispatchSubcommand(
   if (manifest.target === "cloudflare") {
     fail(`${label} is not implemented for cloudflare yet.`);
   }
-  const target = manifest.target as CliDeployTarget;
+  const target: CliDeployTarget = manifest.target;
   const entry = SUBCOMMAND_DISPATCH[target];
   const argv = pick(entry);
   if (argv === null) {

@@ -25,7 +25,7 @@ export function createPostThreadTool(client: TwitterClient): Tool<z.infer<typeof
       try {
         const results = await client.api.v2.tweetThread(input.tweets);
         const ids = results.map((r) => r.data.id);
-        const rootUrl = ids.length > 0 ? tweetUrl(ids[0] as string) : "";
+        const rootUrl = ids.length > 0 ? tweetUrl(ids[0]) : "";
         return {
           content: `Posted thread of ${ids.length} tweets. IDs: ${ids.join(", ")}\nRoot: ${rootUrl}`,
         };

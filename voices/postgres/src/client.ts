@@ -55,11 +55,13 @@ export class PostgresClientWrapper {
     if (this.pool) return this.pool;
     if (this.initPromise) return this.initPromise;
 
-    this.initPromise = (async () => {
+    // Factory is synchronous, but we cache as a Promise so concurrent
+    // callers between the assignment and resolution share the same value.
+    this.initPromise = Promise.resolve().then(() => {
       const p = this.factory(this.poolConfig);
       this.pool = p;
       return p;
-    })();
+    });
 
     try {
       return await this.initPromise;

@@ -17,7 +17,7 @@ import { createSearchMessagesTool } from "./tools/search-messages.js";
 import { createGetWorkspaceInfoTool } from "./tools/get-workspace-info.js";
 
 /** Options for {@link SlackVoice}. */
-export interface SlackVoiceOptions extends SlackClientOptions {}
+export type SlackVoiceOptions = SlackClientOptions;
 
 /**
  * Gives agents the ability to read, post and moderate Slack messages

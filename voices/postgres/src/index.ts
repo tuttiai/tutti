@@ -14,7 +14,7 @@ import { createExplainTool } from "./tools/explain.js";
 import { createGetDatabaseInfoTool } from "./tools/get-database-info.js";
 
 /** Options for {@link PostgresVoice}. */
-export interface PostgresVoiceOptions extends PostgresClientOptions {}
+export type PostgresVoiceOptions = PostgresClientOptions;
 
 /**
  * Gives agents the ability to query and inspect a PostgreSQL database.

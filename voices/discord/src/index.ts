@@ -17,7 +17,7 @@ import { createSearchMessagesTool } from "./tools/search-messages.js";
 import { createGetGuildInfoTool } from "./tools/get-guild-info.js";
 
 /** Options for {@link DiscordVoice}. */
-export interface DiscordVoiceOptions extends DiscordClientOptions {}
+export type DiscordVoiceOptions = DiscordClientOptions;
 
 /**
  * Gives agents the ability to read, post and moderate Discord messages

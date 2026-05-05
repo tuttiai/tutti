@@ -117,8 +117,11 @@ export function useExecutionStream(): ExecutionState {
   useEffect(() => {
     const source = new EventSource("/studio/events");
     source.onmessage = (msg): void => {
+      // `MessageEvent.data` is `any` in the DOM lib; narrow before parsing.
+      const data: unknown = msg.data;
+      if (typeof data !== "string") return;
       try {
-        const event = JSON.parse(msg.data) as ExecutionEvent;
+        const event = JSON.parse(data) as ExecutionEvent;
         dispatch({ type: "event", event });
       } catch {
         // Malformed frame — ignore. Server only emits valid JSON.

@@ -168,11 +168,13 @@ export class SlackClientWrapper {
     if (this.client) return this.client;
     if (this.initPromise) return this.initPromise;
 
-    this.initPromise = (async () => {
+    // Factory is synchronous, but we cache as a Promise so concurrent
+    // callers between the assignment and resolution share the same value.
+    this.initPromise = Promise.resolve().then(() => {
       const c = this.factory(this.token);
       this.client = c;
       return c;
-    })();
+    });
 
     try {
       return await this.initPromise;
@@ -183,12 +185,13 @@ export class SlackClientWrapper {
     }
   }
 
-  async destroy(): Promise<void> {
+  destroy(): Promise<void> {
     // The Slack WebClient holds no long-lived sockets, so destroy is just
     // a cache clear. Kept for symmetry with the discord voice + the Voice
-    // teardown contract.
+    // teardown contract — hence the `Promise<void>` return.
     this.client = undefined;
     this.initPromise = undefined;
+    return Promise.resolve();
   }
 }
 

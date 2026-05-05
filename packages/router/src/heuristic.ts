@@ -22,12 +22,18 @@ const SIMPLE_KEYWORDS =
  */
 export class HeuristicClassifier implements Classifier {
   /**
-   * Pick a {@link Tier} for `req`.
+   * Pick a {@link Tier} for `req`. The decision is fully synchronous, but
+   * the public surface returns a `Promise` to satisfy the {@link Classifier}
+   * contract shared with async classifiers (e.g. {@link LLMClassifier}).
    *
    * @param req - The chat request being routed.
    * @param ctx - Routing-only context (policy, prior stop reason, destructive count).
    */
-  async classify(req: ChatRequest, ctx: ClassifierContext): Promise<Tier> {
+  classify(req: ChatRequest, ctx: ClassifierContext): Promise<Tier> {
+    return Promise.resolve(this.decide(req, ctx));
+  }
+
+  private decide(req: ChatRequest, ctx: ClassifierContext): Tier {
     const lastUser = [...req.messages].reverse().find((m) => m.role === "user")?.content ?? "";
     const text = typeof lastUser === "string" ? lastUser : JSON.stringify(lastUser);
     const charCount = text.length;

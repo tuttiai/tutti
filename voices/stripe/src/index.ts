@@ -33,7 +33,7 @@ import { createGetBalanceTool } from "./tools/get-balance.js";
 import { createListBalanceTransactionsTool } from "./tools/list-balance-transactions.js";
 
 /** Options for {@link StripeVoice}. */
-export interface StripeVoiceOptions extends StripeClientOptions {}
+export type StripeVoiceOptions = StripeClientOptions;
 
 /**
  * Gives agents broad access to a Stripe account: customers, products,

@@ -14,7 +14,7 @@ import { createGetTimelineTool } from "./tools/get-timeline.js";
  * Options for {@link TwitterVoice}. Omit any field to fall back to the
  * matching `TWITTER_*` environment variable.
  */
-export interface TwitterVoiceOptions extends TwitterClientOptions {}
+export type TwitterVoiceOptions = TwitterClientOptions;
 
 /**
  * Gives agents the ability to read, post, search and manage Twitter/X

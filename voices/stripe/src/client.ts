@@ -375,11 +375,13 @@ export class StripeClientWrapper {
     if (this.client) return this.client;
     if (this.initPromise) return this.initPromise;
 
-    this.initPromise = (async () => {
+    // Factory is synchronous, but we cache as a Promise so concurrent
+    // callers between the assignment and resolution share the same value.
+    this.initPromise = Promise.resolve().then(() => {
       const c = this.factory(this.apiKey);
       this.client = c;
       return c;
-    })();
+    });
 
     try {
       return await this.initPromise;
@@ -389,9 +391,12 @@ export class StripeClientWrapper {
     }
   }
 
-  async destroy(): Promise<void> {
+  destroy(): Promise<void> {
+    // No long-lived sockets — destroy is just a cache clear, but we return
+    // a `Promise<void>` for symmetry with the Voice teardown contract.
     this.client = undefined;
     this.initPromise = undefined;
+    return Promise.resolve();
   }
 }
 
