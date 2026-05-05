@@ -64,14 +64,15 @@ const SPARK_BARS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 export function sparkline(values: readonly number[]): string {
   if (values.length === 0) return "";
   const max = values.reduce((a, b) => (b > a ? b : a), 0);
-  if (max <= 0) return SPARK_BARS[0]!.repeat(values.length);
+  if (max <= 0) return SPARK_BARS[0].repeat(values.length);
   return values
     .map((v) => {
       const idx = Math.min(
         SPARK_BARS.length - 1,
         Math.max(0, Math.floor((v / max) * (SPARK_BARS.length - 1) + 0.5)),
       );
-      return SPARK_BARS[idx]!;
+      // eslint-disable-next-line security/detect-object-injection -- idx is clamped to [0, SPARK_BARS.length - 1]
+      return SPARK_BARS[idx];
     })
     .join("");
 }
@@ -101,6 +102,7 @@ export function bucketByDay(
     if (!Number.isFinite(t)) continue;
     if (t < start || t >= end) continue;
     const idx = Math.min(bucketCount - 1, Math.floor((t - start) / dayMs));
+    // eslint-disable-next-line security/detect-object-injection -- idx is clamped to [0, bucketCount - 1]
     buckets[idx] = (buckets[idx] ?? 0) + r.cost_usd;
   }
   return buckets;
@@ -558,7 +560,7 @@ function escapeCsv(value: string): string {
 export function parseLastWindow(input: string, now: Date = new Date()): Date | null {
   const match = /^(\d+)([dh])$/.exec(input.trim());
   if (!match) return null;
-  const n = Number.parseInt(match[1]!, 10);
+  const n = Number.parseInt(match[1], 10);
   if (!Number.isFinite(n) || n <= 0) return null;
   const unitMs = match[2] === "h" ? 3_600_000 : 86_400_000;
   return new Date(now.getTime() - n * unitMs);

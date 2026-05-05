@@ -146,18 +146,22 @@ export function registerCostRoutes(app: FastifyInstance, runtime: TuttiRuntime):
   app.get<{ Querystring: { agent_id?: string } }>("/cost/budgets", async (request, reply) => {
     const agentId = request.query.agent_id;
     const score = runtime.score;
-    const agents = score.agents as Record<string, { budget?: BudgetsResponse["budget"] }>;
+    // Use a Map for the lookup so untrusted query strings can't reach
+    // prototype keys (`__proto__`, `constructor`, etc.).
+    const agents = new Map<string, { budget?: BudgetsResponse["budget"] }>(
+      Object.entries(score.agents as Record<string, { budget?: BudgetsResponse["budget"] }>),
+    );
     // Without an explicit agent_id, surface every agent that has a
     // budget configured. This matches how the CLI's `budgets` command
     // renders an overview.
     if (agentId === undefined) {
       const out: BudgetsResponse[] = [];
-      for (const [name, agent] of Object.entries(agents)) {
+      for (const [name, agent] of agents) {
         out.push(await buildBudgetsResponse(runtime, name, agent.budget));
       }
       return { agents: out };
     }
-    const agent = agents[agentId];
+    const agent = agents.get(agentId);
     if (!agent) {
       return reply.code(404).send({
         error: "agent_not_found",
