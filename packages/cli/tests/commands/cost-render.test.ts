@@ -17,9 +17,11 @@ import {
   renderReportJson,
   renderReportText,
   renderTopRuns,
+  renderTopTools,
   sparkline,
   type AgentBudget,
   type CostRun,
+  type ToolsResponse,
 } from "../../src/commands/cost-render.js";
 
 chalk.level = 1;
@@ -210,6 +212,130 @@ describe("renderHints", () => {
     expect(out.split("\n")).toHaveLength(2);
     expect(out).toContain("first");
     expect(out).toContain("second");
+  });
+});
+
+describe("renderTopTools", () => {
+  it("always shows the live-window caveat at the top, even when empty", () => {
+    const out = stripAnsi(
+      renderTopTools({
+        window_started_at: "2026-05-05T12:00:00.000Z",
+        window_span_count: 0,
+        tools: [],
+      }),
+    );
+    expect(out).toContain("Live window: 0 spans collected since 2026-05-05T12:00");
+    expect(out).toContain("No tool calls in this window");
+  });
+
+  it("renders rows sorted by call count, truncated to limit", () => {
+    const out = stripAnsi(
+      renderTopTools(
+        {
+          window_started_at: "2026-05-05T00:00:00.000Z",
+          window_span_count: 100,
+          tools: [
+            { tool_name: "read_file", call_count: 30, total_llm_tokens: 30000, avg_llm_tokens_per_call: 1000 },
+            { tool_name: "write_file", call_count: 10, total_llm_tokens: 5000, avg_llm_tokens_per_call: 500 },
+            { tool_name: "search", call_count: 5, total_llm_tokens: 2500, avg_llm_tokens_per_call: 500 },
+          ],
+        },
+        2,
+      ),
+    );
+    expect(out).toContain("Live window:");
+    expect(out).toContain("read_file");
+    expect(out).toContain("write_file");
+    expect(out).not.toContain("search");
+  });
+});
+
+describe("buildHints — caching (live window)", () => {
+  const since = new Date("2026-04-29T00:00:00Z");
+  const tools: ToolsResponse = {
+    window_started_at: "2026-05-05T00:00:00.000Z",
+    window_span_count: 50,
+    tools: [
+      { tool_name: "read_file", call_count: 47, total_llm_tokens: 90000, avg_llm_tokens_per_call: 1900 },
+      { tool_name: "search", call_count: 3, total_llm_tokens: 9000, avg_llm_tokens_per_call: 3000 },
+    ],
+  };
+
+  it("fires when the most-used tool clears the threshold", () => {
+    const hints = buildHints({ runs: [], since, tools });
+    const cacheHint = hints.find((h) => h.id.startsWith("tool.frequent-calls."));
+    expect(cacheHint).toBeDefined();
+    expect(cacheHint?.id).toBe("tool.frequent-calls.read_file");
+    expect(cacheHint?.message).toContain("47 times");
+    expect(cacheHint?.message).toContain("cache");
+  });
+
+  it("does not fire when the top tool is below threshold", () => {
+    const sparseTools: ToolsResponse = {
+      ...tools,
+      tools: [{ tool_name: "x", call_count: 3, total_llm_tokens: 0, avg_llm_tokens_per_call: 0 }],
+    };
+    const hints = buildHints({ runs: [], since, tools: sparseTools });
+    expect(hints.filter((h) => h.id.startsWith("tool.frequent-calls."))).toHaveLength(0);
+  });
+});
+
+describe("buildHints — model: auto suggestion", () => {
+  const since = new Date("2026-04-29T00:00:00Z");
+  const cheapTools: ToolsResponse = {
+    window_started_at: "2026-05-05T00:00:00.000Z",
+    window_span_count: 50,
+    tools: [
+      { tool_name: "lookup", call_count: 30, total_llm_tokens: 6000, avg_llm_tokens_per_call: 200 },
+      { tool_name: "format", call_count: 20, total_llm_tokens: 4000, avg_llm_tokens_per_call: 200 },
+    ],
+  };
+  const expensiveTools: ToolsResponse = {
+    ...cheapTools,
+    tools: [
+      { tool_name: "summarise", call_count: 40, total_llm_tokens: 80000, avg_llm_tokens_per_call: 2000 },
+    ],
+  };
+
+  it("fires when most live tool calls are short and there is real cost", () => {
+    const hints = buildHints({
+      runs: [
+        {
+          run_id: "r1",
+          agent_name: "a",
+          started_at: "2026-05-01T00:00:00Z",
+          cost_usd: 0.5,
+          total_tokens: 1000,
+        },
+      ],
+      since,
+      tools: cheapTools,
+    });
+    const autoHint = hints.find((h) => h.id === "model.auto-suggestion");
+    expect(autoHint).toBeDefined();
+    expect(autoHint?.message).toContain("model: 'auto'");
+  });
+
+  it("does not fire when calls are heavy", () => {
+    const hints = buildHints({
+      runs: [
+        {
+          run_id: "r1",
+          agent_name: "a",
+          started_at: "2026-05-01T00:00:00Z",
+          cost_usd: 0.5,
+          total_tokens: 1000,
+        },
+      ],
+      since,
+      tools: expensiveTools,
+    });
+    expect(hints.filter((h) => h.id === "model.auto-suggestion")).toHaveLength(0);
+  });
+
+  it("does not fire when there is no cost data", () => {
+    const hints = buildHints({ runs: [], since, tools: cheapTools });
+    expect(hints.filter((h) => h.id === "model.auto-suggestion")).toHaveLength(0);
   });
 });
 

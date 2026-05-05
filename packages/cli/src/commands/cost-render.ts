@@ -19,6 +19,23 @@ export interface CostRun {
   total_tokens: number;
 }
 
+/** Wire shape of one row from `GET /cost/tools`. */
+export interface ToolUsage {
+  tool_name: string;
+  call_count: number;
+  total_llm_tokens: number;
+  avg_llm_tokens_per_call: number;
+}
+
+/** Wire shape of `GET /cost/tools`. */
+export interface ToolsResponse {
+  /** ISO-8601 timestamp of the earliest span in the live tracer window. */
+  window_started_at: string;
+  /** Total spans the live tracer is currently holding. */
+  window_span_count: number;
+  tools: ToolUsage[];
+}
+
 /** Wire shape of one row from `GET /cost/budgets`. */
 export interface AgentBudget {
   agent_id: string;
@@ -166,6 +183,9 @@ export interface HintInputs {
   until?: Date;
   /** Agent budgets to compare burn rate against. */
   budgets?: readonly AgentBudget[];
+  /** Tool-usage rows from the live tracer window. Optional — when absent
+   *  only the burn-rate hint can fire. */
+  tools?: ToolsResponse;
 }
 
 /** Plain-text optimisation hint surfaced in `analyze costs` output. */
@@ -184,7 +204,13 @@ export interface Hint {
  * Pure — no I/O. Tests feed mock inputs and assert on the resulting
  * hint list.
  */
-export function buildHints({ runs, since, until = new Date(), budgets = [] }: HintInputs): Hint[] {
+export function buildHints({
+  runs,
+  since,
+  until = new Date(),
+  budgets = [],
+  tools,
+}: HintInputs): Hint[] {
   const hints: Hint[] = [];
 
   const windowDays = Math.max(1, (until.getTime() - since.getTime()) / 86_400_000);
@@ -211,7 +237,81 @@ export function buildHints({ runs, since, until = new Date(), budgets = [] }: Hi
     });
   }
 
+  if (tools && tools.tools.length > 0) {
+    // Hint 1 — caching: surface tools called frequently in the live
+    // window. Fires on the most-used tool when its call_count clears the
+    // threshold; the user can then enable AgentCacheConfig.
+    const TOOL_CACHE_HINT_THRESHOLD = 10;
+    const top = tools.tools[0];
+    if (top && top.call_count >= TOOL_CACHE_HINT_THRESHOLD) {
+      hints.push({
+        id: "tool.frequent-calls." + top.tool_name,
+        message: `Tool "${top.tool_name}" was called ${top.call_count} times in the live tracer window (since ${tools.window_started_at.slice(0, 16)}). Repeated identical calls — consider enabling \`cache: { enabled: true }\` on the agent.`,
+      });
+    }
+
+    // Hint 2 — model: auto: when most live calls are short (low average
+    // tokens per LLM call) yet the run cost is non-trivial, suggest
+    // routing. Threshold mirrors the heuristic classifier's "small" tier
+    // boundary (~200 input tokens, ≤4 tools).
+    const MODEL_AUTO_TOKEN_THRESHOLD = 800;
+    const totalCalls = tools.tools.reduce((a, t) => a + t.call_count, 0);
+    const cheapCalls = tools.tools.filter(
+      (t) => t.avg_llm_tokens_per_call > 0 && t.avg_llm_tokens_per_call < MODEL_AUTO_TOKEN_THRESHOLD,
+    ).reduce((a, t) => a + t.call_count, 0);
+    if (totalCalls > 0 && cheapCalls / totalCalls >= 0.6 && totalCost > 0) {
+      const pct = Math.round((cheapCalls / totalCalls) * 100);
+      hints.push({
+        id: "model.auto-suggestion",
+        message: `${pct}% of recent tool-driven turns ran on small inputs (<${MODEL_AUTO_TOKEN_THRESHOLD} avg tokens/call). Consider \`model: 'auto'\` plus a SmartProvider so cheap turns route to a smaller tier.`,
+      });
+    }
+  }
+
   return hints;
+}
+
+/**
+ * Render the top-N tools by call count from the live tracer window.
+ *
+ * Always prefixes the table with a one-line caveat naming the window
+ * boundary (since-server-boot, span count). Without the caveat users
+ * read these numbers as authoritative all-time totals — they're not.
+ */
+export function renderTopTools(input: ToolsResponse, limit = 5): string {
+  const lines: string[] = [];
+  lines.push(
+    chalk.dim(
+      "  Live window: " +
+        input.window_span_count +
+        " spans collected since " +
+        input.window_started_at.slice(0, 16),
+    ),
+  );
+  if (input.tools.length === 0) {
+    lines.push(chalk.dim("  No tool calls in this window."));
+    return lines.join("\n");
+  }
+  lines.push(
+    chalk.dim(
+      "  " +
+        pad("TOOL", 24) +
+        pad("CALLS", 10) +
+        pad("AVG TOK/CALL", 16) +
+        "TOTAL TOKENS",
+    ),
+  );
+  lines.push(chalk.dim("  " + "─".repeat(70)));
+  for (const t of input.tools.slice(0, limit)) {
+    lines.push(
+      "  " +
+        chalk.bold(pad(t.tool_name, 24)) +
+        pad(String(t.call_count), 10) +
+        pad(formatTokens(Math.round(t.avg_llm_tokens_per_call)), 16) +
+        formatTokens(t.total_llm_tokens),
+    );
+  }
+  return lines.join("\n");
 }
 
 /** Render hints as a bulleted list, dimmed when empty. */
@@ -230,6 +330,10 @@ export function renderAnalyze(input: {
   since: Date;
   until?: Date;
   budgets?: readonly AgentBudget[];
+  /** Optional tool-usage data from `/cost/tools`. When provided, an
+   *  extra "Top tools" section renders, framed as a live tracer
+   *  window. */
+  tools?: ToolsResponse;
   agent_id?: string;
   store_missing?: boolean;
 }): string {
@@ -277,11 +381,18 @@ export function renderAnalyze(input: {
   const sorted = [...input.runs].sort((a, b) => b.cost_usd - a.cost_usd);
   lines.push(renderTopRuns(sorted, 10));
 
+  if (input.tools !== undefined) {
+    lines.push("");
+    lines.push(chalk.bold("Top tools (live window)"));
+    lines.push(renderTopTools(input.tools, 5));
+  }
+
   const hints = buildHints({
     runs: input.runs,
     since: input.since,
     ...(input.until !== undefined ? { until: input.until } : {}),
     budgets: input.budgets ?? [],
+    ...(input.tools !== undefined ? { tools: input.tools } : {}),
   });
   lines.push("");
   lines.push(chalk.bold("Hints"));

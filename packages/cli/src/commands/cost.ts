@@ -19,6 +19,7 @@ import {
   renderReportText,
   type AgentBudget,
   type CostRun,
+  type ToolsResponse,
 } from "./cost-render.js";
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:3847";
@@ -109,6 +110,24 @@ async function fetchRuns(
   return (await res.json()) as CostRunsBody;
 }
 
+async function fetchTools(
+  baseUrl: string,
+  opts: CostOptions,
+): Promise<ToolsResponse | undefined> {
+  const url = baseUrl.replace(/\/$/, "") + "/cost/tools";
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: resolveAuthHeader(opts) });
+  } catch {
+    // Live tracer data is best-effort — failure is non-fatal so the
+    // analyze command still runs (and the user still sees the
+    // persistent run-cost data plus hint #3).
+    return undefined;
+  }
+  if (!res.ok) return undefined;
+  return (await res.json()) as ToolsResponse;
+}
+
 async function fetchBudgets(
   baseUrl: string,
   opts: CostOptions,
@@ -154,16 +173,14 @@ export async function analyzeCostsCommand(opts: AnalyzeCostsOptions): Promise<vo
     ...(opts.agent !== undefined ? { agent: opts.agent } : {}),
     limit: 1000,
   });
-  const budgetsBody = await fetchBudgets(
-    baseUrl,
-    opts,
-    opts.agent,
-  );
+  const budgetsBody = await fetchBudgets(baseUrl, opts, opts.agent);
+  const tools = await fetchTools(baseUrl, opts);
   console.log(
     renderAnalyze({
       runs: runsBody.runs,
       since,
       budgets: budgetsBody.agents,
+      ...(tools !== undefined ? { tools } : {}),
       ...(opts.agent !== undefined ? { agent_id: opts.agent } : {}),
       store_missing: runsBody.store_missing,
     }),

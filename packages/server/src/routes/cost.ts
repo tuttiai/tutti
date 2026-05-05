@@ -11,8 +11,8 @@
  */
 
 import type { FastifyInstance } from "fastify";
-import type { TuttiRuntime } from "@tuttiai/core";
-import { getDailyCost, getMonthlyCost } from "@tuttiai/core";
+import type { TuttiRuntime, TuttiSpan } from "@tuttiai/core";
+import { getDailyCost, getMonthlyCost, getTuttiTracer } from "@tuttiai/core";
 
 interface RunCostRecordWire {
   run_id: string;
@@ -33,6 +33,29 @@ interface RunsResponse {
   /** `true` when the runtime has no store configured. */
   store_missing: boolean;
   runs: RunCostRecordWire[];
+}
+
+interface ToolUsageRow {
+  tool_name: string;
+  call_count: number;
+  /** Total prompt + completion tokens of the LLM calls in traces that
+   *  used this tool. Proxy for "how expensive are runs that use this
+   *  tool" — never authoritative per-tool. */
+  total_llm_tokens: number;
+  /** Average tokens-per-call (`total_llm_tokens / call_count`). */
+  avg_llm_tokens_per_call: number;
+}
+
+interface ToolsResponse {
+  /**
+   * Live-window framing — these counts come from the in-memory tracer's
+   * ring buffer, which is bounded (default 1000 spans) and lost on
+   * server restart. The CLI surfaces `window_started_at` so the
+   * caller knows what they're looking at.
+   */
+  window_started_at: string;
+  window_span_count: number;
+  tools: ToolUsageRow[];
 }
 
 interface BudgetsResponse {
@@ -114,6 +137,12 @@ export function registerCostRoutes(app: FastifyInstance, runtime: TuttiRuntime):
     },
   );
 
+  app.get("/cost/tools", () => {
+    const tracer = getTuttiTracer();
+    const allSpans = tracer.getAllSpans();
+    return aggregateToolUsage(allSpans);
+  });
+
   app.get<{ Querystring: { agent_id?: string } }>("/cost/budgets", async (request, reply) => {
     const agentId = request.query.agent_id;
     const score = runtime.score;
@@ -138,6 +167,64 @@ export function registerCostRoutes(app: FastifyInstance, runtime: TuttiRuntime):
     const single = await buildBudgetsResponse(runtime, agentId, agent.budget);
     return { agents: [single] };
   });
+}
+
+/**
+ * Aggregate `tool.call` spans into per-tool usage rows. Total LLM
+ * tokens are summed across `llm.completion` spans in every trace that
+ * also contains at least one call of the tool — this is a proxy for
+ * "how expensive are runs that use this tool", explicitly framed as
+ * such on the CLI side. Never claims authoritative per-tool cost.
+ *
+ * Exported so the CLI tests can drive the aggregation directly.
+ */
+export function aggregateToolUsage(spans: readonly TuttiSpan[]): ToolsResponse {
+  let earliest: Date | undefined;
+  // Index llm.completion tokens by trace_id for the proxy aggregation.
+  const tokensByTrace = new Map<string, number>();
+  // Group tool.call spans by tool_name, also remembering the trace ids
+  // they belong to so we can attribute trace tokens once per (tool, trace).
+  const toolTraces = new Map<string, { count: number; traceIds: Set<string> }>();
+
+  for (const s of spans) {
+    if (earliest === undefined || s.started_at < earliest) earliest = s.started_at;
+    if (s.name === "llm.completion") {
+      const total = s.attributes.total_tokens ?? 0;
+      tokensByTrace.set(s.trace_id, (tokensByTrace.get(s.trace_id) ?? 0) + total);
+      continue;
+    }
+    if (s.name === "tool.call") {
+      const name = s.attributes.tool_name;
+      if (typeof name !== "string" || name.length === 0) continue;
+      const entry = toolTraces.get(name) ?? { count: 0, traceIds: new Set<string>() };
+      entry.count += 1;
+      entry.traceIds.add(s.trace_id);
+      toolTraces.set(name, entry);
+    }
+  }
+
+  const tools: ToolUsageRow[] = [];
+  for (const [name, entry] of toolTraces) {
+    let totalTokens = 0;
+    for (const traceId of entry.traceIds) {
+      totalTokens += tokensByTrace.get(traceId) ?? 0;
+    }
+    const avg = entry.count > 0 ? totalTokens / entry.count : 0;
+    tools.push({
+      tool_name: name,
+      call_count: entry.count,
+      total_llm_tokens: totalTokens,
+      avg_llm_tokens_per_call: avg,
+    });
+  }
+  // Most-used first — the CLI's `analyze costs` table truncates to top 5.
+  tools.sort((a, b) => b.call_count - a.call_count);
+
+  return {
+    window_started_at: (earliest ?? new Date()).toISOString(),
+    window_span_count: spans.length,
+    tools,
+  };
 }
 
 async function buildBudgetsResponse(

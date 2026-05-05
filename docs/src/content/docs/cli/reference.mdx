@@ -619,9 +619,20 @@ Top runs by cost
   abc12345  evaluator         2026-05-04 14:22  12.3k     $0.4521
   ...
 
+Top tools (live window)
+  Live window: 247 spans collected since 2026-05-05T14:00
+  TOOL                    CALLS     AVG TOK/CALL    TOTAL TOKENS
+  ──────────────────────────────────────────────────────────────────────
+  read_file               47        1.0k            47.0k
+  search_repo             8         800             6.4k
+
 Hints
 • Agent "triage" is burning $0.1234/day on average — at this rate the monthly $5.00 cap will be hit in ~28.4 days.
+• Tool "read_file" was called 47 times in the live tracer window (since 2026-05-05T14:00). Repeated identical calls — consider enabling `cache: { enabled: true }` on the agent.
+• 78% of recent tool-driven turns ran on small inputs (<800 avg tokens/call). Consider `model: 'auto'` plus a SmartProvider so cheap turns route to a smaller tier.
 ```
+
+The "Top tools" section and the last two hints come from the in-memory tracer (`/cost/tools`), which is bounded to ~1000 spans and lost on server restart — the live-window line names the boundary so the numbers can't be misread as authoritative all-time totals. The "burning $X/day" hint comes from the persistent `RunCostStore` and is accurate over the full `--last` window.
 
 ### `tutti-ai report costs`
 

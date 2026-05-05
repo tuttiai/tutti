@@ -9,7 +9,11 @@
   - `tutti-ai report costs [--last 7d|30d] [--agent <id>] [--format text|json|csv]` — exportable cost report; CSV is suitable for spreadsheets and billing tools.
   - `tutti-ai budgets [--agent <id>]` — per-agent budget config and current daily/monthly spend with percentage-of-budget figures.
 - Sparkline is hand-rolled unicode (`▁▂▃▄▅▆▇█`); no new runtime dep.
-- Pure render helpers in `cost-render.ts` (mirrors `traces-render.ts` pattern) so formatting and hint logic stay unit-tested without HTTP. 29 new render tests.
+- Pure render helpers in `cost-render.ts` (mirrors `traces-render.ts` pattern) so formatting and hint logic stay unit-tested without HTTP. 36 render tests.
+- `analyze costs` now also surfaces a "Top tools (live window)" table when the server's `/cost/tools` route returns data, plus two extra optimisation hints driven by the same data:
+  - **Caching hint** — fires when a single tool was called ≥10 times in the live tracer window, suggesting `cache: { enabled: true }`.
+  - **`model: 'auto'` hint** — fires when ≥60% of recent tool-driven turns ran on small inputs (avg <800 tokens/call) yet the run cost is non-trivial, cross-promoting the SmartProvider routing path.
+  Both sections are explicitly framed as a **live window** ("X spans collected since &lt;timestamp&gt;") so users don't read these counts as authoritative all-time totals — they're bounded by the in-memory tracer ring buffer (default 1000 spans, lost on server restart).
 
 ## 0.20.0
 
