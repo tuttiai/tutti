@@ -32,6 +32,7 @@ export {
   getMonthlyCost,
   startOfUtcDay,
   startOfUtcMonth,
+  type RunCostQuery,
   type RunCostRecord,
   type RunCostStore,
 } from "./run-cost-store.js";

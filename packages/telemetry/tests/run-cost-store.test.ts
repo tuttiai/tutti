@@ -61,6 +61,67 @@ describe("InMemoryRunCostStore", () => {
     expect(total).toBeCloseTo(0.5, 10);
   });
 
+  it("list() returns matching records sorted desc by default", async () => {
+    const store = new InMemoryRunCostStore();
+    await store.record({
+      run_id: "old",
+      agent_name: "a",
+      started_at: new Date("2026-05-01T00:00:00Z"),
+      cost_usd: 0.1,
+      total_tokens: 100,
+    });
+    await store.record({
+      run_id: "new",
+      agent_name: "a",
+      started_at: new Date("2026-05-02T00:00:00Z"),
+      cost_usd: 0.2,
+      total_tokens: 200,
+    });
+    const rows = await store.list();
+    expect(rows.map((r) => r.run_id)).toEqual(["new", "old"]);
+  });
+
+  it("list() filters by since/until/agent_name and respects limit", async () => {
+    const store = new InMemoryRunCostStore();
+    await store.record({
+      run_id: "r1",
+      agent_name: "alpha",
+      started_at: new Date("2026-05-01T00:00:00Z"),
+      cost_usd: 0.1,
+      total_tokens: 100,
+    });
+    await store.record({
+      run_id: "r2",
+      agent_name: "beta",
+      started_at: new Date("2026-05-02T00:00:00Z"),
+      cost_usd: 0.2,
+      total_tokens: 200,
+    });
+    await store.record({
+      run_id: "r3",
+      agent_name: "alpha",
+      started_at: new Date("2026-05-03T00:00:00Z"),
+      cost_usd: 0.3,
+      total_tokens: 300,
+    });
+
+    const filtered = await store.list({ agent_name: "alpha" });
+    expect(filtered.map((r) => r.run_id)).toEqual(["r3", "r1"]);
+
+    const windowed = await store.list({
+      since: new Date("2026-05-02T00:00:00Z"),
+      until: new Date("2026-05-03T00:00:00Z"),
+    });
+    expect(windowed.map((r) => r.run_id)).toEqual(["r2"]);
+
+    const limited = await store.list({ limit: 1 });
+    expect(limited).toHaveLength(1);
+    expect(limited[0]?.run_id).toBe("r3");
+
+    const ascending = await store.list({ order: "asc" });
+    expect(ascending.map((r) => r.run_id)).toEqual(["r1", "r2", "r3"]);
+  });
+
   it("reset() drops every record", async () => {
     const store = new InMemoryRunCostStore();
     await store.record({

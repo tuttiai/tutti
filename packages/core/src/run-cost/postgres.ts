@@ -1,5 +1,5 @@
 import pg from "pg";
-import type { RunCostRecord, RunCostStore } from "@tuttiai/telemetry";
+import type { RunCostQuery, RunCostRecord, RunCostStore } from "@tuttiai/telemetry";
 import { logger } from "../logger.js";
 
 const { Pool } = pg;
@@ -103,6 +103,54 @@ export class PostgresRunCostStore implements RunCostStore {
     const raw = rows[0]?.total ?? "0";
     const n = Number(raw);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  async list(query: RunCostQuery = {}): Promise<RunCostRecord[]> {
+    await this.ensureSchema();
+    // Build the WHERE clause dynamically while keeping every value
+    // parameterised — `$N` placeholders only, no string interpolation.
+    const params: unknown[] = [];
+    const where: string[] = [];
+    if (query.since !== undefined) {
+      params.push(query.since);
+      where.push("started_at >= $" + params.length);
+    }
+    if (query.until !== undefined) {
+      params.push(query.until);
+      where.push("started_at < $" + params.length);
+    }
+    if (query.agent_name !== undefined) {
+      params.push(query.agent_name);
+      where.push("agent_name = $" + params.length);
+    }
+    const whereSql = where.length > 0 ? " WHERE " + where.join(" AND ") : "";
+    const orderSql = (query.order ?? "desc") === "asc" ? " ASC" : " DESC";
+    let limitSql = "";
+    if (query.limit !== undefined) {
+      params.push(Math.max(0, query.limit));
+      limitSql = " LIMIT $" + params.length;
+    }
+    const sql =
+      "SELECT run_id, agent_name, started_at, cost_usd::text AS cost_usd, total_tokens FROM " +
+      this.table +
+      whereSql +
+      " ORDER BY started_at" +
+      orderSql +
+      limitSql;
+    const { rows } = await this.pool.query<{
+      run_id: string;
+      agent_name: string;
+      started_at: Date;
+      cost_usd: string;
+      total_tokens: string | number;
+    }>(sql, params);
+    return rows.map((r) => ({
+      run_id: r.run_id,
+      agent_name: r.agent_name,
+      started_at: r.started_at,
+      cost_usd: Number(r.cost_usd),
+      total_tokens: typeof r.total_tokens === "string" ? Number(r.total_tokens) : r.total_tokens,
+    }));
   }
 
   /** Release the underlying pool. Call on shutdown. */

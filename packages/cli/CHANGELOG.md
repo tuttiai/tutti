@@ -1,5 +1,16 @@
 # @tuttiai/cli
 
+## [Unreleased]
+
+### Minor Changes
+
+- New cost-analysis commands that talk to a running `tutti-ai serve` process:
+  - `tutti-ai analyze costs [--last 7d|<N>h] [--agent <id>]` — top runs by cost, daily-spend unicode sparkline, and burn-rate optimisation hints (compares daily average against each agent's `max_cost_usd_per_month`).
+  - `tutti-ai report costs [--last 7d|30d] [--agent <id>] [--format text|json|csv]` — exportable cost report; CSV is suitable for spreadsheets and billing tools.
+  - `tutti-ai budgets [--agent <id>]` — per-agent budget config and current daily/monthly spend with percentage-of-budget figures.
+- Sparkline is hand-rolled unicode (`▁▂▃▄▅▆▇█`); no new runtime dep.
+- Pure render helpers in `cost-render.ts` (mirrors `traces-render.ts` pattern) so formatting and hint logic stay unit-tested without HTTP. 29 new render tests.
+
 ## 0.20.0
 
 ### Minor Changes
