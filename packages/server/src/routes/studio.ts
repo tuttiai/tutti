@@ -1,4 +1,4 @@
-import { createReadStream, statSync } from "node:fs";
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -91,6 +91,15 @@ async function sendFile(reply: FastifyReply, file: string): Promise<FastifyReply
 export function registerStudioRoute(app: FastifyInstance, distDir: string): void {
   const root = resolve(distDir);
   const indexFile = join(root, "index.html");
+
+  // Fail fast at server start if the SPA bundle is missing — every studio
+  // request would otherwise 500 once it falls through to `sendFile(indexFile)`.
+  if (!existsSync(indexFile)) {
+    throw new Error(
+      `Studio dist directory is missing index.html: ${indexFile}. ` +
+        `Build @tuttiai/studio (npm -w @tuttiai/studio run build) or unset studio_dist_dir.`,
+    );
+  }
 
   const handler = async (
     request: FastifyRequest<{ Params: { "*"?: string } }>,
