@@ -1,0 +1,278 @@
+---
+title: "Inbox — Inbound Messaging"
+description: "Wire Telegram (and future Slack/Discord) inbound messages to a Tutti agent with @tuttiai/inbox"
+sidebar:
+  order: 11
+---
+
+`@tuttiai/inbox` turns a Tutti agent into something users can actually message — Telegram in v0.25.0, with Slack/Discord/Twitter to follow. It's a thin orchestrator on top of platform adapters: every adapter dispatches inbound messages to one score-defined agent, the agent's reply is shipped back through the same adapter, and the orchestrator applies allow-list, rate-limit, queue, and error policy uniformly.
+
+## Quick start (Telegram)
+
+```bash
+npm install @tuttiai/inbox
+npx tutti-ai add telegram
+```
+
+In your score:
+
+```ts
+import { TelegramVoice } from "@tuttiai/telegram";
+import { defineScore } from "@tuttiai/core";
+
+export default defineScore({
+  agents: {
+    support: {
+      name: "support",
+      system_prompt: "You are a Telegram support agent.",
+      voices: [new TelegramVoice()],
+      permissions: ["network"],
+    },
+  },
+  inbox: {
+    agent: "support",
+    adapters: [{ platform: "telegram" }],
+  },
+});
+```
+
+Then run:
+
+```bash
+TELEGRAM_BOT_TOKEN=… npx tutti-ai inbox start
+```
+
+The CLI loads your score, builds adapters from `score.inbox.adapters`, constructs a `TuttiInbox`, and runs until Ctrl+C. Each adapter logs a "connected" line on start and `inbox:*` events stream through the runtime's event bus throughout the run.
+
+## Platforms shipped
+
+The platform integration model in Tutti is **a platform = a voice**. Each voice owns a token-keyed shared client wrapper (`*ClientWrapper.forToken(token)`); the inbox's per-platform adapter consumes that wrapper. A score that uses a voice for outbound tools AND the inbox adapter for inbound on the same token ends up with one platform connection — Discord's Gateway API rejects two simultaneous bot sessions per token, so this is a correctness requirement.
+
+| Platform | Adapter | Voice it consumes | Tokens |
+|---|---|---|---|
+| Telegram | `TelegramInboxAdapter` | `@tuttiai/telegram` | `TELEGRAM_BOT_TOKEN` |
+| Slack | `SlackInboxAdapter` | `@tuttiai/slack` | `SLACK_BOT_TOKEN` (`xoxb-…`) + `SLACK_APP_TOKEN` (`xapp-…` for Socket Mode) |
+| Discord | `DiscordInboxAdapter` | `@tuttiai/discord` | `DISCORD_BOT_TOKEN` |
+| Email | `EmailInboxAdapter` | `@tuttiai/email` | `TUTTI_EMAIL_PASSWORD` (or `TUTTI_EMAIL_IMAP_PASSWORD` + `TUTTI_EMAIL_SMTP_PASSWORD`) |
+| WhatsApp | `WhatsAppInboxAdapter` | `@tuttiai/whatsapp` | `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET` |
+
+Twitter follows once its voice's shared client lands.
+
+### Slack (Socket Mode)
+
+Slack's inbox uses [@slack/socket-mode](https://www.npmjs.com/package/@slack/socket-mode) — no public webhook required. You'll need an app with Socket Mode enabled, the `connections:write` scope on the app-level token, and the usual bot scopes (`chat:write`, `channels:history`, …) on the bot token. See the [@tuttiai/slack docs](/voices/slack/) for setup steps.
+
+```ts
+inbox: {
+  agent: "support",
+  adapters: [{ platform: "slack" }],  // tokens come from env
+}
+```
+
+### Discord
+
+Discord uses the bot Gateway you already configured for the `@tuttiai/discord` voice. The wrapper opens one Gateway session per token, regardless of whether the voice, the inbox adapter, or both are active. The voice's default intents now include `DirectMessages` so DM-flow inbox use works out of the box.
+
+```ts
+inbox: {
+  agent: "support",
+  adapters: [{ platform: "discord" }],  // token comes from DISCORD_BOT_TOKEN
+}
+```
+
+### WhatsApp (Cloud API webhook)
+
+WhatsApp is the first webhook-based adapter. Inbound goes through Meta's Cloud API which POSTs to a public HTTPS endpoint your server hosts. The voice spins up its own Fastify server (default port 3848) hosting `GET /webhook` (verify) and `POST /webhook` (signed inbound). **Operationally, you must run a tunnel:**
+
+```bash
+cloudflared tunnel --url http://localhost:3848
+# or:
+ngrok http 3848
+# or run a proper reverse proxy (nginx, Caddy) in front of port 3848.
+```
+
+Then configure Meta App → WhatsApp → Configuration:
+
+- Callback URL: `https://<your-tunnel>/webhook`
+- Verify token: matches `WHATSAPP_VERIFY_TOKEN`
+- Subscribe to the `messages` field.
+
+```ts
+inbox: {
+  agent: "support",
+  adapters: [{
+    platform: "whatsapp",
+    phoneNumberId: "1234567890",  // from Meta App dashboard
+    // Optional:
+    // port: 3848, host: "0.0.0.0", graphApiVersion: "v21.0",
+    // bodyLimit: 5 * 1024 * 1024, inboxRedactRawText: true,
+  }],
+}
+```
+
+Three secrets resolve from env: `WHATSAPP_ACCESS_TOKEN` (System User token), `WHATSAPP_VERIFY_TOKEN` (random string), `WHATSAPP_APP_SECRET` (Meta App Secret — used to verify HMAC-SHA256 signatures on inbound).
+
+**24h customer-service window**: WhatsApp only allows free-form replies within 24h of the user's last inbound. Outside that window, only pre-approved Message Templates work. The voice's `send_text_message` surfaces error 131047 with a clear hint pointing at `send_template_message` (which sends pre-approved templates). Group chats and outbound media are not supported on the Cloud API for two-way bots in v0.25.
+
+### Email (IMAP IDLE + SMTP)
+
+Email is the trickiest of the four. Inbound goes through IMAP IDLE — server-pushed, no polling — and outbound through SMTP. The adapter handles RFC 5322 threading automatically: it caches the inbound `Message-ID`, `References` chain, sender and subject keyed by the inbound chat_id (which is the Message-ID itself), and the orchestrator's reply gets `In-Reply-To` + extended `References` so Gmail / Outlook / Apple Mail thread the conversation. Subject is also concatenated into the agent's input as `Subject: …\\n\\n<body>` so the agent sees it as conversation context.
+
+```ts
+inbox: {
+  agent: "support",
+  adapters: [{
+    platform: "email",
+    imap: { host: "imap.example.com", port: 993, user: "bot@example.com" },
+    smtp: { host: "smtp.example.com", port: 587, user: "bot@example.com" },
+    from: "Tutti Bot <bot@example.com>",
+    // Optional:
+    // maxBodyChars: 1_000_000,         // drop oversized inbound (default 1 MB)
+    // inboxRedactRawText: false,       // disable SecretsManager.redact on input (default on)
+  }],
+}
+```
+
+Set `TUTTI_EMAIL_PASSWORD` (shared) or `TUTTI_EMAIL_IMAP_PASSWORD` + `TUTTI_EMAIL_SMTP_PASSWORD` (per-side). For Gmail / Outlook with 2FA, use an [app-specific password](https://support.google.com/accounts/answer/185833).
+
+## All five adapters at once
+
+Wire every platform into a single inbox so an agent can be reached on whichever channel its users prefer:
+
+```ts
+import { defineScore } from "@tuttiai/core";
+import { TelegramVoice } from "@tuttiai/telegram";
+import { SlackVoice } from "@tuttiai/slack";
+import { DiscordVoice } from "@tuttiai/discord";
+import { EmailVoice } from "@tuttiai/email";
+import { WhatsAppVoice } from "@tuttiai/whatsapp";
+
+const EMAIL_CONN = {
+  imap: { host: "imap.example.com", port: 993, user: "bot@example.com" },
+  smtp: { host: "smtp.example.com", port: 587, user: "bot@example.com" },
+  from: "Tutti Bot <bot@example.com>",
+} as const;
+
+const WHATSAPP_PHONE_NUMBER_ID = "1234567890";
+
+export default defineScore({
+  agents: {
+    support: {
+      name: "support",
+      system_prompt:
+        "You are a customer-support agent. You receive inbound messages from Telegram, Slack, Discord, email and WhatsApp; reply briefly and politely on the same channel.",
+      voices: [
+        new TelegramVoice(),
+        new SlackVoice(),
+        new DiscordVoice(),
+        new EmailVoice(EMAIL_CONN),
+        new WhatsAppVoice({ phoneNumberId: WHATSAPP_PHONE_NUMBER_ID }),
+      ],
+      permissions: ["network"],
+    },
+  },
+  inbox: {
+    agent: "support",
+    adapters: [
+      { platform: "telegram" },
+      { platform: "slack" },
+      { platform: "discord" },
+      { platform: "email", ...EMAIL_CONN },
+      { platform: "whatsapp", phoneNumberId: WHATSAPP_PHONE_NUMBER_ID },
+    ],
+    rateLimit: { messagesPerWindow: 60, windowMs: 60_000, burst: 20 },
+    maxQueuePerChat: 10,
+  },
+});
+```
+
+Set the env vars for whichever channels you wired up:
+
+```bash
+export TELEGRAM_BOT_TOKEN=…
+export SLACK_BOT_TOKEN=xoxb-…
+export SLACK_APP_TOKEN=xapp-…
+export DISCORD_BOT_TOKEN=…
+export TUTTI_EMAIL_PASSWORD=…       # shared across IMAP + SMTP, or use the per-side vars
+export WHATSAPP_ACCESS_TOKEN=…       # System User token from Meta Business
+export WHATSAPP_VERIFY_TOKEN=…       # any random string; matches Meta App webhook config
+export WHATSAPP_APP_SECRET=…         # Meta App → Settings → Basic → App Secret
+
+# WhatsApp needs a tunnel. Run this in another terminal BEFORE starting the inbox:
+cloudflared tunnel --url http://localhost:3848
+
+tutti-ai inbox start
+```
+
+## Safety, by default
+
+| Surface | Default | Why |
+|---|---|---|
+| Per-user rate limit | 30 msg / 60 s, burst 10 | A public bot endpoint is a DoS surface. Don't burn the agent budget on a spammer. |
+| Per-chat serial queue | depth 10 | Reply for message N must ship before message N+1 runs. Excess depth is dropped, not buffered indefinitely. |
+| Allow-list | off (every sender accepted) | Off-by-default. Set `inbox.allowedUsers.telegram` to lock down. |
+| `inbox:message_received` | text length only | The message text is **not** in the event — subscribe to the adapter directly if you need it. Prevents accidental PII leakage into traces. |
+
+Errors at any stage emit `inbox:error` (with a `SecretsManager`-redacted message) and call the optional `onError` callback. The inbox itself never crashes — adapters keep listening.
+
+## Score-level configuration
+
+```ts
+inbox: {
+  agent: "support",
+  adapters: [{ platform: "telegram" }],
+
+  // Lock down: only these Telegram user ids may message the bot.
+  allowedUsers: { telegram: ["123456789", "987654321"] },
+
+  // Override the default rate limit.
+  rateLimit: { messagesPerWindow: 60, windowMs: 60_000, burst: 20 },
+
+  // Or disable rate limiting entirely (only for trusted private bots).
+  // rateLimit: { disabled: true },
+
+  // Override the per-chat queue cap.
+  maxQueuePerChat: 25,
+}
+```
+
+## Events
+
+The orchestrator emits four typed events on `runtime.events`:
+
+- `inbox:message_received` — passed allow-list + rate-limit + queue, about to dispatch. Carries `text_length` rather than the message body.
+- `inbox:message_replied` — agent run completed and reply handed to the adapter for delivery. Includes `duration_ms` and `session_id`.
+- `inbox:message_blocked` — dropped before dispatch. `reason` is `"not_allowlisted"`, `"rate_limited"`, `"queue_full"` or `"empty_text"`.
+- `inbox:error` — caught error at any stage. The inbox keeps running.
+
+## Identity & cross-platform sessions
+
+Identity is keyed as `${platform}:${platform_user_id}`. The default `InMemoryIdentityStore` is a union-find — `link("telegram:42", "slack:U7")` makes both sides resolve to the same Tutti session, so a user who connects on Telegram and later authenticates on Slack sees one continuous conversation regardless of where the next message arrives. Swap in a Postgres- or Redis-backed store for multi-process deployments.
+
+## Optional peer dependencies
+
+`@tuttiai/inbox` declares each platform voice as an **optional `peerDependency`**:
+
+```jsonc
+"peerDependenciesMeta": {
+  "@tuttiai/telegram": { "optional": true },
+  "@tuttiai/slack":    { "optional": true },
+  "@tuttiai/discord":  { "optional": true },
+  "@tuttiai/twitter":  { "optional": true }
+}
+```
+
+Each adapter dynamic-imports its voice and surfaces a friendly "install `@tuttiai/<platform>`" error when the peer is missing. Telegram-only deployments don't ship a Discord SDK.
+
+## Roadmap
+
+| Platform | Status |
+|---|---|
+| Telegram | **Shipped** (v0.25.0) |
+| Slack | **Shipped** (v0.25.0) |
+| Discord | **Shipped** (v0.25.0) |
+| Email | **Shipped** (v0.25.0) — IMAP IDLE + SMTP with RFC 5322 threading |
+| WhatsApp | **Shipped** (v0.25.0) — Meta Cloud API with HMAC-signed webhooks; requires a public tunnel |
+| Twitter | Planned once a `voices/twitter` shared client lands. |
+
+See [`@tuttiai/inbox` README](https://github.com/tuttiai/tutti/blob/main/packages/inbox/README.md) for the full API.
