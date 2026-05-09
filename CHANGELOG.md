@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Breaking
+- **@tuttiai/types / @tuttiai/core** — `AgentConfig.semantic_memory` moved to `AgentConfig.memory.semantic`. Score files using the old top-level `semantic_memory` field must rename it. The `AgentMemoryConfig` shape itself is unchanged at its core (`enabled`, `max_memories`, `inject_system`); see "New" below for the additional fields.
+
+### New
+- **@tuttiai/core** — agent-curated semantic memory. `remember` / `recall` / `forget` are exposed to the model itself (alongside the existing system-prompt injection) when `agent.memory.semantic.curated_tools !== false`. Both surfaces route through a shared `MemoryEnforcer` so per-agent cap, true-LRU eviction, and `memory:*` events fire exactly once per logical operation. Agent-written entries carry `source: "agent"` so consumers can distinguish them from system writes.
+- **@tuttiai/core** — `MemoryEnforcer`, `createMemoryHelpers`, `createMemoryTools`, `DEFAULT_MAX_ENTRIES_PER_AGENT` exported from the package entry point. The factory accepts either a pre-built enforcer (used by the runtime to share state with `ToolContext.memory`) or a `{ store, agentName, ... }` config (for embedding in custom orchestration).
+- **@tuttiai/types** — `MemoryEntry` gains `source?: "agent" | "system"`, `tags?: string[]`, and `last_accessed_at?: Date`. `SemanticMemoryStore` gains `listByAgent()` and `touch()` methods to support the LRU eviction path; `search()` accepts an optional `{ source, tags }` filter and updates `last_accessed_at` on hits.
+- **@tuttiai/types** — `AgentMemoryConfig` gains `curated_tools?: boolean` (default `true`), `max_entries_per_agent?: number` (default `1000`), and `store?: SemanticMemoryStore` for per-agent store overrides.
+- **@tuttiai/types** — `ToolMemoryHelpers.remember` now returns `{ id }` and accepts a `ToolRememberOptions` bag (`{ source, tags, metadata }`) alongside the legacy metadata-only call form.
+- **@tuttiai/types** — three new event variants: `memory:write`, `memory:read`, and `memory:delete` (with `reason: "explicit" | "lru_eviction"`). Both the curated agent tools and `ToolContext.memory` helpers emit them.
+- **examples/curated-memory.ts** — two-turn example showing the agent storing a user preference via `remember` and the next session picking it up via system-prompt injection.
+
 ## v0.24.0 — Production Ship: Deploy, Studio, Realtime, Cost Optimisation
 
 The four-headline release that takes Tutti from "great in dev" to "ready in prod":
