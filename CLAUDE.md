@@ -36,6 +36,7 @@ packages/cli/        @tuttiai/cli        Binary: tutti-ai
 packages/server/     @tuttiai/server     HTTP server: REST API + SSE streaming
 packages/router/     @tuttiai/router     Smart model router (heuristic + LLM classifier)
 packages/telemetry/  @tuttiai/telemetry  OpenTelemetry tracer, cost estimation, exporters
+packages/inbox/      @tuttiai/inbox      Inbound messaging orchestrator — dispatches platform messages to agents
 packages/tutti-ai/   tutti-ai            Thin wrapper re-exporting the CLI binary
 voices/filesystem/   @tuttiai/filesystem 7 file system tools
 voices/github/       @tuttiai/github     10 GitHub API tools
@@ -48,6 +49,9 @@ voices/discord/      @tuttiai/discord    11 Discord tools (messages, channels, m
 voices/postgres/     @tuttiai/postgres   8 Postgres tools (query/execute + introspection)
 voices/stripe/       @tuttiai/stripe     27 Stripe API tools (customers, payments, subs, invoices, balance)
 voices/twitter/      @tuttiai/twitter    9 Twitter / X tools (tweets, threads, mentions, timeline)
+voices/telegram/     @tuttiai/telegram   Telegram tools (send, edit, delete, react) + shared bot client for @tuttiai/inbox
+voices/email/        @tuttiai/email      Email tools (send, reply, list_inbox) + IMAP IDLE / SMTP shared client for @tuttiai/inbox
+voices/whatsapp/     @tuttiai/whatsapp   WhatsApp Cloud API tools (send_text, send_template) + signed-webhook listener for @tuttiai/inbox
 voices/rag/          @tuttiai/rag        4 RAG tools (ingest, search, list sources, delete source)
 docs/                                    Astro Starlight documentation site
 ```
@@ -211,6 +215,7 @@ Every rule in this section blocks PR merge if violated.
 | `packages/types` | 100% | 100% | — |
 | `packages/core` | 85% | 85% | 75% |
 | `packages/cli` | 70% | 70% | — |
+| `packages/inbox` | 85% | 85% | 75% |
 | `voices/*` | 80% | 80% | 70% |
 
 ### Test categories (ALL required before merge)
@@ -384,7 +389,7 @@ async run(agent_name: string, input: string, session_id?: string): Promise<Agent
 | `chore` | Build, deps, CI config |
 | `ci` | CI pipeline changes |
 
-Scopes: `core`, `cli`, `types`, `server`, `router`, `telemetry`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `voice/slack`, `voice/discord`, `voice/postgres`, `voice/stripe`, `voice/twitter`, `voice/rag`, `voice/web`, `voice/sandbox`, `docs`, `ci`.
+Scopes: `core`, `cli`, `types`, `server`, `router`, `telemetry`, `inbox`, `voice/filesystem`, `voice/github`, `voice/playwright`, `voice/mcp`, `voice/slack`, `voice/discord`, `voice/postgres`, `voice/stripe`, `voice/twitter`, `voice/telegram`, `voice/email`, `voice/whatsapp`, `voice/rag`, `voice/web`, `voice/sandbox`, `docs`, `ci`.
 
 ### PR checklist (ALL must pass before merge)
 
