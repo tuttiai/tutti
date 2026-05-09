@@ -78,6 +78,7 @@ import {
   deployRollbackCommand,
   type DeployOptions,
 } from "./commands/deploy.js";
+import { inboxStartCommand } from "./commands/inbox.js";
 
 const program = new Command();
 
@@ -655,6 +656,17 @@ deployCmd
   .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
   .action(async (opts: { score?: string }) => {
     await deployRollbackCommand(opts);
+  });
+
+const inboxCmd = program
+  .command("inbox")
+  .description("Inbound messaging — dispatch platform messages (Telegram, ...) to a score-defined agent");
+
+inboxCmd
+  .command("start [score]")
+  .description("Start the inbox: connect every adapter declared in score.inbox.adapters and run until Ctrl+C")
+  .action(async (score: string | undefined) => {
+    await inboxStartCommand(score);
   });
 
 program.parse();
