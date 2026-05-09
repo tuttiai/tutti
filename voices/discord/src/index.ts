@@ -73,4 +73,5 @@ export type {
   DiscordGuildChannelLike,
   DiscordGuildMemberLike,
   ClientFactory,
+  DiscordMessageHandler,
 } from "./client.js";
