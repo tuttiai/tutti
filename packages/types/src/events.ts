@@ -98,6 +98,39 @@ export type TuttiEvent =
       from_model: string;
       to_model: string;
       error: string;
+    }
+  /**
+   * Emitted whenever a semantic memory entry is written, read, or
+   * deleted — whether through the curated `remember` / `recall` /
+   * `forget` agent tools or via {@link ToolMemoryHelpers} from
+   * user-defined tool code. Both surfaces share the same enforcement
+   * pipeline, so subscribers see one event stream.
+   *
+   * `memory:write` — `entry_id` is the new id; `source` is `"agent"`
+   *   for curated-tool writes, `"system"` for everything else.
+   * `memory:read` — `result_count` is the number of entries returned
+   *   (0 for misses).
+   * `memory:delete` — fires for explicit `forget` calls and for
+   *   automatic LRU eviction. `reason` discriminates them.
+   */
+  | {
+      type: "memory:write";
+      agent_name: string;
+      entry_id: string;
+      source: "agent" | "system";
+      tags?: string[];
+    }
+  | {
+      type: "memory:read";
+      agent_name: string;
+      query: string;
+      result_count: number;
+    }
+  | {
+      type: "memory:delete";
+      agent_name: string;
+      entry_id: string;
+      reason: "explicit" | "lru_eviction";
     };
 
 export type TuttiEventType = TuttiEvent["type"];
