@@ -28,6 +28,12 @@ import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
+import {
+  MemoryEnforcer,
+  createMemoryHelpers,
+  createMemoryTools,
+  DEFAULT_MAX_ENTRIES_PER_AGENT,
+} from "./memory/curated.js";
 import { createUserMemoryStore } from "./memory/user/index.js";
 import type {
   AgentRunOptions,
@@ -574,6 +580,32 @@ export class AgentRunner {
         allTools.push(this.createHitlTool(agent.name, session.id));
       }
 
+      // Resolve the semantic memory config + store once per run. Both
+      // the system-prompt injection (later in this method) and the
+      // ToolContext.memory helpers / curated agent tools route through
+      // the same `MemoryEnforcer`, so per-agent cap, LRU eviction, and
+      // memory:* events fire exactly once per logical operation.
+      //
+      // The curated tools are NOT a Voice — voices declare permissions
+      // and have setup/teardown hooks that don't apply to in-process
+      // memory. They are appended directly to `allTools` here.
+      const semanticCfg = agent.memory?.semantic;
+      const semanticStore: SemanticMemoryStore | undefined = semanticCfg?.enabled
+        ? (semanticCfg.store ?? this.semanticMemory)
+        : undefined;
+      const memoryEnforcer =
+        semanticCfg?.enabled && semanticStore
+          ? new MemoryEnforcer(
+              semanticStore,
+              agent.name,
+              semanticCfg.max_entries_per_agent ?? DEFAULT_MAX_ENTRIES_PER_AGENT,
+              this.events,
+            )
+          : undefined;
+      if (memoryEnforcer && semanticCfg?.curated_tools !== false) {
+        allTools.push(...createMemoryTools({ enforcer: memoryEnforcer }));
+      }
+
       const toolDefs = allTools.map(toolToDefinition);
       // Counted once per run — neither voices nor HITL toggle mid-loop.
       // Threaded into the router ALS scope so emitted decisions can
@@ -787,14 +819,16 @@ export class AgentRunner {
           turn: turns,
         });
 
-        // Inject semantic memories into system prompt if enabled
+        // Inject semantic memories into system prompt if enabled.
+        // Uses the per-agent-resolved store so a custom
+        // `agent.memory.semantic.store` is honoured here too.
         let systemPrompt = baseSystemPrompt;
-        const memCfg = agent.semantic_memory;
-        if (memCfg?.enabled && this.semanticMemory) {
+        const memCfg = semanticCfg;
+        if (memCfg?.enabled && semanticStore) {
           const maxMemories = memCfg.max_memories ?? 5;
           const injectSystem = memCfg.inject_system !== false;
           if (injectSystem) {
-            const memories = await this.semanticMemory.search(
+            const memories = await semanticStore.search(
               input,
               agent.name,
               maxMemories,
@@ -806,6 +840,14 @@ export class AgentRunner {
               systemPrompt +=
                 "\n\nRelevant context from previous sessions:\n" +
                 memoryBlock;
+              // When the curated tools are also active, hint that the
+              // model may call them to extend or correct this context.
+              if (memCfg.curated_tools !== false) {
+                systemPrompt +=
+                  "\n\nUse the `remember` tool when the user shares something worth keeping. " +
+                  "Use `recall` to look things up. " +
+                  "Use `forget` to remove an entry the user retracts.";
+              }
             }
           }
         }
@@ -1045,22 +1087,13 @@ export class AgentRunner {
           };
         }
 
-        // Attach memory helpers if semantic memory is enabled
-        if (memCfg?.enabled && this.semanticMemory) {
-          const sm = this.semanticMemory;
-          const agentName = agent.name;
-          toolContext.memory = {
-            remember: async (content, metadata = {}) => {
-              await sm.add({ agent_name: agentName, content, metadata });
-            },
-            recall: async (query, limit) => {
-              const entries = await sm.search(query, agentName, limit);
-              return entries.map((e) => ({ id: e.id, content: e.content }));
-            },
-            forget: async (id) => {
-              await sm.delete(id);
-            },
-          };
+        // Attach memory helpers if semantic memory is enabled. Both
+        // `ctx.memory` (for user-defined tool code) and the curated
+        // `remember` / `recall` / `forget` agent tools route through
+        // the same `MemoryEnforcer`, so cap, LRU eviction, and
+        // `memory:*` events fire exactly once per logical operation.
+        if (memoryEnforcer) {
+          toolContext.memory = createMemoryHelpers(memoryEnforcer);
         }
 
         const toolResults: ToolResultBlock[] = await Promise.all(

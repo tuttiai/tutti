@@ -126,7 +126,18 @@ export { EventBus } from "./event-bus.js";
 export { InMemorySessionStore } from "./session-store.js";
 export { PostgresSessionStore } from "./memory/postgres.js";
 export { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
-export type { MemoryEntry, SemanticMemoryStore } from "./memory/semantic.js";
+export type {
+  MemoryEntry,
+  SemanticMemoryStore,
+  SemanticSearchOptions,
+} from "./memory/semantic.js";
+export {
+  MemoryEnforcer,
+  createMemoryHelpers,
+  createMemoryTools,
+  DEFAULT_MAX_ENTRIES_PER_AGENT,
+  type CuratedMemoryOptions,
+} from "./memory/curated.js";
 export {
   DEFAULT_MAX_MEMORIES_PER_USER,
   MemoryUserMemoryStore,
