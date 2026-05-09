@@ -1,0 +1,51 @@
+{
+  "name": "@tuttiai/inbox",
+  "version": "0.1.0",
+  "description": "Inbound messaging orchestrator for Tutti — dispatches Telegram, Slack, Discord and email messages to score-defined agents",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.9.0",
+    "@tuttiai/telegram": ">=0.1.0",
+    "@tuttiai/slack": ">=0.1.0",
+    "@tuttiai/discord": ">=0.1.0",
+    "@tuttiai/email": ">=0.1.0",
+    "@tuttiai/whatsapp": ">=0.1.0",
+    "@tuttiai/twitter": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@tuttiai/telegram": { "optional": true },
+    "@tuttiai/slack": { "optional": true },
+    "@tuttiai/discord": { "optional": true },
+    "@tuttiai/email": { "optional": true },
+    "@tuttiai/whatsapp": { "optional": true },
+    "@tuttiai/twitter": { "optional": true }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "packages/inbox"
+  },
+  "homepage": "https://tutti-ai.com",
+  "keywords": ["tutti", "ai", "agents", "inbox", "telegram", "slack", "discord", "email", "imap", "messaging"]
+}
