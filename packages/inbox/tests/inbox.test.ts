@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EventBus } from "@tuttiai/core";
 import type { TuttiEvent, AgentResult } from "@tuttiai/types";
 import { TuttiInbox } from "../src/inbox.js";

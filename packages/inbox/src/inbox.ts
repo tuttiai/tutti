@@ -102,24 +102,25 @@ export class TuttiInbox {
   }
 
   /** Filter, rate-limit, and enqueue. Called by adapters via the handler. */
-  private async onInbound(msg: InboxMessage): Promise<void> {
+  private onInbound(msg: InboxMessage): Promise<void> {
     if (msg.text.length === 0) {
       this.emitBlocked(msg, "empty_text");
-      return;
+      return Promise.resolve();
     }
     const allow = this.allowedUsers[msg.platform];
     if (allow && !allow.has(msg.platform_user_id)) {
       this.emitBlocked(msg, "not_allowlisted");
-      return;
+      return Promise.resolve();
     }
     if (!this.rateLimit.allow(`${msg.platform}:${msg.platform_user_id}`)) {
       this.emitBlocked(msg, "rate_limited");
-      return;
+      return Promise.resolve();
     }
     const queueKey = `${msg.platform}:${msg.platform_chat_id}`;
     if (!this.queue.enqueue(queueKey, msg)) {
       this.emitBlocked(msg, "queue_full");
     }
+    return Promise.resolve();
   }
 
   /** Per-chat serial worker. Runs the agent and ships the reply. */
