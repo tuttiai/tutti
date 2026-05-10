@@ -1693,7 +1693,7 @@ function toolToDefinition(tool: Tool): ToolDefinition {
   return {
     name: tool.name,
     description: tool.description,
-    input_schema: jsonSchema as Record<string, unknown>,
+    input_schema: jsonSchema,
   };
 }
 

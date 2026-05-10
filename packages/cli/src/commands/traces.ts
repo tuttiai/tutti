@@ -226,9 +226,9 @@ export async function tracesTailCommand(opts: TracesTailOptions): Promise<void> 
 function reviveSpanDates(span: TuttiSpan): TuttiSpan {
   return {
     ...span,
-    started_at: new Date(span.started_at as unknown as string),
+    started_at: new Date(span.started_at),
     ...(span.ended_at !== undefined
-      ? { ended_at: new Date(span.ended_at as unknown as string) }
+      ? { ended_at: new Date(span.ended_at) }
       : {}),
   };
 }

@@ -24,10 +24,7 @@ export interface PostgresPoolLike {
 export type PoolFactory = (config: PoolConfig) => PostgresPoolLike;
 
 function defaultFactory(config: PoolConfig): PostgresPoolLike {
-  // The real pg.Pool is structurally compatible with the narrow methods
-  // we declare above. Cast through `unknown` once at this boundary so
-  // tools never see the wider Pool surface.
-  return new Pool(config) as unknown as PostgresPoolLike;
+  return new Pool(config);
 }
 
 const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;

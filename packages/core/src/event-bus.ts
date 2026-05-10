@@ -28,7 +28,7 @@ export class EventBus {
     type: T,
     handler: (event: Extract<TuttiEvent, { type: T }>) => void,
   ): void {
-    this.listeners.get(type)?.delete(handler as Handler);
+    this.listeners.get(type)?.delete(handler);
   }
 
   emit(event: TuttiEvent): void {

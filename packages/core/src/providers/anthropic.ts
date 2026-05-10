@@ -40,7 +40,7 @@ export class AnthropicProvider implements LLMProvider {
         system: request.system ?? "",
         messages: request.messages.map((msg) => ({
           role: msg.role,
-          content: msg.content as Anthropic.MessageCreateParams["messages"][number]["content"],
+          content: msg.content,
         })),
         tools: request.tools?.map((tool) => ({
           name: tool.name,
@@ -102,7 +102,7 @@ export class AnthropicProvider implements LLMProvider {
         system: request.system ?? "",
         messages: request.messages.map((msg) => ({
           role: msg.role,
-          content: msg.content as Anthropic.MessageCreateParams["messages"][number]["content"],
+          content: msg.content,
         })),
         tools: request.tools?.map((tool) => ({
           name: tool.name,

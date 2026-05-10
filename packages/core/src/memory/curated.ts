@@ -237,7 +237,7 @@ function normaliseRememberOptions(
   // absence of any options-bag key — if so, treat the whole value as
   // metadata. New callers pass `{ source, tags, metadata }`.
   if ("source" in raw || "tags" in raw || "metadata" in raw) {
-    return raw as ToolRememberOptions;
+    return raw;
   }
   return { metadata: raw as Record<string, unknown> };
 }

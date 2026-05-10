@@ -99,7 +99,7 @@ export class McpVoice implements Voice {
     return mcpTools.map((mcpTool) => {
       const raw = mcpTool.inputSchema;
       const schema = jsonSchemaToZod(
-        typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {},
+        typeof raw === "object" && raw !== null ? raw : {},
       );
 
       return {
