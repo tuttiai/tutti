@@ -102,3 +102,21 @@ tutti-ai run triage "Catch me up on #support since yesterday"
 ```
 
 With a HITL-enabled runtime, any `post_message` / `delete_message` / `send_dm` call pauses for human approval before execution.
+
+## Inbound (inbox)
+
+The same `SlackClientWrapper` powers [`@tuttiai/inbox`](/guides/inbox/)'s Slack adapter. Inbound messages arrive over [Socket Mode](https://api.slack.com/authentication/socket-mode) — no public webhook required. Two distinct tokens are needed:
+
+- **Bot user OAuth token** (`xoxb-…`) — `SLACK_BOT_TOKEN`. Used for outbound `chat.postMessage` and as the cache key for the shared wrapper.
+- **App-level token** (`xapp-…`) — `SLACK_APP_TOKEN`. Created at <https://api.slack.com/apps/{your-app}/general> with the `connections:write` scope. Used only for the Socket Mode connection.
+
+In your Slack app's settings, enable **Socket Mode** and subscribe the bot to the events you want — `message.channels` and `message.im` cover the most common cases.
+
+```ts
+inbox: {
+  agent: "support",
+  adapters: [{ platform: "slack" }],  // tokens come from env
+}
+```
+
+The wrapper filters out `bot_id` events and any message with a non-default `subtype` (edits, channel-joins, …) before dispatch, so handlers only see fresh, human-authored messages. The voice's outbound WebClient and the inbox's Socket Mode connection share a single wrapper instance via `SlackClientWrapper.forToken(botToken, factory?, { appToken })` — pay-for-what-you-use without duplicate auth plumbing.

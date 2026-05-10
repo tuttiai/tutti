@@ -9,7 +9,8 @@ import type {
   SlackTeamLike,
   SlackUserLike,
 } from "../src/client.js";
-import { SlackClientWrapper } from "../src/client.js";
+import { SlackClientWrapper, createSlackClient } from "../src/client.js";
+import type { SlackEventEnvelope, SlackEventLike } from "../src/socket-mode.js";
 import { createPostMessageTool } from "../src/tools/post-message.js";
 import { createUpdateMessageTool } from "../src/tools/update-message.js";
 import { createDeleteMessageTool } from "../src/tools/delete-message.js";
@@ -108,6 +109,9 @@ function readyClient(
 let env: ReturnType<typeof readyClient>;
 
 beforeEach(() => {
+  // Reset the token-keyed cache so SlackVoice instances created in
+  // separate tests with the same token don't share a cached wrapper.
+  SlackClientWrapper.cache.clear();
   env = readyClient();
 });
 
@@ -226,6 +230,225 @@ describe("SlackClientWrapper", () => {
     const wrapper = new SlackClientWrapper("xoxb-t", factory);
     await wrapper.destroy();
     expect(factory).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token-keyed cache + ref counting (forToken)
+// ---------------------------------------------------------------------------
+
+describe("SlackClientWrapper.forToken", () => {
+  it("returns the same instance for the same token across callers", () => {
+    const a = SlackClientWrapper.forToken("xoxb-shared", () => makeMockClient());
+    const b = SlackClientWrapper.forToken("xoxb-shared", () => makeMockClient());
+    expect(a).toBe(b);
+    expect(a._refCount).toBe(2);
+  });
+
+  it("returns distinct instances for different tokens", () => {
+    const a = SlackClientWrapper.forToken("xoxb-A", () => makeMockClient());
+    const b = SlackClientWrapper.forToken("xoxb-B", () => makeMockClient());
+    expect(a).not.toBe(b);
+    expect(a._refCount).toBe(1);
+    expect(b._refCount).toBe(1);
+  });
+
+  it("only releases the cached instance after the last destroy", async () => {
+    const factory = vi.fn(() => makeMockClient());
+    const a = SlackClientWrapper.forToken("xoxb-rc", factory);
+    const b = SlackClientWrapper.forToken("xoxb-rc", factory);
+    await a.getClient();
+    expect(factory).toHaveBeenCalledTimes(1);
+    await a.destroy();
+    expect(SlackClientWrapper.cache.has("xoxb-rc")).toBe(true);
+    await b.destroy();
+    expect(SlackClientWrapper.cache.has("xoxb-rc")).toBe(false);
+  });
+
+  it("createSlackClient deduplicates by token", () => {
+    const factory = () => makeMockClient();
+    const c1 = createSlackClient({ token: "xoxb-shared", clientFactory: factory });
+    const c2 = createSlackClient({ token: "xoxb-shared", clientFactory: factory });
+    if (c1.kind !== "ready" || c2.kind !== "ready") throw new Error("expected ready");
+    expect(c1.wrapper).toBe(c2.wrapper);
+  });
+
+  it("standalone wrapper is independent of the cache", () => {
+    const a = SlackClientWrapper.forToken("xoxb-standalone-1", () => makeMockClient());
+    const b = new SlackClientWrapper("xoxb-standalone-1", () => makeMockClient());
+    expect(a).not.toBe(b);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Socket Mode + subscribeMessage — inbound dispatch for @tuttiai/inbox
+// ---------------------------------------------------------------------------
+
+interface MockSocket {
+  on: ReturnType<typeof vi.fn>;
+  start: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+  emit: (envelope: SlackEventEnvelope) => Promise<void>;
+}
+
+function makeMockSocket(): MockSocket {
+  let listener: ((env: SlackEventEnvelope) => void | Promise<void>) | undefined;
+  const on = vi.fn(
+    (event: "slack_event", l: (env: SlackEventEnvelope) => void | Promise<void>) => {
+      if (event === "slack_event") listener = l;
+    },
+  );
+  const socket: MockSocket = {
+    on: on,
+    start: vi.fn(async () => undefined),
+    disconnect: vi.fn(async () => undefined),
+    emit: async (env) => {
+      if (!listener) throw new Error("no slack_event listener registered");
+      await listener(env);
+    },
+  };
+  return socket;
+}
+
+function makeEnvelope(event: Partial<SlackEventLike>): SlackEventEnvelope {
+  return {
+    envelope_id: "env-1",
+    body: {
+      type: "events_api",
+      team_id: "T1",
+      event: { type: "message", ts: "1700000000.001", ...event } as SlackEventLike,
+    },
+    ack: vi.fn(async () => undefined),
+  };
+}
+
+describe("SlackClientWrapper.subscribeMessage (Socket Mode)", () => {
+  it("throws when subscribing without an appToken", () => {
+    const wrapper = SlackClientWrapper.forToken("xoxb-no-app", () => makeMockClient());
+    expect(() => wrapper.subscribeMessage(vi.fn())).toThrow(/appToken/);
+  });
+
+  it("lazy-launches the socket on first subscription and installs a single dispatcher", async () => {
+    const socket = makeMockSocket();
+    const wrapper = SlackClientWrapper.forToken(
+      "xoxb-A",
+      () => makeMockClient(),
+      { appToken: "xapp-A", socketModeFactory: () => socket },
+    );
+    expect(socket.start).not.toHaveBeenCalled();
+    wrapper.subscribeMessage(vi.fn());
+    wrapper.subscribeMessage(vi.fn());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(socket.start).toHaveBeenCalledTimes(1);
+    expect(socket.on).toHaveBeenCalledTimes(1);
+    expect(wrapper._socketStarted).toBe(true);
+  });
+
+  it("dispatches non-bot, no-subtype message events to subscribers", async () => {
+    const socket = makeMockSocket();
+    const wrapper = SlackClientWrapper.forToken(
+      "xoxb-B",
+      () => makeMockClient(),
+      { appToken: "xapp-B", socketModeFactory: () => socket },
+    );
+    const handler = vi.fn();
+    wrapper.subscribeMessage(handler);
+    await wrapper.launch();
+    await socket.emit(makeEnvelope({ user: "U1", channel: "C1", text: "hello" }));
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0]?.[0].text).toBe("hello");
+  });
+
+  it("filters out bot_id messages (loop guard)", async () => {
+    const socket = makeMockSocket();
+    const wrapper = SlackClientWrapper.forToken(
+      "xoxb-C",
+      () => makeMockClient(),
+      { appToken: "xapp-C", socketModeFactory: () => socket },
+    );
+    const handler = vi.fn();
+    wrapper.subscribeMessage(handler);
+    await wrapper.launch();
+    await socket.emit(makeEnvelope({ bot_id: "B1", channel: "C1", text: "from bot" }));
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("filters out non-default subtypes (edits, joins, …)", async () => {
+    const socket = makeMockSocket();
+    const wrapper = SlackClientWrapper.forToken(
+      "xoxb-D",
+      () => makeMockClient(),
+      { appToken: "xapp-D", socketModeFactory: () => socket },
+    );
+    const handler = vi.fn();
+    wrapper.subscribeMessage(handler);
+    await wrapper.launch();
+    await socket.emit(makeEnvelope({ user: "U1", channel: "C1", text: "edit", subtype: "message_changed" }));
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("ack()s every envelope before dispatch", async () => {
+    const socket = makeMockSocket();
+    const wrapper = SlackClientWrapper.forToken(
+      "xoxb-E",
+      () => makeMockClient(),
+      { appToken: "xapp-E", socketModeFactory: () => socket },
+    );
+    wrapper.subscribeMessage(vi.fn());
+    await wrapper.launch();
+    const env = makeEnvelope({ user: "U1", channel: "C1", text: "hi" });
+    await socket.emit(env);
+    expect(env.ack).toHaveBeenCalledTimes(1);
+  });
+
+  it("a thrown handler does not stop other handlers", async () => {
+    const socket = makeMockSocket();
+    const wrapper = SlackClientWrapper.forToken(
+      "xoxb-F",
+      () => makeMockClient(),
+      { appToken: "xapp-F", socketModeFactory: () => socket },
+    );
+    const a = vi.fn(() => {
+      throw new Error("boom");
+    });
+    const b = vi.fn();
+    wrapper.subscribeMessage(a);
+    wrapper.subscribeMessage(b);
+    await wrapper.launch();
+    await socket.emit(makeEnvelope({ user: "U1", channel: "C1", text: "x" }));
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(1);
+  });
+
+  it("destroy disconnects the socket on the last release and stops dispatch", async () => {
+    const socket = makeMockSocket();
+    const a = SlackClientWrapper.forToken(
+      "xoxb-G",
+      () => makeMockClient(),
+      { appToken: "xapp-G", socketModeFactory: () => socket },
+    );
+    const b = SlackClientWrapper.forToken("xoxb-G", () => makeMockClient());
+    expect(a).toBe(b);
+    a.subscribeMessage(vi.fn());
+    await a.launch();
+    await a.destroy();
+    expect(socket.disconnect).not.toHaveBeenCalled();
+    await b.destroy();
+    expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    expect(SlackClientWrapper.cache.has("xoxb-G")).toBe(false);
+  });
+
+  it("appToken supplied on a later forToken call promotes the cached wrapper", () => {
+    const factory = () => makeMockClient();
+    const a = SlackClientWrapper.forToken("xoxb-H", factory);
+    expect(() => a.subscribeMessage(vi.fn())).toThrow(/appToken/);
+    SlackClientWrapper.forToken("xoxb-H", factory, {
+      appToken: "xapp-H",
+      socketModeFactory: () => makeMockSocket(),
+    });
+    // Same instance — but now Socket-Mode-ready.
+    expect(() => a.subscribeMessage(vi.fn())).not.toThrow();
   });
 });
 

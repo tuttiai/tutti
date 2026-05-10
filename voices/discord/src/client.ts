@@ -87,7 +87,25 @@ export interface DiscordClientLike {
   users: { fetch(id: string): Promise<DiscordUserLike> };
   destroy(): Promise<void> | void;
   login(token: string): Promise<string>;
+  /**
+   * Subscribe to gateway events. Only `messageCreate` is part of the
+   * narrow surface the wrapper itself drives; tools that need other
+   * events should reach for the underlying client via tests / direct
+   * use rather than expanding this interface.
+   */
+  on(
+    event: "messageCreate",
+    handler: (message: DiscordMessageLike) => void | Promise<void>,
+  ): void;
 }
+
+/**
+ * Handler invoked by {@link DiscordClientWrapper.subscribeMessage} for
+ * every non-bot inbound `messageCreate` event. Bots' own messages and
+ * messages from other bots are filtered out before the handler is
+ * called — handlers don't need to re-implement the loop guard.
+ */
+export type DiscordMessageHandler = (msg: DiscordMessageLike) => void | Promise<void>;
 
 /** Async factory used by DiscordClientWrapper; swappable in tests. */
 export type ClientFactory = () => DiscordClientLike;
@@ -97,6 +115,10 @@ const DEFAULT_INTENTS = [
   GatewayIntentBits.GuildMessages,
   GatewayIntentBits.GuildMembers,
   GatewayIntentBits.MessageContent,
+  // Required for inbound DMs via @tuttiai/inbox. Existing outbound
+  // tools (post_message, send_dm, …) work without this intent, so it's
+  // additive — no breaking change for upgraders.
+  GatewayIntentBits.DirectMessages,
 ];
 
 function defaultFactory(): DiscordClientLike {
@@ -114,10 +136,53 @@ function defaultFactory(): DiscordClientLike {
  * until the first tool call; subsequent calls share the same logged-in
  * Client. Safe to call {@link getClient} concurrently — concurrent calls
  * await the same in-flight login promise.
+ *
+ * Construction modes:
+ * - {@link forToken} (preferred) — token-keyed shared instance with
+ *   reference counting. Discord's Gateway API does not allow two
+ *   simultaneous sessions per bot token, so two callers using the
+ *   same token (e.g. `voices/discord` for outbound tools and
+ *   `@tuttiai/inbox` for the inbound adapter) MUST share a single
+ *   wrapper or one of them will be forcibly disconnected. {@link destroy}
+ *   only closes the gateway connection once the last holder releases.
+ * - `new DiscordClientWrapper(token)` — standalone (not cached). Useful
+ *   for tests and one-off scripts. {@link destroy} closes immediately.
  */
 export class DiscordClientWrapper {
+  /** Token-keyed cache of shared wrappers. Exposed for tests. */
+  static readonly cache = new Map<string, DiscordClientWrapper>();
+
   private client?: DiscordClientLike;
   private loginPromise?: Promise<DiscordClientLike>;
+  private cacheKey?: string;
+  private refCount = 0;
+  private destroyed = false;
+  private readonly subscribers = new Set<DiscordMessageHandler>();
+  private dispatcherInstalled = false;
+  private dispatcherInstallPromise?: Promise<void>;
+
+  /**
+   * Get-or-create a shared, ref-counted wrapper for the given token.
+   * Subsequent calls with the same token return the same instance and
+   * bump the ref-count; the underlying gateway connection is only
+   * closed when {@link destroy} has been called once per `forToken`
+   * call.
+   */
+  static forToken(
+    token: string,
+    factory: ClientFactory = defaultFactory,
+  ): DiscordClientWrapper {
+    const existing = this.cache.get(token);
+    if (existing) {
+      existing.refCount += 1;
+      return existing;
+    }
+    const wrapper = new DiscordClientWrapper(token, factory);
+    wrapper.cacheKey = token;
+    wrapper.refCount = 1;
+    this.cache.set(token, wrapper);
+    return wrapper;
+  }
 
   constructor(
     private readonly token: string,
@@ -145,11 +210,99 @@ export class DiscordClientWrapper {
   }
 
   async destroy(): Promise<void> {
+    if (this.destroyed) return;
+    if (this.cacheKey !== undefined) {
+      this.refCount -= 1;
+      if (this.refCount > 0) return;
+      DiscordClientWrapper.cache.delete(this.cacheKey);
+    }
+    this.destroyed = true;
+    this.subscribers.clear();
     if (this.client) {
       await this.client.destroy();
       this.client = undefined;
       this.loginPromise = undefined;
+      this.dispatcherInstalled = false;
+      this.dispatcherInstallPromise = undefined;
     }
+  }
+
+  /**
+   * Subscribe to inbound `messageCreate` events. The wrapper installs
+   * a single `messageCreate` listener on the underlying Client the
+   * first time anyone subscribes — discord.js has no `off()`-by-name
+   * surface that we use here, so subscriber management lives in the
+   * wrapper. Messages from any bot (including this one) are filtered
+   * out before the handler is invoked, matching the standard Discord
+   * loop-prevention pattern.
+   *
+   * Eagerly triggers login so subscribers don't have to remember to
+   * call {@link getClient} first. The returned function unsubscribes
+   * the handler; the listener stays installed on the underlying Client
+   * for the wrapper's lifetime, since discord.js doesn't expose a
+   * stable handler-removal path for arrow-function dispatchers.
+   *
+   * Subscription itself returns synchronously — fire-and-forget. To
+   * await the dispatcher being installed on the Client (e.g. before
+   * sending a message that would otherwise echo back), call
+   * {@link whenSubscribed} after subscribing.
+   */
+  subscribeMessage(handler: DiscordMessageHandler): () => void {
+    this.subscribers.add(handler);
+    void this.installDispatcher();
+    return () => {
+      this.subscribers.delete(handler);
+    };
+  }
+
+  /**
+   * Resolves once the `messageCreate` dispatcher has been installed on
+   * the underlying Client. Callers that need a live subscription
+   * before proceeding (the inbox adapter is the canonical example)
+   * should await this after their first {@link subscribeMessage} call.
+   * Resolves immediately when the dispatcher is already installed or
+   * when no subscription has been triggered yet.
+   */
+  whenSubscribed(): Promise<void> {
+    if (this.dispatcherInstalled) return Promise.resolve();
+    return this.dispatcherInstallPromise ?? Promise.resolve();
+  }
+
+  private installDispatcher(): Promise<void> {
+    if (this.dispatcherInstalled) return Promise.resolve();
+    if (this.dispatcherInstallPromise) return this.dispatcherInstallPromise;
+    this.dispatcherInstallPromise = (async () => {
+      const client = await this.getClient();
+      if (this.dispatcherInstalled) return;
+      client.on("messageCreate", (msg) => this.dispatchMessage(msg));
+      this.dispatcherInstalled = true;
+    })();
+    return this.dispatcherInstallPromise.catch((err) => {
+      this.dispatcherInstallPromise = undefined;
+      throw err;
+    });
+  }
+
+  private async dispatchMessage(msg: DiscordMessageLike): Promise<void> {
+    // Loop guard — never dispatch messages from the bot itself or any
+    // other bot. This is the standard Discord pattern; without it, the
+    // bot's own replies would fan back through the inbox handler.
+    if (msg.author.bot) return;
+    // Snapshot subscribers — handlers may unsubscribe themselves.
+    for (const handler of [...this.subscribers]) {
+      try {
+        await handler(msg);
+      } catch {
+        // Wrapper is not the place for error reporting — the inbox
+        // orchestrator emits typed inbox:error events on its handler's
+        // throws. Swallow here to keep the dispatcher loop intact.
+      }
+    }
+  }
+
+  /** For tests and diagnostics — current shared-cache ref count. */
+  get _refCount(): number {
+    return this.refCount;
   }
 }
 
@@ -188,6 +341,6 @@ export function createDiscordClient(options: DiscordClientOptions = {}): Discord
 
   return {
     kind: "ready",
-    wrapper: new DiscordClientWrapper(token, options.clientFactory),
+    wrapper: DiscordClientWrapper.forToken(token, options.clientFactory),
   };
 }

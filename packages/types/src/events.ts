@@ -131,6 +131,72 @@ export type TuttiEvent =
       agent_name: string;
       entry_id: string;
       reason: "explicit" | "lru_eviction";
+    }
+  /**
+   * Emitted by `@tuttiai/inbox` when an inbound message arrives from a
+   * platform adapter (Telegram, Slack, Discord, ...) and has passed
+   * allow-list and rate-limit checks. The `agent_name` is the inbox's
+   * configured handler agent. `platform_chat_id` is the platform's
+   * chat/channel/thread id; `platform_user_id` is the platform's user
+   * id. `text_length` is in characters, not tokens — the message text
+   * itself is intentionally NOT included to avoid PII leakage into
+   * logs and telemetry; subscribe to the adapter directly if you need
+   * the raw text.
+   */
+  | {
+      type: "inbox:message_received";
+      agent_name: string;
+      platform: string;
+      platform_user_id: string;
+      platform_chat_id: string;
+      text_length: number;
+    }
+  /**
+   * Emitted after a successful agent run originated from an inbox
+   * message and the reply has been handed back to the adapter for
+   * delivery. `duration_ms` measures the full agent run, not the
+   * adapter delivery latency. `session_id` is the Tutti session that
+   * handled the message; consumers can correlate this with
+   * `agent:start`/`agent:end` events.
+   */
+  | {
+      type: "inbox:message_replied";
+      agent_name: string;
+      platform: string;
+      platform_chat_id: string;
+      session_id: string;
+      duration_ms: number;
+    }
+  /**
+   * Emitted when an inbound message is dropped before reaching the
+   * agent. `reason` discriminates: `"not_allowlisted"` (sender not in
+   * `allowedUsers`), `"rate_limited"` (token-bucket exhausted for the
+   * sender), `"queue_full"` (per-chat queue at capacity), or
+   * `"empty_text"` (no text content to dispatch — attachments-only
+   * messages are dropped in v0.25 and re-enabled when adapter support
+   * lands).
+   */
+  | {
+      type: "inbox:message_blocked";
+      platform: string;
+      platform_user_id: string;
+      platform_chat_id: string;
+      reason: "not_allowlisted" | "rate_limited" | "queue_full" | "empty_text";
+    }
+  /**
+   * Emitted when the inbox or one of its adapters caught an error
+   * processing an inbound message. Errors do NOT crash the inbox —
+   * subscribers should treat this as observability, not control flow.
+   * `error_message` is redacted via SecretsManager before emission.
+   */
+  | {
+      type: "inbox:error";
+      platform: string;
+      /** Optional — absent if the error was raised before the message was parsed. */
+      platform_chat_id?: string;
+      /** Stage at which the error occurred. */
+      stage: "receive" | "dispatch" | "reply";
+      error_message: string;
     };
 
 export type TuttiEventType = TuttiEvent["type"];

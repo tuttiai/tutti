@@ -9,7 +9,7 @@ import type {
   DiscordTextChannelLike,
   DiscordUserLike,
 } from "../src/client.js";
-import { DiscordClientWrapper } from "../src/client.js";
+import { DiscordClientWrapper, createDiscordClient } from "../src/client.js";
 import { createPostMessageTool } from "../src/tools/post-message.js";
 import { createEditMessageTool } from "../src/tools/edit-message.js";
 import { createDeleteMessageTool } from "../src/tools/delete-message.js";
@@ -93,15 +93,31 @@ interface MockClient extends DiscordClientLike {
   users: { fetch: ReturnType<typeof vi.fn> };
   destroy: ReturnType<typeof vi.fn>;
   login: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+  /** Test helper — synthesise an inbound messageCreate event. */
+  emitMessage: (msg: DiscordMessageLike) => Promise<void>;
 }
 
 function makeMockClient(): MockClient {
+  let messageHandler:
+    | ((msg: DiscordMessageLike) => void | Promise<void>)
+    | undefined;
+  const on = vi.fn(
+    (event: "messageCreate", handler: (msg: DiscordMessageLike) => void | Promise<void>) => {
+      if (event === "messageCreate") messageHandler = handler;
+    },
+  );
   return {
     channels: { fetch: vi.fn() },
     guilds: { fetch: vi.fn() },
     users: { fetch: vi.fn() },
     destroy: vi.fn(async () => undefined),
     login: vi.fn(async () => "token"),
+    on: on as unknown as MockClient["on"],
+    emitMessage: async (msg: DiscordMessageLike) => {
+      if (!messageHandler) throw new Error("no messageCreate handler registered");
+      await messageHandler(msg);
+    },
   };
 }
 
@@ -116,6 +132,9 @@ function readyClient(
 let env: ReturnType<typeof readyClient>;
 
 beforeEach(() => {
+  // Reset the token-keyed cache so DiscordVoice instances created in
+  // separate tests with the same token don't share a cached wrapper.
+  DiscordClientWrapper.cache.clear();
   env = readyClient();
 });
 
@@ -241,6 +260,173 @@ describe("DiscordClientWrapper", () => {
     const wrapper = new DiscordClientWrapper("t", () => mock);
     await wrapper.destroy();
     expect(mock.destroy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token-keyed cache + ref counting (forToken) — required because
+// Discord's Gateway API only allows one session per bot token.
+// ---------------------------------------------------------------------------
+
+describe("DiscordClientWrapper.forToken", () => {
+  it("returns the same instance for the same token across callers", () => {
+    const a = DiscordClientWrapper.forToken("tok-A", () => makeMockClient());
+    const b = DiscordClientWrapper.forToken("tok-A", () => makeMockClient());
+    expect(a).toBe(b);
+    expect(a._refCount).toBe(2);
+  });
+
+  it("returns distinct instances for different tokens", () => {
+    const a = DiscordClientWrapper.forToken("tok-A", () => makeMockClient());
+    const b = DiscordClientWrapper.forToken("tok-B", () => makeMockClient());
+    expect(a).not.toBe(b);
+  });
+
+  it("only destroys the underlying Client after the last release", async () => {
+    const mock = makeMockClient();
+    const a = DiscordClientWrapper.forToken("tok-rc", () => mock);
+    const b = DiscordClientWrapper.forToken("tok-rc", () => mock);
+    await a.getClient();
+    expect(mock.login).toHaveBeenCalledTimes(1);
+    await a.destroy();
+    expect(mock.destroy).not.toHaveBeenCalled();
+    await b.destroy();
+    expect(mock.destroy).toHaveBeenCalledTimes(1);
+    expect(DiscordClientWrapper.cache.has("tok-rc")).toBe(false);
+  });
+
+  it("createDiscordClient deduplicates by token so the voice and inbox share one bot", () => {
+    const factory = () => makeMockClient();
+    const c1 = createDiscordClient({ token: "shared", clientFactory: factory });
+    const c2 = createDiscordClient({ token: "shared", clientFactory: factory });
+    if (c1.kind !== "ready" || c2.kind !== "ready") throw new Error("expected ready");
+    expect(c1.wrapper).toBe(c2.wrapper);
+  });
+
+  it("destroy is idempotent for cached wrappers", async () => {
+    const mock = makeMockClient();
+    const w = DiscordClientWrapper.forToken("tok-idem", () => mock);
+    await w.getClient();
+    await w.destroy();
+    await w.destroy();
+    expect(mock.destroy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// subscribeMessage — inbound dispatch for @tuttiai/inbox
+// ---------------------------------------------------------------------------
+
+function makeBotMessage(
+  overrides: Partial<DiscordMessageLike> & { author?: Partial<DiscordMessageLike["author"]> } = {},
+): DiscordMessageLike {
+  return {
+    id: overrides.id ?? "m1",
+    channelId: overrides.channelId ?? "c1",
+    guildId: overrides.guildId ?? null,
+    content: overrides.content ?? "hello",
+    createdTimestamp: overrides.createdTimestamp ?? 1_700_000_000_000,
+    editedTimestamp: overrides.editedTimestamp ?? null,
+    author: {
+      id: overrides.author?.id ?? "u1",
+      username: overrides.author?.username ?? "alice",
+      bot: overrides.author?.bot ?? false,
+    },
+    edit: vi.fn(),
+    delete: vi.fn(),
+    react: vi.fn(),
+    ...(overrides.url !== undefined ? { url: overrides.url } : {}),
+  } as DiscordMessageLike;
+}
+
+describe("DiscordClientWrapper.subscribeMessage", () => {
+  it("eagerly logs in and installs a single messageCreate dispatcher on first subscription", async () => {
+    const mock = makeMockClient();
+    const wrapper = new DiscordClientWrapper("t", () => mock);
+    const handler = vi.fn();
+    wrapper.subscribeMessage(handler);
+    // Wait for the dispatcher install (fire-and-forget from subscribeMessage).
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(mock.login).toHaveBeenCalledTimes(1);
+    expect(mock.on).toHaveBeenCalledWith("messageCreate", expect.any(Function));
+  });
+
+  it("dispatches non-bot messages to every subscriber", async () => {
+    const mock = makeMockClient();
+    const wrapper = new DiscordClientWrapper("t", () => mock);
+    const a = vi.fn();
+    const b = vi.fn();
+    wrapper.subscribeMessage(a);
+    wrapper.subscribeMessage(b);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await mock.emitMessage(makeBotMessage({ content: "hello" }));
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(1);
+    expect(a.mock.calls[0]?.[0].content).toBe("hello");
+  });
+
+  it("filters out messages from any bot (loop guard)", async () => {
+    const mock = makeMockClient();
+    const wrapper = new DiscordClientWrapper("t", () => mock);
+    const handler = vi.fn();
+    wrapper.subscribeMessage(handler);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await mock.emitMessage(makeBotMessage({ author: { id: "self", username: "tutti", bot: true } }));
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("unsubscribe stops further deliveries to that handler", async () => {
+    const mock = makeMockClient();
+    const wrapper = new DiscordClientWrapper("t", () => mock);
+    const a = vi.fn();
+    const b = vi.fn();
+    const offA = wrapper.subscribeMessage(a);
+    wrapper.subscribeMessage(b);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await mock.emitMessage(makeBotMessage({ id: "m1" }));
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(1);
+    offA();
+    await mock.emitMessage(makeBotMessage({ id: "m2" }));
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(2);
+  });
+
+  it("a thrown handler does not stop other handlers from receiving the message", async () => {
+    const mock = makeMockClient();
+    const wrapper = new DiscordClientWrapper("t", () => mock);
+    const a = vi.fn(() => {
+      throw new Error("boom");
+    });
+    const b = vi.fn();
+    wrapper.subscribeMessage(a);
+    wrapper.subscribeMessage(b);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await mock.emitMessage(makeBotMessage());
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(1);
+  });
+
+  it("two subscribers share one dispatcher on the underlying Client", async () => {
+    const mock = makeMockClient();
+    const wrapper = new DiscordClientWrapper("t", () => mock);
+    wrapper.subscribeMessage(vi.fn());
+    wrapper.subscribeMessage(vi.fn());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(mock.on).toHaveBeenCalledTimes(1);
+  });
+
+  it("destroy clears subscribers so post-destroy events are dropped", async () => {
+    const mock = makeMockClient();
+    const wrapper = new DiscordClientWrapper("t", () => mock);
+    const handler = vi.fn();
+    wrapper.subscribeMessage(handler);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await wrapper.destroy();
+    // The dispatcher is still installed on the (now-destroyed) Client mock,
+    // but the wrapper cleared its subscriber set.
+    await mock.emitMessage(makeBotMessage());
+    expect(handler).not.toHaveBeenCalled();
   });
 });
 

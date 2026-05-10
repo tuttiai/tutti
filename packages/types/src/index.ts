@@ -47,6 +47,9 @@ export type {
   TelemetryConfig,
   ScoreConfig,
   ParallelEntryConfig,
+  InboxPlatform,
+  InboxAdapterConfig,
+  InboxConfig,
 } from "./score.js";
 
 export type {
