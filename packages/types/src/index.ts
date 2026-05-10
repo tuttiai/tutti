@@ -17,6 +17,7 @@ export type {
   Permission,
   ToolResult,
   ToolMemoryHelpers,
+  ToolRememberOptions,
   ToolContext,
   Tool,
   UserMemoryToolHelpers,
@@ -55,6 +56,12 @@ export type {
   Session,
   SessionStore,
 } from "./session.js";
+
+export type {
+  MemoryEntry,
+  SemanticSearchOptions,
+  SemanticMemoryStore,
+} from "./memory.js";
 
 export type {
   TuttiEvent,

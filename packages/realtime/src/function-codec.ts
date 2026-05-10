@@ -45,7 +45,7 @@ export function toolToFunctionDefinition(tool: Tool): RealtimeEvent {
     type: "function",
     name: tool.name,
     description: tool.description,
-    parameters: parameters as Record<string, unknown>,
+    parameters,
   };
 }
 

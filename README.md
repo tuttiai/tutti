@@ -204,7 +204,7 @@ Agents remember facts across sessions:
   coder: {
     name: "Coder",
     system_prompt: "You are a TypeScript developer.",
-    semantic_memory: { enabled: true, max_memories: 5 },
+    memory: { semantic: { enabled: true, max_memories: 5 } },
     voices: [new FilesystemVoice()],
     permissions: ["filesystem"],
   },

@@ -48,7 +48,9 @@ console.log(result.output);
 
 ### Sessions & memory
 - **InMemorySessionStore**, **PostgresSessionStore** — session persistence
-- **SemanticMemoryStore** — per-agent long-term memory (in-memory or Postgres)
+- **SemanticMemoryStore** — per-agent long-term memory (in-memory or Postgres). Two surfaces share one enforcement pipeline:
+  - System-prompt injection — relevant entries injected at the start of each turn (`agent.memory.semantic.inject_system`).
+  - Curated agent tools — `remember` / `recall` / `forget` exposed to the model itself (`agent.memory.semantic.curated_tools`, default `true`). Agent-curated entries are tagged `source: "agent"` and a per-agent cap evicts the least-recently-used entry on overflow. See [`examples/curated-memory.ts`](../../examples/curated-memory.ts).
 - **UserMemoryStore** — per-end-user memory, auto-injected into the system prompt on every run (Postgres)
 
 ### Durability & scheduling

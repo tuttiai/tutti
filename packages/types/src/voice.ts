@@ -9,9 +9,38 @@ export interface ToolResult {
   is_error?: boolean;
 }
 
+/**
+ * Options accepted by {@link ToolMemoryHelpers.remember}. All fields
+ * are optional — callers can store a bare content string and let the
+ * helper tag it with `source: "system"` by default.
+ */
+export interface ToolRememberOptions {
+  /** Free-form metadata persisted alongside the entry. */
+  metadata?: Record<string, unknown>;
+  /**
+   * Provenance tag for the entry. Defaults to `"system"` when called
+   * from user-defined tool code. The curated `remember` tool surface
+   * passes `"agent"` so self-curated facts are distinguishable from
+   * system writes. See {@link MemoryEntry.source}.
+   */
+  source?: "agent" | "system";
+  /** Free-form labels for later filtering. See {@link MemoryEntry.tags}. */
+  tags?: string[];
+}
+
 export interface ToolMemoryHelpers {
-  /** Store a fact the agent should remember across sessions. */
-  remember(content: string, metadata?: Record<string, unknown>): Promise<void>;
+  /**
+   * Store a fact the agent should remember across sessions. The
+   * second argument may be either a metadata record (legacy form) or
+   * a {@link ToolRememberOptions} bag. The runtime narrows the value
+   * based on the presence of `source` / `tags` keys; the legacy form
+   * is treated as `{ metadata: <value> }` so existing callers keep
+   * working.
+   */
+  remember(
+    content: string,
+    options?: ToolRememberOptions | Record<string, unknown>,
+  ): Promise<{ id: string }>;
   /** Search for relevant memories. */
   recall(query: string, limit?: number): Promise<{ id: string; content: string }[]>;
   /** Delete a specific memory by ID. */
@@ -45,7 +74,7 @@ export interface UserMemoryToolHelpers {
 export interface ToolContext {
   session_id: string;
   agent_name: string;
-  /** Semantic memory helpers — only available when agent.semantic_memory.enabled is true. */
+  /** Semantic memory helpers — only available when agent.memory.semantic.enabled is true. */
   memory?: ToolMemoryHelpers;
   /**
    * Per-end-user memory helpers — only available when the agent has

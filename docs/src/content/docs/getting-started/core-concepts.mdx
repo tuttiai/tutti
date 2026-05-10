@@ -40,7 +40,7 @@ An **agent** is an LLM-powered worker. Each agent has:
 | `max_tool_calls` | No | Max tool calls per run (default: 20) |
 | `tool_timeout_ms` | No | Per-tool timeout in ms (default: 30000) |
 | `budget` | No | Token + per-run / daily / monthly USD limits for this agent |
-| `memory` | No | Long-term memory (`{ semantic_memory?, user_memory? }`). See [Memory](#memory). |
+| `memory` | No | Long-term memory (`{ semantic?, user_memory? }`). See [Memory](#memory). |
 | `streaming` | No | Enable token-by-token streaming (default: false) |
 | `delegates` | No | Agent IDs this orchestrator can delegate to |
 | `role` | No | `"orchestrator"` or `"specialist"` |
@@ -192,15 +192,22 @@ Tutti has three kinds of memory, each configured separately:
 | Type | Scope | Backend | Config |
 | ---- | ----- | ------- | ------ |
 | **Session** | One conversation | In-memory / Postgres | `score.memory.provider` |
-| **Semantic** | All sessions for an agent | In-memory / Postgres | `agent.memory.semantic_memory` |
+| **Semantic** | All sessions for an agent | In-memory / Postgres | `agent.memory.semantic` |
 | **User** | All sessions for an end-user, across agents | Postgres | `agent.memory.user_memory` |
 
-**Semantic memory** lets agents remember facts about their own work — project context, past decisions, recurring preferences. Enable it per agent:
+**Semantic memory** lets agents remember facts about their own work — project context, past decisions, recurring preferences. Two surfaces share the same backing store: relevant entries are auto-injected into the system prompt at the start of each turn, and the agent can call `remember` / `recall` / `forget` as tools to curate memory itself. Enable per agent:
 
 ```ts
 {
   coder: {
-    memory: { semantic_memory: { enabled: true, max_memories: 5 } },
+    memory: {
+      semantic: {
+        enabled: true,
+        max_memories: 5,        // entries injected per turn (default 5)
+        max_entries_per_agent: 1000, // LRU cap per agent (default 1000)
+        curated_tools: true,    // expose remember/recall/forget tools (default true)
+      },
+    },
     // ...
   },
 }

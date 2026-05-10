@@ -84,10 +84,14 @@ Semantic memory lets agents remember facts across sessions. When a user tells th
   coder: {
     name: "Coder",
     system_prompt: "You are a TypeScript developer.",
-    semantic_memory: {
-      enabled: true,
-      max_memories: 5,        // inject up to 5 relevant memories (default)
-      inject_system: true,    // append to system prompt (default)
+    memory: {
+      semantic: {
+        enabled: true,
+        max_memories: 5,             // inject up to 5 relevant memories (default)
+        inject_system: true,         // append to system prompt (default)
+        curated_tools: true,         // expose remember/recall/forget tools to the agent (default)
+        max_entries_per_agent: 1000, // LRU cap per agent (default)
+      },
     },
     voices: [new FilesystemVoice()],
     permissions: ["filesystem"],
@@ -125,6 +129,29 @@ execute: async (input, context) => {
   return { content: "Preferences updated." };
 }
 ```
+
+### Agent-curated memory tools
+
+When `curated_tools` is on (the default), the runtime exposes
+`remember`, `recall`, and `forget` as Tools the model itself can call
+across turns. Entries written by the model are tagged
+`source: "agent"`, and a per-agent cap (`max_entries_per_agent`,
+default 1000) evicts the least-recently-used entry first when the
+cap is reached. Both surfaces — the `context.memory` helpers above
+and the agent-callable tools — share one enforcement pipeline, so
+the cap, LRU eviction, and `memory:write` / `memory:read` /
+`memory:delete` events fire exactly once per logical operation.
+
+Subscribe to the events to observe what the agent is curating:
+
+```ts
+tutti.events.on("memory:write", (e) => {
+  console.log(`agent ${e.agent_name} stored ${e.entry_id} (${e.source})`);
+});
+```
+
+A two-turn end-to-end example lives at
+[`examples/curated-memory.ts`](https://github.com/tuttiai/tutti/blob/main/examples/curated-memory.ts).
 
 ### Storing memories from your code
 

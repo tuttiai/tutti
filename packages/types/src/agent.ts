@@ -2,6 +2,7 @@
 
 import type { ZodType } from "zod";
 import type { ChatMessage, TokenUsage } from "./llm.js";
+import type { SemanticMemoryStore } from "./memory.js";
 import type { Permission } from "./voice.js";
 import type { Voice } from "./voice.js";
 import type { TuttiHooks } from "./hooks.js";
@@ -32,6 +33,26 @@ export interface AgentMemoryConfig {
   max_memories?: number;
   /** Inject memories into the system prompt (default true). */
   inject_system?: boolean;
+  /**
+   * Hard cap on entries stored for this agent. When a `remember` write
+   * would exceed the cap, the runtime evicts the entry with the oldest
+   * `last_accessed_at` first (true LRU). Default 1000.
+   */
+  max_entries_per_agent?: number;
+  /**
+   * Expose `remember` / `recall` / `forget` as agent-callable tools so
+   * the model itself can curate memory across turns. Independent of
+   * {@link AgentMemoryConfig.inject_system} — both surfaces can be
+   * active simultaneously. Default `true`.
+   */
+  curated_tools?: boolean;
+  /**
+   * Optional override for the backing store. When omitted, the runtime
+   * falls back to its shared `SemanticMemoryStore` instance. Use this
+   * to attach a per-agent vector store, a shared Postgres pool, or a
+   * test double without disturbing other agents in the score.
+   */
+  store?: SemanticMemoryStore;
 }
 
 /**
@@ -238,21 +259,18 @@ export interface AgentConfig {
   max_tool_calls?: number;
   tool_timeout_ms?: number;
   budget?: BudgetConfig;
-  /** Semantic (long-term) memory configuration. */
-  semantic_memory?: AgentMemoryConfig;
   /**
-   * Memory configuration umbrella. Currently houses **user memory** —
-   * cross-session facts about an end user that get injected at run start
-   * when {@link AgentRunOptions.user_id} is provided.
+   * Memory configuration umbrella.
    *
-   * The existing {@link AgentConfig.semantic_memory} field is kept at the
-   * top level for backwards compatibility; a future revision may move it
-   * to `memory.semantic` under this same umbrella.
-   *
-   * Design-only — no implementation yet. The runtime does not currently
-   * read this field.
+   * - `semantic` — cross-session facts the agent has accumulated about
+   *   its work. Replaces the v0.21 top-level `semantic_memory` field;
+   *   see {@link AgentMemoryConfig} for the full shape.
+   * - `user_memory` — per-end-user facts that get injected at run start
+   *   when {@link AgentRunOptions.user_id} is provided. Design-only —
+   *   the runtime does not currently read this field.
    */
   memory?: {
+    semantic?: AgentMemoryConfig;
     user_memory?: AgentUserMemoryConfig;
   };
   /** Enable token-by-token streaming (default: false). */
