@@ -44,7 +44,8 @@ console.log(result.output);
 - **AnthropicProvider** — `@anthropic-ai/sdk`
 - **OpenAIProvider** — `openai`
 - **GeminiProvider** — `@google/generative-ai`
-- All three support streaming, tool calling, and prompt caching where the underlying API supports it
+- **OpenRouterProvider** — OpenAI-compatible aggregator for 300+ models across providers via one API key. See [openrouter.ai/models](https://openrouter.ai/models) for the live catalogue. Per-call USD cost is returned inline on `ChatResponse.usage.cost_usd` (via OpenRouter's `usage: { include: true }` extension).
+- All four support streaming, tool calling, and prompt caching where the underlying API supports it
 
 ### Sessions & memory
 - **InMemorySessionStore**, **PostgresSessionStore** — session persistence
