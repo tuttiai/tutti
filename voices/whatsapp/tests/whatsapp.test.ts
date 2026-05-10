@@ -146,7 +146,7 @@ function makePayload(overrides: { messages?: unknown[]; statuses?: unknown[] } =
 describe("WhatsAppClientWrapper webhook routes", () => {
   it("GET /webhook returns hub.challenge as plain text on a correct verify_token", async () => {
     const wrapper = new WhatsAppClientWrapper({ ...baseConfig, fetchFn: makeFetchOk({}) });
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const res = await app.inject({
       method: "GET",
       url: "/webhook",
@@ -162,7 +162,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
 
   it("GET /webhook returns 403 on wrong verify_token", async () => {
     const wrapper = new WhatsAppClientWrapper({ ...baseConfig, fetchFn: makeFetchOk({}) });
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const res = await app.inject({
       method: "GET",
       url: "/webhook",
@@ -193,7 +193,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     });
     const body = JSON.stringify(payload);
     const sig = signBody(body, "app-secret");
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const res = await app.inject({
       method: "POST",
       url: "/webhook",
@@ -222,7 +222,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     const payload = makePayload({
       messages: [{ from: "1", id: "x", timestamp: "1", type: "text", text: { body: "hi" } }],
     });
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const res = await app.inject({
       method: "POST",
       url: "/webhook",
@@ -249,7 +249,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     });
     const body = JSON.stringify(payload);
     const sig = signBody(body, "app-secret");
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const res = await app.inject({
       method: "POST",
       url: "/webhook",
@@ -296,7 +296,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     });
     const body = JSON.stringify(payload);
     const sig = signBody(body, "app-secret");
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     await app.inject({
       method: "POST",
       url: "/webhook",
@@ -332,7 +332,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     });
     const body = JSON.stringify(payload);
     const sig = signBody(body, "app-secret");
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     await app.inject({
       method: "POST",
       url: "/webhook",
@@ -350,7 +350,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
       fetchFn: makeFetchOk({}),
       rateLimit: { max: 2, windowMs: 60_000 },
     });
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const payload = makePayload({
       messages: [{ from: "1", id: "x", timestamp: "1700000000", type: "text", text: { body: "hi" } }],
     });
@@ -367,7 +367,12 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     expect((await send()).statusCode).toBe(200);
     const third = await send();
     expect(third.statusCode).toBe(429);
-    expect(third.json()).toEqual({ error: "rate_limited" });
+    // @fastify/rate-limit ships its own RFC-7807-ish payload — assert
+    // shape rather than exact body so a plugin minor bump doesn't
+    // churn the test.
+    const errorBody = third.json() as { statusCode?: number; error?: string };
+    expect(errorBody.statusCode).toBe(429);
+    expect(typeof errorBody.error).toBe("string");
   });
 
   it("rate-limits GET /webhook verification too (DoS defence)", async () => {
@@ -376,7 +381,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
       fetchFn: makeFetchOk({}),
       rateLimit: { max: 1, windowMs: 60_000 },
     });
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const params = {
       "hub.mode": "subscribe",
       "hub.verify_token": "verify-secret",
@@ -396,7 +401,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
       fetchFn: makeFetchOk({}),
       rateLimit: false,
     });
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     const payload = makePayload({
       messages: [{ from: "1", id: "x", timestamp: "1700000000", type: "text", text: { body: "hi" } }],
     });
@@ -430,7 +435,7 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     });
     const body = JSON.stringify(payload);
     const sig = signBody(body, "app-secret");
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
     await app.inject({
       method: "POST",
       url: "/webhook",

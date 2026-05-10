@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { verifyMetaSignature } from "./signature.js";
 import type { InboundWebhookPayload } from "./types.js";
 
@@ -52,36 +53,6 @@ const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_KEYS = 10_000;
 
 /**
- * Tiny per-key fixed-window counter used by the webhook server. Drops
- * the oldest key when the map exceeds {@link RATE_LIMIT_MAX_KEYS} so a
- * pathological IP-spoofing flood cannot grow memory without bound.
- */
-class WebhookRateLimiter {
-  private readonly buckets = new Map<string, { resetAt: number; count: number }>();
-  constructor(private readonly max: number, private readonly windowMs: number) {}
-
-  allow(key: string, now: number): boolean {
-    const bucket = this.buckets.get(key);
-    if (!bucket || bucket.resetAt <= now) {
-      if (this.buckets.size >= RATE_LIMIT_MAX_KEYS) {
-        const oldest = this.buckets.keys().next().value;
-        if (oldest !== undefined) this.buckets.delete(oldest);
-      }
-      this.buckets.set(key, { resetAt: now + this.windowMs, count: 1 });
-      return true;
-    }
-    if (bucket.count >= this.max) return false;
-    bucket.count += 1;
-    return true;
-  }
-
-  /** Test-only — clear all tracked buckets. */
-  clear(): void {
-    this.buckets.clear();
-  }
-}
-
-/**
  * Build (but do not start) a Fastify instance hosting Meta's webhook
  * routes. Tests can call `server.inject({ … })` to exercise the
  * handlers without binding to a real port; the wrapper's `launch()`
@@ -96,33 +67,27 @@ class WebhookRateLimiter {
  *   immediately and dispatches the payload to `onPayload`
  *   asynchronously — Meta retries non-2xx within ~20s, so blocking
  *   the response on agent work would cause duplicate deliveries.
+ *
+ * Rate-limited via `@fastify/rate-limit` ahead of signature
+ * verification (default 100 req / 60s per source IP) so a flood of
+ * unsigned or correctly-signed requests can't amplify cost on the
+ * downstream `onPayload` dispatcher or starve real Meta deliveries.
  */
-export function buildWebhookServer(options: WebhookServerOptions): FastifyInstance {
+export async function buildWebhookServer(
+  options: WebhookServerOptions,
+): Promise<FastifyInstance> {
   const server = Fastify({
     logger: false,
     bodyLimit: options.bodyLimit ?? 5 * 1024 * 1024,
   });
 
-  const limiter =
-    options.rateLimit === false
-      ? null
-      : new WebhookRateLimiter(
-          options.rateLimit?.max ?? DEFAULT_RATE_LIMIT_MAX,
-          options.rateLimit?.windowMs ?? DEFAULT_RATE_LIMIT_WINDOW_MS,
-        );
-
-  if (limiter) {
-    server.addHook("onRequest", (req, reply, done) => {
-      if (req.method !== "POST" && req.method !== "GET") {
-        done();
-        return;
-      }
-      const key = req.ip || "unknown";
-      if (!limiter.allow(key, Date.now())) {
-        reply.code(429).send({ error: "rate_limited" });
-        return;
-      }
-      done();
+  if (options.rateLimit !== false) {
+    await server.register(rateLimit, {
+      global: true,
+      max: options.rateLimit?.max ?? DEFAULT_RATE_LIMIT_MAX,
+      timeWindow: options.rateLimit?.windowMs ?? DEFAULT_RATE_LIMIT_WINDOW_MS,
+      cache: RATE_LIMIT_MAX_KEYS,
+      keyGenerator: (req) => req.ip || "unknown",
     });
   }
 

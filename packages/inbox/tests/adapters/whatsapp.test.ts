@@ -97,7 +97,7 @@ describe("WhatsAppInboxAdapter", () => {
 
     const wrapper = wrapperRef.current;
     expect(wrapper).toBeDefined();
-    const app = wrapper._app!;
+    const app = await wrapper.whenReady();
 
     const payload = makePayload([
       {

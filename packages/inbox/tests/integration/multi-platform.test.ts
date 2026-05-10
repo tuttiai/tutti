@@ -619,7 +619,7 @@ describe("multi-platform inbox", () => {
       };
       const wbody = JSON.stringify(whatsappPayload);
       const wsig = signWhatsAppBody(wbody, "wa-secret");
-      const wres = await whatsappWrapper._app!.inject({
+      const wres = await (await whatsappWrapper.whenReady()).inject({
         method: "POST",
         url: "/webhook",
         headers: {

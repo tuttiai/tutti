@@ -103,6 +103,7 @@ export class WhatsAppClientWrapper {
 
   private readonly graph: GraphClient;
   private server?: FastifyInstance;
+  private readonly serverReady: Promise<FastifyInstance>;
   private listening = false;
   private listenPromise?: Promise<void>;
   private readonly subscribers = new Set<WhatsAppMessageHandler>();
@@ -119,13 +120,33 @@ export class WhatsAppClientWrapper {
     if (options.graphApiVersion !== undefined) graphOpts.graphApiVersion = options.graphApiVersion;
     if (options.fetchFn !== undefined) graphOpts.fetchFn = options.fetchFn;
     this.graph = new GraphClient(graphOpts);
-    this.server = buildWebhookServer({
+    this.serverReady = buildWebhookServer({
       verifyToken: options.verifyToken,
       appSecret: options.appSecret,
       ...(options.bodyLimit !== undefined ? { bodyLimit: options.bodyLimit } : {}),
       ...(options.rateLimit !== undefined ? { rateLimit: options.rateLimit } : {}),
       onPayload: (payload) => this.handlePayload(payload),
     });
+    this.serverReady.then((s) => {
+      // If destroy() ran before the server finished registering plugins,
+      // close it immediately so we don't leak resources.
+      if (this.destroyed) {
+        void s.close();
+        return;
+      }
+      this.server = s;
+    }).catch(() => {
+      // Surfaced when launch()/whenReady() awaits the same promise.
+    });
+  }
+
+  /**
+   * Resolves to the underlying Fastify instance once `@fastify/rate-limit`
+   * has finished registering. Use this in tests instead of `_app` —
+   * `inject()` works as soon as this resolves.
+   */
+  whenReady(): Promise<FastifyInstance> {
+    return this.serverReady;
   }
 
   // ── inbound ────────────────────────────────────────────────────────
@@ -147,13 +168,13 @@ export class WhatsAppClientWrapper {
   async launch(): Promise<void> {
     if (this.listening) return;
     if (this.listenPromise) return this.listenPromise;
-    if (!this.server) {
+    if (this.destroyed) {
       throw new Error("WhatsAppClientWrapper.launch: server has been destroyed.");
     }
-    const server = this.server;
     const port = this.options.port ?? 3848;
     const host = this.options.host ?? "0.0.0.0";
     this.listenPromise = (async () => {
+      const server = await this.serverReady;
       await server.listen({ port, host });
       this.listening = true;
     })();
@@ -209,14 +230,13 @@ export class WhatsAppClientWrapper {
     this.destroyed = true;
     this.subscribers.clear();
     this.mediaCache.clear();
-    if (this.server) {
-      try {
-        await this.server.close();
-      } catch {
-        // best-effort
-      }
-      this.server = undefined;
+    try {
+      const server = await this.serverReady;
+      await server.close();
+    } catch {
+      // best-effort
     }
+    this.server = undefined;
     this.listening = false;
     this.listenPromise = undefined;
   }
