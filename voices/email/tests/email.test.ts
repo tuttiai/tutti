@@ -798,3 +798,354 @@ describe("EmailVoice", () => {
     expect(EmailClientWrapper.cache.size).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Default factories — exercised so we don't ship code that only works in
+// tests because the real-dependency boundaries were never invoked.
+// ---------------------------------------------------------------------------
+
+describe("default factories", () => {
+  it("defaultParser parses an RFC 822 buffer end-to-end via mailparser", async () => {
+    const { defaultParser } = await import("../src/parser.js");
+    const raw = Buffer.from(
+      [
+        "From: Alice <alice@example.com>",
+        "To: Bot <bot@example.com>",
+        "Subject: hello",
+        "Message-ID: <m-1@example.com>",
+        "",
+        "body text",
+        "",
+      ].join("\r\n"),
+      "utf8",
+    );
+    const parsed = await defaultParser(raw);
+    expect(parsed.subject).toBe("hello");
+    expect(parsed.from?.value?.[0]?.address).toBe("alice@example.com");
+    expect(parsed.text?.includes("body text")).toBe(true);
+  });
+
+  it("defaultSmtpFactory returns a transporter for STARTTLS port 587 (secure=false)", async () => {
+    const { defaultSmtpFactory } = await import("../src/smtp.js");
+    const t = defaultSmtpFactory({
+      host: "smtp.local",
+      port: 587,
+      user: "u",
+      pass: "p",
+    });
+    expect(typeof t.sendMail).toBe("function");
+  });
+
+  it("defaultSmtpFactory returns a transporter for implicit TLS port 465 (secure=true)", async () => {
+    const { defaultSmtpFactory } = await import("../src/smtp.js");
+    const t = defaultSmtpFactory({
+      host: "smtp.local",
+      port: 465,
+      user: "u",
+      pass: "p",
+    });
+    expect(typeof t.sendMail).toBe("function");
+  });
+
+  it("defaultSmtpFactory honours an explicit secure override", async () => {
+    const { defaultSmtpFactory } = await import("../src/smtp.js");
+    const t = defaultSmtpFactory({
+      host: "smtp.local",
+      port: 587,
+      user: "u",
+      pass: "p",
+      secure: true,
+    });
+    expect(typeof t.sendMail).toBe("function");
+  });
+
+  it("defaultImapFactory builds a client without opening a connection", async () => {
+    const { defaultImapFactory } = await import("../src/imap.js");
+    const c = defaultImapFactory({
+      host: "imap.local",
+      port: 993,
+      user: "u",
+      pass: "p",
+    });
+    expect(typeof c.connect).toBe("function");
+    expect(typeof c.fetch).toBe("function");
+    expect(typeof c.logout).toBe("function");
+  });
+
+  it("defaultImapFactory honours an explicit secure: false (port 143 STARTTLS)", async () => {
+    const { defaultImapFactory } = await import("../src/imap.js");
+    const c = defaultImapFactory({
+      host: "imap.local",
+      port: 143,
+      user: "u",
+      pass: "p",
+      secure: false,
+    });
+    expect(typeof c.connect).toBe("function");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error-formatting + tool error branches — lift branch coverage of the
+// helpers and the catch-paths in send-email / send-reply / list-inbox.
+// ---------------------------------------------------------------------------
+
+describe("emailErrorMessage", () => {
+  it("formats errors with both code and message", async () => {
+    const { emailErrorMessage } = await import("../src/utils/format.js");
+    expect(emailErrorMessage({ code: "EAUTH", message: "Invalid login" }, "smtp.send")).toBe(
+      "Email error [EAUTH] for smtp.send: Invalid login",
+    );
+  });
+
+  it("formats errors with message only", async () => {
+    const { emailErrorMessage } = await import("../src/utils/format.js");
+    expect(emailErrorMessage(new Error("boom"), "list_inbox")).toBe(
+      "Email error for list_inbox: boom",
+    );
+  });
+
+  it("falls back to String(err) for non-object errors", async () => {
+    const { emailErrorMessage } = await import("../src/utils/format.js");
+    expect(emailErrorMessage("plain string", "ctx")).toBe("Email error for ctx: plain string");
+    expect(emailErrorMessage(undefined, "ctx")).toBe("Email error for ctx: undefined");
+  });
+});
+
+describe("snippet", () => {
+  it("returns empty string for empty input", async () => {
+    const { snippet } = await import("../src/utils/format.js");
+    expect(snippet("")).toBe("");
+  });
+
+  it("collapses whitespace and trims", async () => {
+    const { snippet } = await import("../src/utils/format.js");
+    expect(snippet("  hello   world  ")).toBe("hello world");
+  });
+
+  it("truncates with an ellipsis when exceeding max", async () => {
+    const { snippet } = await import("../src/utils/format.js");
+    const out = snippet("a".repeat(50), 10);
+    expect(out.length).toBe(10);
+    expect(out.endsWith("…")).toBe(true);
+  });
+});
+
+describe("send_email error branches", () => {
+  it("surfaces SMTP errors via emailErrorMessage with the recipient list", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    const smtp = makeMockSmtp();
+    smtp.sendMail.mockRejectedValueOnce(
+      Object.assign(new Error("Invalid login"), { code: "EAUTH" }),
+    );
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-err-send" },
+      smtp: { host: "h", port: 587, user: "u-err-send" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const send = voice.tools.find((t) => t.name === "send_email");
+    if (!send) throw new Error("send_email tool not found");
+    const result = await send.execute(
+      { to: ["a@example.com", "b@example.com"], subject: "Hi", text: "hi" },
+      ctx,
+    );
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("[EAUTH]");
+    expect(result.content).toContain("a@example.com, b@example.com");
+    await voice.teardown();
+  });
+
+  it("falls back to a no-Message-ID notice when SMTP returns none", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    const smtp = makeMockSmtp();
+    smtp.sendMail.mockResolvedValueOnce({ accepted: ["a@example.com"], rejected: [] });
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-no-id" },
+      smtp: { host: "h", port: 587, user: "u-no-id" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const send = voice.tools.find((t) => t.name === "send_email");
+    if (!send) throw new Error("send_email tool not found");
+    const result = await send.execute({ to: "a@example.com", subject: "Hi", text: "hi" }, ctx);
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("(no Message-ID returned)");
+    await voice.teardown();
+  });
+});
+
+describe("send_reply error branches", () => {
+  it("does not duplicate in_reply_to when references already include it", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    const smtp = makeMockSmtp();
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-reply-dedup" },
+      smtp: { host: "h", port: 587, user: "u-reply-dedup" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const reply = voice.tools.find((t) => t.name === "send_reply");
+    if (!reply) throw new Error("send_reply tool not found");
+    const result = await reply.execute(
+      {
+        to: "a@example.com",
+        subject: "Re: Hi",
+        text: "thanks",
+        in_reply_to: "<m-1@example.com>",
+        references: ["<root@example.com>", "<m-1@example.com>"],
+      },
+      ctx,
+    );
+    expect(result.is_error).toBeUndefined();
+    expect(smtp.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        references: ["<root@example.com>", "<m-1@example.com>"],
+      }),
+    );
+    await voice.teardown();
+  });
+
+  it("surfaces send errors with the in_reply_to in the context", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    const smtp = makeMockSmtp();
+    smtp.sendMail.mockRejectedValueOnce(new Error("boom"));
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-reply-err" },
+      smtp: { host: "h", port: 587, user: "u-reply-err" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const reply = voice.tools.find((t) => t.name === "send_reply");
+    if (!reply) throw new Error("send_reply tool not found");
+    const result = await reply.execute(
+      {
+        to: "a@example.com",
+        subject: "Re: Hi",
+        text: "thanks",
+        in_reply_to: "<m-1@example.com>",
+      },
+      ctx,
+    );
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("<m-1@example.com>");
+    await voice.teardown();
+  });
+});
+
+describe("list_inbox error branches", () => {
+  it("rejects an invalid 'since' timestamp before hitting IMAP", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    const smtp = makeMockSmtp();
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-bad-since" },
+      smtp: { host: "h", port: 587, user: "u-bad-since" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const list = voice.tools.find((t) => t.name === "list_inbox");
+    if (!list) throw new Error("list_inbox tool not found");
+    // Bypass Zod's z.string().datetime() guard so we exercise the
+    // wrapper-level Date guard. Cast through unknown for the same reason.
+    const result = await list.execute(
+      { since: "not-a-date" } as unknown as { since?: string },
+      ctx,
+    );
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Invalid 'since'");
+    await voice.teardown();
+  });
+
+  it("returns 'No matching messages.' for an empty inbox", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    imap.setQueue([]);
+    const smtp = makeMockSmtp();
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-empty" },
+      smtp: { host: "h", port: 587, user: "u-empty" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const list = voice.tools.find((t) => t.name === "list_inbox");
+    if (!list) throw new Error("list_inbox tool not found");
+    const result = await list.execute({}, ctx);
+    expect(result.content).toBe("No matching messages.");
+    await voice.teardown();
+  });
+
+  it("respects unseen_only=false (returns seen messages too)", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    imap.setQueue([
+      {
+        uid: 99,
+        envelope: {
+          messageId: "<seen-99@example.com>",
+          subject: "Seen one",
+          from: [{ address: "a@example.com" }],
+          date: new Date("2026-02-01T00:00:00Z"),
+        },
+      },
+    ]);
+    const smtp = makeMockSmtp();
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-seen-toggle" },
+      smtp: { host: "h", port: 587, user: "u-seen-toggle" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const list = voice.tools.find((t) => t.name === "list_inbox");
+    if (!list) throw new Error("list_inbox tool not found");
+    const result = await list.execute({ unseen_only: false }, ctx);
+    expect(result.is_error).toBeUndefined();
+    // unseen_only=false ⇒ no `seen` filter is set, so fetch sees both
+    // read and unread messages.
+    const filter = imap.fetch.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+    expect(filter && Object.prototype.hasOwnProperty.call(filter, "seen")).toBe(false);
+    expect(result.content).toContain("<seen-99@example.com>");
+    await voice.teardown();
+  });
+
+  it("surfaces IMAP errors via emailErrorMessage", async () => {
+    process.env["TUTTI_EMAIL_PASSWORD"] = "secret";
+    const imap = makeMockImap();
+    imap.fetch.mockImplementationOnce(() => {
+      throw Object.assign(new Error("disconnected"), { code: "ECONNRESET" });
+    });
+    const smtp = makeMockSmtp();
+    const voice = new EmailVoice({
+      imap: { host: "h", port: 993, user: "u-imap-err" },
+      smtp: { host: "h", port: 587, user: "u-imap-err" },
+      from: "Bot <bot@x>",
+      imapFactory: () => imap,
+      smtpFactory: () => smtp,
+      parser: makeParser({}),
+    });
+    const list = voice.tools.find((t) => t.name === "list_inbox");
+    if (!list) throw new Error("list_inbox tool not found");
+    const result = await list.execute({}, ctx);
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("[ECONNRESET]");
+    await voice.teardown();
+  });
+});

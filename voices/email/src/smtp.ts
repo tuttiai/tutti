@@ -39,7 +39,7 @@ export interface SmtpSendInfo {
 export interface SmtpTransporterLike {
   sendMail(args: SmtpSendArgs): Promise<SmtpSendInfo>;
   /** Optional — pooled transports use it; real-time transports may not. */
-  close?(): Promise<unknown> | unknown;
+  close?(): unknown;
 }
 
 /** Connection options accepted by both the wrapper and the factory. */
