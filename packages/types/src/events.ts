@@ -133,6 +133,19 @@ export type TuttiEvent =
       reason: "explicit" | "lru_eviction";
     }
   /**
+   * Emitted when the dialectic user-model consolidator successfully
+   * refreshes a user's rolling profile. `turn_count` is the user's
+   * cumulative turn counter at the time of consolidation — also the
+   * value the consolidator wrote to `last_consolidated_turn`. Subscribe
+   * for telemetry or to trigger downstream syncs (e.g. push the new
+   * profile to an external personalisation store).
+   */
+  | {
+      type: "user_model:consolidated";
+      user_id: string;
+      turn_count: number;
+    }
+  /**
    * Emitted by `@tuttiai/inbox` when an inbound message arrives from a
    * platform adapter (Telegram, Slack, Discord, ...) and has passed
    * allow-list and rate-limit checks. The `agent_name` is the inbox's

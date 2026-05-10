@@ -96,6 +96,49 @@ export interface AgentUserMemoryConfig {
 }
 
 /**
+ * Per-agent dialectic-user-model configuration.
+ *
+ * When `enabled`, the runtime injects the user's rolling LLM-summarised
+ * profile into the system prompt at run start (alongside the per-fact
+ * `user_memory` entries when both are configured) and runs a periodic
+ * consolidation pass that re-summarises the profile from accumulated
+ * `UserMemory` entries every `every_n_turns` turns.
+ *
+ * Distinct from {@link AgentUserMemoryConfig}: that type configures the
+ * granular per-fact store (one row per fact); this configures the
+ * holistic profile (one document per user). Both surfaces inject; both
+ * read from the same `user_id`.
+ *
+ * The consolidator pulls source signal from the configured `user_memory`
+ * store, so enabling `user_model` without also enabling `user_memory`
+ * means the consolidator has nothing to read on the first pass and the
+ * profile bootstraps from an empty list.
+ */
+export interface AgentUserModelConfig {
+  /** Master switch. When false the runtime never injects or consolidates. */
+  enabled: boolean;
+  /**
+   * Trigger threshold for the consolidation pass. The runtime
+   * accumulates each run's turn count into a per-user counter and runs
+   * a consolidation when `turns_since_last_consolidation >= every_n_turns`.
+   * Default 20.
+   */
+  every_n_turns?: number;
+  /**
+   * Optional model override for the consolidation LLM call. When unset
+   * the consolidator uses whatever default the agent's provider picks.
+   * Useful for cost: a small/cheap model is usually fine here.
+   */
+  consolidation_model?: string;
+  /**
+   * Cap on how many recent `UserMemory` entries get fed to the LLM in
+   * each consolidation pass. Default 50 — chosen as a balance between
+   * recall (more memories = better summary) and prompt cost.
+   */
+  recent_memory_limit?: number;
+}
+
+/**
  * Per-agent durable-checkpoint configuration.
  *
  * When enabled, the runtime persists a {@link Checkpoint} at every turn
@@ -272,6 +315,14 @@ export interface AgentConfig {
   memory?: {
     semantic?: AgentMemoryConfig;
     user_memory?: AgentUserMemoryConfig;
+    /**
+     * Dialectic user model — a rolling LLM-summarised profile of the
+     * end-user, refreshed periodically from accumulated `user_memory`
+     * entries. See {@link AgentUserModelConfig}. Sits alongside (not on
+     * top of) `user_memory`: granular facts and the holistic profile
+     * coexist and both inject into the system prompt at run start.
+     */
+    user_model?: AgentUserModelConfig;
   };
   /** Enable token-by-token streaming (default: false). */
   streaming?: boolean;

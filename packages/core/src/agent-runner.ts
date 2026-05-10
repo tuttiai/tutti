@@ -35,12 +35,22 @@ import {
   DEFAULT_MAX_ENTRIES_PER_AGENT,
 } from "./memory/curated.js";
 import { createUserMemoryStore } from "./memory/user/index.js";
+import { MemoryUserMemoryStore } from "./memory/user/memory-store.js";
 import type {
   AgentRunOptions,
   StoreOptions,
   UserMemory,
   UserMemoryStore,
 } from "./memory/user/types.js";
+import {
+  InMemoryUserModelStore,
+  type UserModelStore,
+  type UserProfile,
+} from "./memory/user-model.js";
+import {
+  UserModelConsolidator,
+  type UserModelConsolidatorOptions,
+} from "./memory/consolidator.js";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { estimateCost, getDailyCost, getMonthlyCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
@@ -204,6 +214,22 @@ export class AgentRunner {
    * pre-populate via {@link setUserMemoryStore} to inject mocks.
    */
   private userMemoryStores = new Map<string, UserMemoryStore>();
+  /**
+   * Per-agent dialectic-user-model wiring. The consolidator is the live
+   * object the runtime calls; the store is exposed alongside so the
+   * runtime's profile-inject path and tests share one state surface.
+   * Built lazily from `agent.memory.user_model` on first use.
+   */
+  private userModelWiring = new Map<
+    string,
+    { store: UserModelStore; consolidator: UserModelConsolidator }
+  >();
+  /**
+   * Test-seam overrides for {@link UserModelStore}, keyed by agent name.
+   * Set via {@link setUserModelStore} before a run; read by
+   * {@link getUserModelConsolidator} when wiring the consolidator.
+   */
+  private userModelStoreOverrides = new Map<string, UserModelStore>();
   /**
    * In-memory resolvers for interrupts waiting on operator approval.
    * Keyed by `interrupt_id`. Populated in {@link awaitApproval} before
@@ -490,6 +516,67 @@ export class AgentRunner {
     return { store, cfg };
   }
 
+  /**
+   * Test seam — pre-register a user-model store for an agent. Used by
+   * `TuttiRuntime.setUserModelStore` and unit tests that want to inject
+   * a custom or shared store across runs.
+   */
+  setUserModelStore(agent_name: string, store: UserModelStore): void {
+    this.userModelStoreOverrides.set(agent_name, store);
+    // If a consolidator was already built with the default store, drop
+    // it so the next run rebuilds against the override.
+    this.userModelWiring.delete(agent_name);
+  }
+
+  /**
+   * Resolve the dialectic-user-model wiring for an agent, constructing
+   * it lazily from `agent.memory.user_model` on first use. Returns
+   * `undefined` when the agent has no user-model configuration or it
+   * is disabled. The consolidator pulls source signal from the same
+   * agent's `user_memory` store; agents with `user_model` but no
+   * `user_memory` get a no-op consolidator that bootstraps off an
+   * empty memory list.
+   */
+  private getUserModelConsolidator(
+    agent: AgentConfig,
+  ): { store: UserModelStore; consolidator: UserModelConsolidator } | undefined {
+    const cfg = agent.memory?.user_model;
+    if (!cfg || cfg.enabled === false) return undefined;
+
+    const cached = this.userModelWiring.get(agent.name);
+    if (cached) return cached;
+
+    const store =
+      this.userModelStoreOverrides.get(agent.name) ?? new InMemoryUserModelStore();
+
+    // The consolidator needs a UserMemoryStore as its source signal.
+    // When the agent has no user_memory config we synthesise an empty
+    // ephemeral store so the consolidator can still bootstrap a profile
+    // from the conversation summaries it writes itself in future
+    // iterations. Today it just returns nothing on the first pass.
+    const memoryStore = this.getUserMemoryStore(agent)?.store
+      ?? new MemoryUserMemoryStore();
+
+    const opts: UserModelConsolidatorOptions = {
+      ...(cfg.every_n_turns !== undefined ? { every_n_turns: cfg.every_n_turns } : {}),
+      ...(cfg.consolidation_model !== undefined ? { model: cfg.consolidation_model } : {}),
+      ...(cfg.recent_memory_limit !== undefined
+        ? { recent_memory_limit: cfg.recent_memory_limit }
+        : {}),
+      events: this.events,
+    };
+    const consolidator = new UserModelConsolidator(
+      store,
+      memoryStore,
+      this.provider,
+      opts,
+    );
+
+    const wiring = { store, consolidator };
+    this.userModelWiring.set(agent.name, wiring);
+    return wiring;
+  }
+
   private async safeHook<T>(fn: (() => Promise<T> | T | undefined) | undefined): Promise<T | undefined> {
     if (!fn) return undefined;
     try {
@@ -747,11 +834,30 @@ export class AgentRunner {
           ". No other text.";
       }
 
+      // Inject the user's dialectic profile (if any) BEFORE per-fact
+      // user memories so the agent sees the holistic picture first, then
+      // the specific facts. Both injectors are independently no-op when
+      // their respective configs are absent.
+      const userMemory = this.getUserMemoryStore(agent);
+      const userModel = this.getUserModelConsolidator(agent);
+      if (userId && userModel) {
+        try {
+          const profile = await userModel.store.get(userId);
+          if (profile) {
+            baseSystemPrompt += renderProfileForPrompt(profile);
+          }
+        } catch (err) {
+          logger.warn(
+            { error: err instanceof Error ? err.message : String(err), agent: agent.name, user_id: userId },
+            "User-model load failed — continuing without injected profile",
+          );
+        }
+      }
+
       // Inject user memories ONCE before the first turn, into the base
       // prompt so they persist for every subsequent turn. Search uses the
       // raw input so the most contextually relevant memories surface.
       // No-op when either user_id or per-agent user_memory config is absent.
-      const userMemory = this.getUserMemoryStore(agent);
       let injectedUserMemories: UserMemory[] = [];
       if (userId && userMemory) {
         const limit = userMemory.cfg.inject_limit ?? 10;
@@ -1320,6 +1426,15 @@ export class AgentRunner {
         );
       }
 
+      // Fire-and-forget consolidation of the dialectic user profile.
+      // We do NOT await — the caller's run latency is bounded by the
+      // turn loop, not by the (possibly slow) consolidation LLM call.
+      // The consolidator catches every error internally so dangling
+      // promises never reach the unhandledRejection handler.
+      if (userId && userModel) {
+        void userModel.consolidator.maybeConsolidate(userId, turns);
+      }
+
       return agentResult;
     });
   }
@@ -1704,6 +1819,38 @@ function extractText(content: string | ContentBlock[] | undefined): string {
     .filter((b) => b.type === "text")
     .map((b) => (b as { text: string }).text)
     .join("\n");
+}
+
+/**
+ * Format a {@link UserProfile} for inclusion in the agent's system
+ * prompt. Returns an empty string when the profile is bootstrap-empty
+ * (no summary, no preferences, no projects) so the runtime doesn't
+ * inject dead weight on a brand-new user.
+ */
+function renderProfileForPrompt(profile: UserProfile): string {
+  const hasSummary = profile.summary.trim().length > 0;
+  const prefEntries = Object.entries(profile.preferences);
+  const hasProjects = profile.ongoing_projects.length > 0;
+  if (!hasSummary && prefEntries.length === 0 && !hasProjects) return "";
+
+  const parts: string[] = ["\n\nUser profile:"];
+  if (hasSummary) parts.push(profile.summary.trim());
+
+  if (prefEntries.length > 0) {
+    parts.push("Known preferences:");
+    for (const [key, value] of prefEntries) {
+      parts.push("- " + key + ": " + value);
+    }
+  }
+
+  if (hasProjects) {
+    parts.push("Ongoing projects:");
+    for (const proj of profile.ongoing_projects) {
+      parts.push("- " + proj);
+    }
+  }
+
+  return parts.join("\n");
 }
 
 /** Render a UserMemoryImportance literal as a human-readable label. */

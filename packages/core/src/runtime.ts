@@ -13,6 +13,7 @@ import type {
   AgentRunOptions,
   UserMemoryStore,
 } from "./memory/user/types.js";
+import type { UserModelStore } from "./memory/user-model.js";
 import type { CheckpointStore } from "./checkpoint/index.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { EventBus } from "./event-bus.js";
@@ -296,6 +297,16 @@ export class TuttiRuntime {
    */
   setUserMemoryStore(agent_name: string, store: UserMemoryStore): void {
     this._runner.setUserMemoryStore(agent_name, store);
+  }
+
+  /**
+   * Pre-register a {@link UserModelStore} for an agent so callers can
+   * inject a custom store (e.g. a Postgres-backed implementation) for
+   * the dialectic user-model. Forwards to the underlying
+   * {@link AgentRunner.setUserModelStore}.
+   */
+  setUserModelStore(agent_name: string, store: UserModelStore): void {
+    this._runner.setUserModelStore(agent_name, store);
   }
 
   /**

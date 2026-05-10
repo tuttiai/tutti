@@ -144,6 +144,23 @@ export {
   PostgresUserMemoryStore,
   createUserMemoryStore,
 } from "./memory/user/index.js";
+export {
+  InMemoryUserModelStore,
+  MAX_SUMMARY_CHARS,
+  UserProfileWritableSchema,
+  emptyProfile,
+} from "./memory/user-model.js";
+export type {
+  UserProfile,
+  UserProfileWritable,
+  UserModelStore,
+} from "./memory/user-model.js";
+export {
+  DEFAULT_EVERY_N_TURNS,
+  DEFAULT_RECENT_MEMORY_LIMIT,
+  UserModelConsolidator,
+} from "./memory/consolidator.js";
+export type { UserModelConsolidatorOptions } from "./memory/consolidator.js";
 
 // Human-in-the-loop interrupts
 export {
