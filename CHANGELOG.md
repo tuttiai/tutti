@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## v0.25.0 — All channels. All memories. All models. (2026-05-10)
+
 ### Breaking
 - **@tuttiai/types / @tuttiai/core** — `AgentConfig.semantic_memory` moved to `AgentConfig.memory.semantic`. Score files using the old top-level `semantic_memory` field must rename it. The `AgentMemoryConfig` shape itself is unchanged at its core (`enabled`, `max_memories`, `inject_system`); see "New" below for the additional fields.
 
@@ -41,6 +43,20 @@
 
 ### Docs
 - **CLAUDE.md** — `voices/telegram` and `packages/inbox` added to the monorepo structure block; `voice/telegram` and `inbox` added to the Conventional-Commits scope list (Section 8); `packages/inbox` row added to the per-package coverage table (Section 4).
+
+### Package versions
+- @tuttiai/types 0.11.3 → 0.12.0 (curated-memory shape + user-model + inbox config union + memory event variants)
+- @tuttiai/core 0.21.0 → 0.22.0 (curated-memory tools + `UserModelConsolidator` + `OpenRouterProvider` + `InboxSchema`)
+- @tuttiai/cli 0.21.0 → 0.22.0 (`tutti-ai inbox start` + exhaustive `buildAdapter` union)
+- @tuttiai/inbox 0.1.0 (new package — five-platform inbound orchestrator)
+- @tuttiai/telegram 0.1.0 (new voice — Telegraf wrapper + 4 outbound tools + shared bot client for inbox)
+- @tuttiai/email 0.1.0 (new voice — IMAP IDLE + SMTP threading + 3 tools + shared client for inbox)
+- @tuttiai/whatsapp 0.1.0 (new voice — Cloud API + signed-webhook server + 2 tools + rate-limited webhook for inbox)
+- @tuttiai/slack 0.1.0 → 0.1.1 (Socket Mode inbound + `forToken` cache + `subscribeMessage`)
+- @tuttiai/discord 0.1.0 → 0.1.1 (`forToken` cache + `DirectMessages` intent + `subscribeMessage`)
+- @tuttiai/postgres 0.1.0 → 0.1.1 (lint cleanup)
+- @tuttiai/mcp 0.1.1 → 0.1.2 (lint cleanup)
+- tutti-ai 0.18.0 → 0.25.0 (meta version aligned with release tag)
 
 ## v0.24.0 — Production Ship: Deploy, Studio, Realtime, Cost Optimisation
 

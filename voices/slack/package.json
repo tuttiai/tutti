@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/slack",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tutti voice — read, post and moderate Slack messages from agents",
   "type": "module",
   "main": "./dist/index.js",
