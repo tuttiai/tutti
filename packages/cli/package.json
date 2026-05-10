@@ -27,6 +27,7 @@
   "dependencies": {
     "@tuttiai/core": "*",
     "@tuttiai/deploy": "*",
+    "@tuttiai/inbox": "*",
     "@tuttiai/server": "*",
     "@tuttiai/studio": "*",
     "@tuttiai/types": "*",

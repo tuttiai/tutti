@@ -62,6 +62,107 @@ const TelemetrySchema = z
   })
   .strict();
 
+const InboxPlatformSchema = z.enum(["telegram", "slack", "discord", "email", "whatsapp"]);
+
+const ImapConfigSchema = z
+  .object({
+    host: z.string().min(1, "imap.host is required"),
+    port: z.number().int().min(1).max(65535),
+    user: z.string().min(1, "imap.user is required"),
+    secure: z.boolean().optional(),
+  })
+  .strict();
+
+const SmtpConfigSchema = z
+  .object({
+    host: z.string().min(1, "smtp.host is required"),
+    port: z.number().int().min(1).max(65535),
+    user: z.string().min(1, "smtp.user is required"),
+    secure: z.boolean().optional(),
+  })
+  .strict();
+
+const InboxAdapterSchema = z.discriminatedUnion("platform", [
+  z
+    .object({
+      platform: z.literal("telegram"),
+      token: z.string().min(1).optional(),
+      polling: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("slack"),
+      botToken: z.string().min(1).optional(),
+      appToken: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("discord"),
+      token: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("email"),
+      imap: ImapConfigSchema,
+      smtp: SmtpConfigSchema,
+      from: z.string().min(1, "email.from is required"),
+      maxBodyChars: z.number().int().positive().optional(),
+      inboxRedactRawText: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("whatsapp"),
+      phoneNumberId: z.string().min(1, "whatsapp.phoneNumberId is required"),
+      port: z.number().int().min(1).max(65535).optional(),
+      host: z.string().min(1).optional(),
+      graphApiVersion: z.string().regex(/^v\d+\.\d+$/, "graphApiVersion must look like 'v21.0'").optional(),
+      bodyLimit: z.number().int().positive().optional(),
+      inboxRedactRawText: z.boolean().optional(),
+    })
+    .strict(),
+]);
+
+const InboxRateLimitSchema = z.union([
+  z.object({ disabled: z.literal(true) }).strict(),
+  z
+    .object({
+      messagesPerWindow: z
+        .number()
+        .int()
+        .positive("inbox.rateLimit.messagesPerWindow must be a positive integer"),
+      windowMs: z
+        .number()
+        .int()
+        .positive("inbox.rateLimit.windowMs must be a positive integer"),
+      burst: z
+        .number()
+        .int()
+        .positive("inbox.rateLimit.burst must be a positive integer")
+        .optional(),
+    })
+    .strict(),
+]);
+
+const InboxSchema = z
+  .object({
+    agent: z.string().min(1, "inbox.agent must be a non-empty agent id"),
+    adapters: z
+      .array(InboxAdapterSchema)
+      .min(1, "inbox.adapters must declare at least one adapter"),
+    allowedUsers: z.record(InboxPlatformSchema, z.array(z.string())).optional(),
+    rateLimit: InboxRateLimitSchema.optional(),
+    maxQueuePerChat: z
+      .number()
+      .int()
+      .positive("inbox.maxQueuePerChat must be a positive integer")
+      .optional(),
+  })
+  .strict();
+
 const ParallelEntrySchema = z
   .object({
     type: z.literal("parallel"),
@@ -90,6 +191,7 @@ const ScoreSchema = z
     default_model: z.string().optional(),
     entry: EntrySchema.optional(),
     telemetry: TelemetrySchema.optional(),
+    inbox: InboxSchema.optional(),
   })
   .passthrough();
 

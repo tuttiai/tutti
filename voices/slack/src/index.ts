@@ -72,4 +72,12 @@ export type {
   SlackUserLike,
   SlackTeamLike,
   ClientFactory,
+  SlackMessageHandler,
+  SlackInboundOptions,
 } from "./client.js";
+export type {
+  SlackEventLike,
+  SlackEventEnvelope,
+  SocketModeClientLike,
+  SocketModeFactory,
+} from "./socket-mode.js";

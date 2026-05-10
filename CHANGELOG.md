@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### New
+- **@tuttiai/whatsapp** — new voice + first webhook-based inbox adapter. Two tools, both `destructive: true`: `send_text_message` (free-form, valid within the 24h customer-service window) and `send_template_message` (pre-approved Message Templates for re-engagement outside the window). The voice spins up its own Fastify server (default port 3848) hosting `GET /webhook` (Meta's verify handshake) and `POST /webhook` (signed inbound). Operationally, the operator must run a tunnel (Cloudflare Tunnel / ngrok / their own reverse proxy) and configure the Meta App Callback URL to point at it — documented as the main UX wart, not hidden. **Defence in depth on the webhook**: HMAC-SHA256 signature verification with constant-time comparison (`crypto.timingSafeEqual`); 200 ack BEFORE handler dispatch (Meta retries non-2xx within ~20s); 5 MB body cap; raw-body contentTypeParser registered explicitly because Fastify's default JSON parser would otherwise discard the buffer and silently break signature verification. Uses Meta's official Cloud API (Graph API v21.0+); does NOT use whatsapp-web.js or any unofficial WhatsApp Web automation (ToS violation, breaks on every WhatsApp update). Status updates (delivery receipts) are silently ignored. WhatsApp 24h-window error code 131047 surfaces with a plain hint pointing at `send_template_message`. Group chats and outbound media are explicitly out of scope for v0.25 (Cloud API doesn't support group webhooks; outbound media follows once the cross-platform InboxMessage attachment shape lands).
+- **@tuttiai/inbox** — fifth platform adapter shipped: `WhatsAppInboxAdapter`. Same shared-wrapper pattern as the other four — `WhatsAppClientWrapper.forKey(phoneNumberId, …)` ensures the voice's outbound tools and the inbox adapter share one Fastify webhook server per phone number id. Inbound media types (image / audio / video / document) surface as a placeholder text (`[image]` / `[image] caption` / etc.) with the resolved Cloud API URL on `InboxMessage.raw`. WhatsApp's `platform_chat_id` equals the sender's E.164 phone number — Cloud API doesn't deliver group messages over webhooks, so every conversation is 1:1.
+- **examples/marketing-agent** — added a fifth `support` agent that handles inbound across all five platforms (Telegram, Slack, Discord, email, WhatsApp). The `inbox` block wires every adapter through to it; the existing marketing orchestrator + twitter / discord / content specialists are unchanged. This is the dogfood: the marketing agent now reaches users on every channel.
+- **@tuttiai/email** — new voice. Three tools: `send_email` and `send_reply` (both `destructive: true`) + `list_inbox` (read-only). Backed by `imapflow` 1.3.3 (IMAP IDLE — server pushes new mail, no polling), `nodemailer` 8.0.7 (SMTP), and `mailparser` 3.9.8 (RFC 5322 → structured) — versions chosen to clear the `npm audit --audit-level=high` gate on shipped CVEs in older nodemailer (`GHSA-mm7p-fcc7-pg87`, `GHSA-rcmh-qjqh-p98v`, `GHSA-c7w3-x93f-qmm8`, `GHSA-vvjj-xcjg-gr5g`) and mailparser (`GHSA-7gmj-h9xc-mcxc`). Exports `EmailClientWrapper` with a `forKey(host:port:user)` shared cache so the voice's outbound tools and the `@tuttiai/inbox` email adapter share one IMAP connection and one SMTP transporter. Passwords NEVER inline — resolved via `SecretsManager.optional` from `TUTTI_EMAIL_IMAP_PASSWORD` / `TUTTI_EMAIL_SMTP_PASSWORD` (or shared `TUTTI_EMAIL_PASSWORD`).
+- **@tuttiai/inbox** — fourth platform adapter shipped: `EmailInboxAdapter` with proper RFC 5322 threading. On receive, the adapter caches the threading context (Message-ID + References + sender + subject) keyed by `platform_chat_id` (= the inbound Message-ID) in a bounded insertion-order LRU (default 1000 entries). On reply, it builds `Re: <subject>` (idempotent — no double prefix), sets `In-Reply-To` to the inbound Message-ID, and extends `References` with the inbound chain so Gmail / Outlook / Apple Mail thread the conversation correctly. Inbound text is prefixed with `Subject: …\\n\\n` so agents see the subject as conversation context. Defence-in-depth: oversized inbound (default > 1 MB plaintext) is dropped at the wrapper boundary by IMAP `SIZE` *before* parsing, and `SecretsManager.redact` runs on the dispatched body by default (opt-out via `inboxRedactRawText: false`).
+- **@tuttiai/inbox** — Slack and Discord inbox adapters now ship alongside Telegram. Both follow the established "platform = voice" pattern: each adapter dynamic-imports its voice (`@tuttiai/slack` / `@tuttiai/discord`) and consumes the voice's shared `*ClientWrapper.forToken` cache, so a score that uses a voice for outbound tools AND the inbox adapter for inbound on the same token ends up with one platform connection — Discord's Gateway API rejects two simultaneous bot sessions per token, so this is a correctness requirement, not just an optimisation. New typed config branches in `ScoreConfig.inbox.adapters`: `{ platform: "slack", botToken?, appToken? }` and `{ platform: "discord", token? }`.
+- **@tuttiai/slack** — gains inbound capability via `@slack/socket-mode` (pinned `2.0.4`). `SlackClientWrapper.forToken(botToken, factory?, { appToken, socketModeFactory? })` accepts an optional app-level token; when set, the wrapper opens one Socket Mode connection on first `subscribeMessage()` and routes `message` events (filtered to skip `bot_id` and any `subtype`) to subscribers. Outbound REST continues through the existing WebClient. New exports: `SlackMessageHandler`, `SlackInboundOptions`, `SlackEventLike`, `SlackEventEnvelope`, `SocketModeClientLike`, `SocketModeFactory`. Chose `@slack/socket-mode` over `@slack/bolt` — the lighter primitive (~30 KB) is the right fit for a single-concern listener; bolt's framework, signing-secret verification and routing are not needed here.
+- **@tuttiai/discord** — gains a `subscribeMessage(handler)` method on `DiscordClientWrapper` plus a companion `whenSubscribed()` promise so callers can await dispatcher install. The wrapper installs a single `messageCreate` listener on the underlying Client and routes events to subscribers, filtering out any `msg.author.bot` for the standard loop guard. `DEFAULT_INTENTS` now includes `GatewayIntentBits.DirectMessages` — additive, no breaking change for outbound-only consumers.
+- **@tuttiai/cli** — `tutti-ai inbox start` now accepts `slack` and `discord` adapter configs. The `buildAdapter` switch is exhaustively typed, so adding a new platform to the union without updating the CLI fails the typecheck.
+- **@tuttiai/inbox** — new package: inbound messaging orchestrator. Wires platform adapters to a score-defined agent and applies allow-list, per-user token-bucket rate limit, per-chat serial queue with bounded depth, and uniform error handling that emits typed `inbox:*` events without crashing the inbox. Telegram, Slack and Discord adapters all ship in this release; Twitter follows once `voices/twitter` adopts the shared client wrapper pattern. The platform packages (`@tuttiai/telegram`, `@tuttiai/slack`, `@tuttiai/discord`, `@tuttiai/twitter`) are declared as optional `peerDependencies` so consumers only install what they use, and adapters dynamic-import their voice for graceful "missing peer" errors.
+- **@tuttiai/telegram** — new voice: read, post and moderate Telegram messages via a bot token. Four outbound tools (`post_message`, `edit_message`, `delete_message`, `send_photo`) all marked `destructive: true`. Exports `TelegramClientWrapper` with a token-keyed shared cache (`forToken(token)`) so the voice's outbound API and the `@tuttiai/inbox` Telegram adapter share a single bot — Telegram's `getUpdates` polling does not allow two simultaneous sessions per bot token, so this is a correctness requirement.
+- **@tuttiai/cli** — new `tutti-ai inbox start [score]` command. Loads the score, builds adapters from `score.inbox.adapters`, constructs `TuttiInbox`, and runs until SIGINT/SIGTERM with parallel adapter teardown.
+- **@tuttiai/types** — `ScoreConfig` gains optional `inbox?: InboxConfig`. `InboxPlatform` widened to `"telegram" | "slack" | "discord" | "email" | "whatsapp"`. `InboxAdapterConfig` is now a discriminated union over `platform` with telegram (`token?`, `polling?`), slack (`botToken?`, `appToken?`) and discord (`token?`) variants. `TuttiEvent` extended with four new typed events: `inbox:message_received`, `inbox:message_replied`, `inbox:message_blocked` (`reason: not_allowlisted | rate_limited | queue_full | empty_text`), and `inbox:error`. The `inbox:message_received` event carries `text_length` instead of the message body — log-redaction-by-design.
+- **@tuttiai/core** — `score-schema.ts` gains a strict `InboxSchema` Zod validator: `agent` is required and non-empty, `adapters` is a discriminated union over `platform` covering telegram, slack and discord, `rateLimit` accepts either `{ disabled: true }` or `{ messagesPerWindow, windowMs, burst? }`.
+
+### Changed
+- **@tuttiai/slack** — `SlackClientWrapper` gains a static `forToken(token, factory?)` cache + reference counting on `destroy()`. `createSlackClient(...)` now resolves through the cache so two callers using the same token share a single wrapper. Existing per-instance API is preserved for tests and one-off scripts. No behavioural change for single-caller usage.
+- **@tuttiai/discord** — `DiscordClientWrapper.forToken(token, factory?)` with the same shape. **Fixes a latent dual-session bug** — Discord's Gateway API rejects two simultaneous sessions per bot token, so previously a score that loaded `voices/discord` for outbound tools and (eventually) the `@tuttiai/inbox` Discord adapter would have caused intermittent disconnects. Now they share one Gateway connection.
+
+### Security
+- **@tuttiai/whatsapp** — `buildWebhookServer` now applies a per-source-IP fixed-window rate limit on `/webhook` (default 100 req / 60s, capped at 10k tracked IPs) BEFORE signature verification. Closes a `Missing rate limiting` finding from CodeQL on the authenticated POST path: an attacker that obtained a valid App Secret could otherwise flood the webhook to amplify cost on the downstream `onPayload` dispatcher and starve real Meta deliveries. Configurable via `WhatsAppClientWrapperOptions.rateLimit` (`{ max, windowMs }`) or `false` to disable when fronted by a trusted upstream that already rate-limits.
+
+### Docs
+- **CLAUDE.md** — `voices/telegram` and `packages/inbox` added to the monorepo structure block; `voice/telegram` and `inbox` added to the Conventional-Commits scope list (Section 8); `packages/inbox` row added to the per-package coverage table (Section 4).
+
 ## v0.24.0 — Production Ship: Deploy, Studio, Realtime, Cost Optimisation
 
 The four-headline release that takes Tutti from "great in dev" to "ready in prod":
@@ -159,6 +185,40 @@ The four-headline release that takes Tutti from "great in dev" to "ready in prod
 - `search_messages` does a local case-insensitive substring scan over the last 200 messages of one channel via `conversations.history`. The workspace-wide `search.messages` endpoint requires a user token (`xoxp-`) which standard bot installs do not have, so we never reach for it — same approach as the discord voice.
 - 66 unit tests covering happy path, auth gating for every write tool, lazy-init wrapper semantics (no double init, retry-after-throw, destroy-clears-cache), and every documented Slack error code branch (`not_authed`, `invalid_auth`, `missing_scope`, `channel_not_found`, `user_not_found`, `not_in_channel`, `message_not_found`, `cant_update_message`, `cant_delete_message`, `ratelimited`, `msg_too_long`, `is_archived`, `no_text`). Line coverage 97.79 %, function coverage 97.22 %, branch coverage 82.70 % — all voice thresholds met.
 
+## v0.22.0 — Destructive-Tool HITL by Default + Twitter / Discord voices
+
+The release that closes the most-requested safety hole: any tool whose voice author marks `destructive: true` now pauses for operator approval automatically, with no per-agent wiring. Plus two messaging voices (Twitter / Discord), one-shot CLI mode, and four Dependabot advisories cleared.
+
+### New
+- **`Tool.destructive`** + automatic HITL gating — see "destructive flag" section below.
+- **`@tuttiai/twitter`** (0.1.0) — 9 tools (3 destructive write + 6 read), OAuth 1.0a or bearer-token auth.
+- **`@tuttiai/discord`** (0.1.0) — 11 tools (5 destructive write + 6 read), bot-token auth, Server Members + Message Content intent guidance in the README.
+- **`tutti-ai run -p "<prompt>"`** — one-shot non-interactive mode for scripts, CI smoke tests, shell pipelines.
+- **`tutti-ai info`** — now resolves *installed* package versions from `node_modules/<name>/package.json` instead of echoing back `*` / `^x.y.z` / `workspace:*`.
+
+### Security
+- `fastify` → `5.8.5` (body-schema validation bypass via leading-space `Content-Type`, high).
+- `protobufjs` → `7.5.5` via lockfile (arbitrary code execution, critical, transitive through `@opentelemetry/auto-instrumentations-node`).
+- `hono` → `4.12.14` via lockfile (JSX attribute HTML-injection in `hono/jsx` SSR, moderate, transitive through `@modelcontextprotocol/sdk`).
+- `npm audit --audit-level=high` clean across the monorepo.
+
+### Fixed
+- Typing `exit` / `quit` in `tutti-ai run` no longer leaves the terminal in raw mode — single `shutdown()` path explicitly calls `setRawMode(false)` + `pause()` before `process.exit(0)`. Idempotent on re-entry from SIGINT.
+
+---
+
+### Full release detail
+
+#### Added — `@tuttiai/discord` voice (11 tools)
+- New official voice at `voices/discord/`, published as `@tuttiai/discord@0.1.0`. Built on `discord.js@14.16.3`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
+- 11 tools — 5 write (destructive) + 6 read:
+  - `post_message { channel_id, content, reply_to_message_id? }`, `edit_message { channel_id, message_id, content }`, `delete_message { channel_id, message_id }`, `add_reaction { channel_id, message_id, emoji }`, `send_dm { user_id, content }` — all marked `destructive: true` so HITL-enabled runtimes gate them behind operator approval automatically.
+  - `list_messages`, `get_message`, `list_channels`, `list_members`, `search_messages`, `get_guild_info` — read-only.
+- Auth resolution is lazy and fail-soft: missing `DISCORD_BOT_TOKEN` returns a `kind: "missing"` client; tool calls short-circuit with `is_error` and a hint pointing at the Developer Portal plus the privileged-intent toggles needed (`Server Members`, `Message Content`). Construction never throws.
+- `search_messages` does a local case-insensitive substring scan over the last 100 messages in one channel — the workspace-wide search endpoint Discord exposes is not available to bot tokens, so we don't reach for it (same approach as the slack voice).
+- `add_reaction` accepts unicode emoji or `name:id` custom-emoji shorthand and normalises before calling the API.
+- README ships with full bot-setup walkthrough (Developer Portal → bot creation → privileged intents → OAuth2 URL generator → invite to server) so the first run after `tutti-ai add discord` is a fifteen-minute path, not a Discord-API research project.
+
 #### Added — `@tuttiai/twitter` voice (9 tools)
 - New official voice at `voices/twitter/`, published as `@tuttiai/twitter@0.1.0`. Built on `twitter-api-v2@1.29.0`; zero-dep at runtime beyond that + `zod` + `@tuttiai/types`.
 - 9 tools — 3 write (destructive) + 6 read:
@@ -200,6 +260,14 @@ The four-headline release that takes Tutti from "great in dev" to "ready in prod
 #### Fixed — `tutti-ai info` resolves installed package versions
 - `tutti-ai info` now reads `node_modules/<name>/package.json` to show the actual installed version of each `@tuttiai/*` dependency instead of echoing back the spec string (e.g. `0.18.3` instead of `*`, `^1.0.0`, or `workspace:*`). Falls back to the spec when the package isn't installed or its manifest is unreadable.
 - `resolveInstalledVersion(name, spec, cwd?)` exported from `packages/cli/src/commands/info.ts` — pure helper with 4 unit tests covering installed / missing / malformed manifest / missing-version cases.
+
+### Package versions
+- @tuttiai/types — gains optional `Tool.destructive` field (additive)
+- @tuttiai/core — `needsApproval` consults the `destructive` flag; `AgentRunner` forwards it at the existing gate site
+- @tuttiai/cli — `tutti-ai run -p` one-shot mode; `tutti-ai info` resolves installed versions
+- @tuttiai/twitter 0.1.0 (new package — 9 tools)
+- @tuttiai/discord 0.1.0 (new package — 11 tools)
+- @tuttiai/server — fastify 5.8.5 (security)
 
 ## [0.21.0] - 2026-04-15
 

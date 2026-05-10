@@ -99,3 +99,16 @@ With a HITL-enabled runtime, any `post_message` / `delete_message` / `send_dm` c
 ## Lifecycle
 
 The voice's discord.js Client is lazily logged in on the first tool call and kept warm for the lifetime of the voice. Call `voice.teardown()` (or `TuttiRuntime.teardown()`) on shutdown to close the gateway connection cleanly.
+
+## Inbound (inbox)
+
+The same `DiscordClientWrapper` powers [`@tuttiai/inbox`](/guides/inbox/)'s Discord adapter. Discord's Gateway API allows only one bot session per token, so the inbox adapter and the voice share a single Client via `DiscordClientWrapper.forToken(token)`. Configure the inbox adapter in your score:
+
+```ts
+inbox: {
+  agent: "support",
+  adapters: [{ platform: "discord" }],  // token from DISCORD_BOT_TOKEN
+}
+```
+
+The default intents now include `DirectMessages` so DM-flow inbox use works out of the box. Messages from any bot (yours or third-party) are filtered out of the dispatcher to prevent reply loops.

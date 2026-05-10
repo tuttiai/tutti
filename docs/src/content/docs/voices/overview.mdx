@@ -14,10 +14,18 @@ A **voice** is a pluggable package that gives agents tools and capabilities. Eac
 | [Filesystem](/voices/filesystem) | `@tuttiai/filesystem` | `filesystem` | 7 | Read, write, search, and manage local files |
 | [GitHub](/voices/github) | `@tuttiai/github` | `network` | 10 | Issues, PRs, repos, code search |
 | [Playwright](/voices/playwright) | `@tuttiai/playwright` | `network`, `browser` | 12 | Browser automation, screenshots, page interaction |
-| Web | `@tuttiai/web` | `network` | 3 | Search the web, fetch URLs, parse sitemaps |
-| Sandbox | `@tuttiai/sandbox` | `shell` | 4 | Execute TypeScript, Python, Bash + sandboxed file I/O |
-| RAG | `@tuttiai/rag` | `filesystem`, `network` | ingest, chunk, embed, search | Retrieval-augmented generation over your own documents |
-| MCP Bridge | `@tuttiai/mcp` | `network` | dynamic | Wrap any MCP server as a Tutti voice |
+| [Web](/voices/web) | `@tuttiai/web` | `network` | 3 | Search the web, fetch URLs, parse sitemaps |
+| [Sandbox](/voices/sandbox) | `@tuttiai/sandbox` | `shell` | 4 | Execute TypeScript, Python, Bash + sandboxed file I/O |
+| [RAG](/voices/rag) | `@tuttiai/rag` | `filesystem`, `network` | ingest, chunk, embed, search | Retrieval-augmented generation over your own documents |
+| [Slack](/voices/slack) | `@tuttiai/slack` | `network` | 11 (5 destructive) | Channels, threads, DMs, reactions |
+| [Discord](/voices/discord) | `@tuttiai/discord` | `network` | 11 (5 destructive) | Messages, channels, members, reactions, DMs |
+| [Twitter](/voices/twitter) | `@tuttiai/twitter` | `network` | 9 (3 destructive) | Tweets, threads, mentions, timeline |
+| [Postgres](/voices/postgres) | `@tuttiai/postgres` | `network` | 8 (1 destructive) | Read-only query + schema introspection + write escape hatch |
+| [Stripe](/voices/stripe) | `@tuttiai/stripe` | `network` | 27 (9 destructive) | Customers, payments, subs, invoices, balance |
+| [Realtime](/voices/realtime) | `@tuttiai/realtime` | `network` | 1 + audio bridge | OpenAI Realtime API — voice in / voice out with HITL gating |
+| [MCP Bridge](/voices/mcp) | `@tuttiai/mcp` | `network` | dynamic | Wrap any MCP server as a Tutti voice |
+
+Destructive tools (posting, deleting, sending, paying) gate behind operator approval automatically — see [HITL by default](/guides/security#human-in-the-loop).
 
 ## Installing a voice
 
@@ -28,6 +36,12 @@ npx tutti-ai add playwright
 npx tutti-ai add web
 npx tutti-ai add sandbox
 npx tutti-ai add rag
+npx tutti-ai add slack
+npx tutti-ai add discord
+npx tutti-ai add twitter
+npx tutti-ai add postgres
+npx tutti-ai add stripe
+npx tutti-ai add realtime
 npx tutti-ai add mcp
 ```
 

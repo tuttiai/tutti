@@ -1,5 +1,11 @@
 import { WebClient } from "@slack/web-api";
 import { SecretsManager } from "@tuttiai/core";
+import {
+  defaultSocketModeFactory,
+  type SocketModeClientLike,
+  type SocketModeFactory,
+  type SlackEventLike,
+} from "./socket-mode.js";
 
 /** Narrow shape of a Slack message returned by conversations.history. */
 export interface SlackMessageLike {
@@ -154,10 +160,99 @@ function defaultFactory(token: string): SlackClientLike {
  * Slack's WebClient is stateless HTTP under the hood, so there is no
  * gateway connection to keep alive — but we still memoise so we don't
  * repeatedly allocate axios agents and retry queues.
+ *
+ * Construction modes:
+ * - {@link forToken} (preferred) — token-keyed shared instance with
+ *   reference counting. Multiple callers that ask for the same token
+ *   (e.g. `voices/slack` for outbound tools and `@tuttiai/inbox` for
+ *   the inbound adapter) share one wrapper; {@link destroy} only
+ *   tears down once the last holder releases. Required when the same
+ *   token is used in more than one place to avoid duplicate auth
+ *   plumbing.
+ * - `new SlackClientWrapper(token)` — standalone (not cached). Useful
+ *   for tests and one-off scripts. {@link destroy} clears immediately.
  */
+/**
+ * Handler invoked by {@link SlackClientWrapper.subscribeMessage} for
+ * every inbound non-bot, no-subtype `message` event delivered through
+ * Socket Mode. The wrapper filters out bot messages (`bot_id`) and
+ * non-default message subtypes (edits, channel-joins, …) before
+ * dispatch, so handlers don't need to re-implement the loop guard.
+ */
+export type SlackMessageHandler = (event: SlackEventLike) => void | Promise<void>;
+
+/** Optional Socket Mode configuration on {@link SlackClientWrapper.forToken}. */
+export interface SlackInboundOptions {
+  /**
+   * App-level token (`xapp-…`) for Socket Mode. Without this the
+   * wrapper has no inbound capability — `subscribeMessage` will throw
+   * on the first registration.
+   */
+  appToken?: string;
+  /** Custom Socket Mode factory — primarily for tests. */
+  socketModeFactory?: SocketModeFactory;
+}
+
 export class SlackClientWrapper {
+  /** Token-keyed cache of shared wrappers. Exposed for tests. */
+  static readonly cache = new Map<string, SlackClientWrapper>();
+
   private client?: SlackClientLike;
   private initPromise?: Promise<SlackClientLike>;
+  private cacheKey?: string;
+  private refCount = 0;
+  private appToken?: string;
+  private socketModeFactory: SocketModeFactory = defaultSocketModeFactory;
+  private socket?: SocketModeClientLike;
+  private socketStarted = false;
+  private socketStartPromise?: Promise<void>;
+  private readonly subscribers = new Set<SlackMessageHandler>();
+  private dispatcherInstalled = false;
+
+  /**
+   * Get-or-create a shared, ref-counted wrapper for the given bot
+   * token. Subsequent calls with the same token return the same
+   * instance and bump the ref-count; the underlying state is only
+   * released when {@link destroy} has been called once per `forToken`
+   * call.
+   *
+   * The cache key is the bot token (`xoxb-…`) — the canonical Slack
+   * identity. Pass `inbound.appToken` to enable Socket Mode for
+   * inbox-style use; the first caller's `appToken` wins. Subsequent
+   * `forToken` calls with a *different* `appToken` are silently
+   * accepted but the wrapper keeps the original — Socket Mode is
+   * single-connection per app.
+   */
+  static forToken(
+    token: string,
+    factory: ClientFactory = defaultFactory,
+    inbound: SlackInboundOptions = {},
+  ): SlackClientWrapper {
+    const existing = this.cache.get(token);
+    if (existing) {
+      existing.refCount += 1;
+      // Promote inbound config from the first caller that supplies it,
+      // so `voices/slack` (outbound, no appToken) followed by
+      // `@tuttiai/inbox` (inbound, with appToken) ends up Socket-Mode-
+      // ready without forcing a destroy/recreate cycle.
+      if (existing.appToken === undefined && inbound.appToken !== undefined) {
+        existing.appToken = inbound.appToken;
+        if (inbound.socketModeFactory !== undefined) {
+          existing.socketModeFactory = inbound.socketModeFactory;
+        }
+      }
+      return existing;
+    }
+    const wrapper = new SlackClientWrapper(token, factory);
+    wrapper.cacheKey = token;
+    wrapper.refCount = 1;
+    if (inbound.appToken !== undefined) wrapper.appToken = inbound.appToken;
+    if (inbound.socketModeFactory !== undefined) {
+      wrapper.socketModeFactory = inbound.socketModeFactory;
+    }
+    this.cache.set(token, wrapper);
+    return wrapper;
+  }
 
   constructor(
     private readonly token: string,
@@ -185,13 +280,122 @@ export class SlackClientWrapper {
     }
   }
 
-  destroy(): Promise<void> {
+  /**
+   * Subscribe to inbound `message` events delivered through Socket
+   * Mode. Throws synchronously if the wrapper has no `appToken` —
+   * callers must construct via `forToken(botToken, factory, { appToken })`
+   * before subscribing. The wrapper installs a single `slack_event`
+   * dispatcher on the underlying `SocketModeClient` the first time
+   * anyone subscribes; bot messages (`bot_id`) and non-default
+   * subtypes (edits, channel-joins, …) are filtered out before the
+   * handler is invoked.
+   *
+   * Eagerly triggers {@link launch} so subscribers don't have to
+   * remember to start the socket explicitly. Returns an unsubscribe
+   * function.
+   */
+  subscribeMessage(handler: SlackMessageHandler): () => void {
+    if (this.appToken === undefined) {
+      throw new Error(
+        "SlackClientWrapper.subscribeMessage requires an `appToken` (xapp-…). " +
+          "Pass one via SlackClientWrapper.forToken(botToken, factory, { appToken }) " +
+          "or via SLACK_APP_TOKEN through the Slack inbox adapter.",
+      );
+    }
+    this.subscribers.add(handler);
+    void this.launch();
+    return () => {
+      this.subscribers.delete(handler);
+    };
+  }
+
+  /**
+   * Open the Socket Mode connection. Idempotent — repeated calls share
+   * the same in-flight `start()`. No-op when no `appToken` is set; the
+   * wrapper raises only on `subscribeMessage` so outbound-only callers
+   * can ignore inbound entirely.
+   */
+  async launch(): Promise<void> {
+    if (this.appToken === undefined) return;
+    if (this.socketStarted) return;
+    if (this.socketStartPromise) return this.socketStartPromise;
+    this.socketStartPromise = (async () => {
+      const socket = this.socket ?? this.socketModeFactory(this.appToken!);
+      this.socket = socket;
+      if (!this.dispatcherInstalled) {
+        socket.on("slack_event", (envelope) => {
+          // ack first thing — Slack retries un-acked events.
+          void envelope.ack().catch(() => {
+            // Failure to ack just means Slack will resend; not fatal.
+          });
+          const evt = envelope.body.event;
+          if (!evt || evt.type !== "message") return;
+          if (evt.subtype !== undefined) return;
+          if (evt.bot_id !== undefined) return;
+          void this.dispatchMessage(evt);
+        });
+        this.dispatcherInstalled = true;
+      }
+      await socket.start();
+      this.socketStarted = true;
+    })();
+    try {
+      await this.socketStartPromise;
+    } catch (err) {
+      this.socketStartPromise = undefined;
+      throw err;
+    }
+  }
+
+  private async dispatchMessage(event: SlackEventLike): Promise<void> {
+    // Snapshot subscribers — handlers may unsubscribe themselves.
+    for (const handler of [...this.subscribers]) {
+      try {
+        await handler(event);
+      } catch {
+        // Wrapper is not the place for error reporting — the inbox
+        // orchestrator emits typed inbox:error events on its handler
+        // throws. Swallow here to keep the dispatcher loop intact.
+      }
+    }
+  }
+
+  async destroy(): Promise<void> {
+    if (this.cacheKey !== undefined) {
+      this.refCount -= 1;
+      if (this.refCount > 0) return;
+      SlackClientWrapper.cache.delete(this.cacheKey);
+      this.cacheKey = undefined;
+      this.refCount = 0;
+    }
+    this.subscribers.clear();
+    if (this.socket && this.socketStarted) {
+      try {
+        await this.socket.disconnect();
+      } catch {
+        // Disconnect failure is best-effort — the process is going
+        // down or the wrapper is being released; nothing useful to do.
+      }
+    }
+    this.socket = undefined;
+    this.socketStarted = false;
+    this.socketStartPromise = undefined;
+    this.dispatcherInstalled = false;
     // The Slack WebClient holds no long-lived sockets, so destroy is just
     // a cache clear. Kept for symmetry with the discord voice + the Voice
     // teardown contract — hence the `Promise<void>` return.
     this.client = undefined;
     this.initPromise = undefined;
-    return Promise.resolve();
+  }
+
+  /** For tests and diagnostics — current shared-cache ref count. */
+  get _refCount(): number {
+    return this.refCount;
+  }
+
+  /** For tests — has the Socket Mode connection been started? */
+  get _socketStarted(): boolean {
+    return this.socketStarted;
   }
 }
 
@@ -230,6 +434,6 @@ export function createSlackClient(options: SlackClientOptions = {}): SlackClient
 
   return {
     kind: "ready",
-    wrapper: new SlackClientWrapper(token, options.clientFactory),
+    wrapper: SlackClientWrapper.forToken(token, options.clientFactory),
   };
 }

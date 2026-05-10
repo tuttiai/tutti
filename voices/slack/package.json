@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@slack/socket-mode": "2.0.4",
     "@slack/web-api": "7.10.0",
     "zod": "3.25.76"
   },

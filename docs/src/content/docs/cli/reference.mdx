@@ -32,10 +32,12 @@ message.
 
 - **Project lifecycle** — [`init`](#tutti-ai-init-project-name), [`templates`](#tutti-ai-templates), [`check`](#tutti-ai-check-score) / [`doctor`](#tutti-ai-doctor-score), [`info`](#tutti-ai-info-score)
 - **Running agents** — [`run`](#tutti-ai-run-score), [`serve`](#tutti-ai-serve-score), [`studio`](#tutti-ai-studio-score), [`resume`](#tutti-ai-resume-session-id), [`replay`](#tutti-ai-replay-session-id)
+- **Deployment** — [`deploy`](#tutti-ai-deploy)
 - **Voices** — [`add`](#tutti-ai-add-voice), [`voices`](#tutti-ai-voices), [`search`](#tutti-ai-search-query), [`publish`](#tutti-ai-publish)
 - **Packages** — [`update`](#tutti-ai-update), [`outdated`](#tutti-ai-outdated), [`upgrade`](#tutti-ai-upgrade-voice)
 - **Scheduling** — [`schedule`](#tutti-ai-schedule-score), [`schedules`](#tutti-ai-schedules)
 - **Observability** — [`traces`](#tutti-ai-traces)
+- **Cost analysis** — [`analyze costs`](#tutti-ai-analyze-costs), [`report costs`](#tutti-ai-report-costs), [`budgets`](#tutti-ai-budgets)
 - **Memory** — [`memory`](#tutti-ai-memory)
 - **Evaluation** — [`eval`](#tutti-ai-eval)
 - **Human-in-the-loop** — [`interrupts`](#tutti-ai-interrupts) / [`approve`](#tutti-ai-approve)
@@ -269,6 +271,7 @@ tutti-ai serve ./custom-score.ts     # custom score path
 tutti-ai serve --port 8080           # custom port
 tutti-ai serve --watch               # reload on file changes
 tutti-ai serve -a researcher         # expose a specific agent
+tutti-ai serve --realtime            # also mount the OpenAI Realtime WebSocket
 ```
 
 **Options:**
@@ -280,6 +283,7 @@ tutti-ai serve -a researcher         # expose a specific agent
 | `-k, --api-key <key>` | `TUTTI_API_KEY` env | Bearer token clients must send. |
 | `-a, --agent <name>` | `score.entry` or first agent | Which agent the default endpoint routes to. |
 | `-w, --watch` | off | Reload the score and restart the server on file changes. |
+| `--realtime` | off | Mount the realtime WebSocket + demo page (requires `OPENAI_API_KEY` and a `realtime` block on the agent). |
 
 **Endpoints:**
 
@@ -288,7 +292,15 @@ POST  /run              # non-streaming agent call
 POST  /run/stream       # SSE streaming (tokens + events)
 GET   /sessions/:id     # session history
 GET   /health           # health check
+GET   /cost/runs        # last 100 runs with cost (requires RunCostStore)
+GET   /cost/budgets     # per-agent budget config + current spend
+GET   /cost/tools       # per-tool call counts from the live tracer window
+
+GET   /realtime         # WebSocket — proxies the OpenAI Realtime API (--realtime only)
+GET   /realtime-demo    # public mic-capture demo page (--realtime only)
 ```
+
+The realtime WebSocket authenticates inline against `?api_key=...` because browsers cannot set `Authorization` on `new WebSocket(url)`. Connections are rejected with `4404 / realtime_disabled_for_agent` when the agent's `realtime` config is `undefined` or `false`, and `4500 / missing_openai_api_key` when `OPENAI_API_KEY` is unset. See [the realtime guide](/voices/realtime) for the full frame protocol and the `RealtimeVoice` setup.
 
 **Environment variables:**
 
@@ -381,6 +393,84 @@ tutti-ai replay 811b3b38 --score ./custom.score.ts
 | `-s, --score <path>` | `./tutti.score.ts` | Score file to load for "replay-from" branching. |
 
 Interactive controls: `n` (next turn), `p` (prev turn), `b` (branch from here), `q` (quit).
+
+---
+
+## Deployment
+
+### `tutti-ai deploy`
+
+Bundle your score and ship it to a hosting platform. Bundles include a Dockerfile, `docker-compose.yml`, and platform-specific config (`fly.toml`, `railway.json`) generated from a `DeployConfig` block on the agent.
+
+```bash
+tutti-ai deploy --target docker                # generate Docker bundle in ./tutti-deploy/
+tutti-ai deploy --target railway               # bundle + railway up
+tutti-ai deploy --target fly                   # bundle + fly deploy
+tutti-ai deploy --target railway --dry-run     # print the plan without executing
+```
+
+**Options:**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `--target <platform>` | (required) | One of `docker`, `railway`, `fly`. |
+| `--dry-run` | false | Print the plan + generated files without invoking the platform CLI. |
+| `-s, --score <path>` | `./tutti.score.ts` | Score file to load. |
+| `-o, --out <dir>` | `./tutti-deploy` | Output directory for generated bundle. |
+
+**Pre-flight checks** run before any I/O:
+
+- `scanForSecrets()` walks the score and every imported package's entry file for `process.env.X` reads, filters Node built-ins, and emits errors for undeclared required vars.
+- `validateSecrets()` warns on secret-shaped names (`*_KEY`, `*_TOKEN`, `*_SECRET`) sitting in plaintext `deploy.env`. Plaintext API keys block the deploy fail-fast.
+- A `.env.deploy.example` is written next to your score on every real-run mode invocation so missing-vars are obvious before the platform rejects them.
+
+**Score-side configuration:** add a `deploy` block to one agent in your score. Exactly one agent should declare it (the deploy entrypoint).
+
+```ts
+import { defineScore } from "@tuttiai/core";
+
+export default defineScore({
+  agents: {
+    api: {
+      name: "api",
+      // ...
+      deploy: {
+        target: "fly",                              // optional override; --target wins
+        region: "auto",
+        scale: { min: 0, max: 3, memory: "512MB" },
+        health: { path: "/health", interval_seconds: 30 },
+        env: { LOG_LEVEL: "info" },
+        secrets: ["ANTHROPIC_API_KEY", "DATABASE_URL"],
+      },
+    },
+  },
+});
+```
+
+### `tutti-ai deploy status`
+
+Platform-equivalent status check. Dispatches to `railway status` / `fly status` / `docker compose ps` based on the target.
+
+```bash
+tutti-ai deploy status
+```
+
+### `tutti-ai deploy logs`
+
+Stream platform logs.
+
+```bash
+tutti-ai deploy logs            # last 100 lines
+tutti-ai deploy logs --tail     # follow
+```
+
+### `tutti-ai deploy rollback`
+
+Roll back to the previous deploy. Dispatches to the platform's equivalent (`railway rollback`, `fly releases rollback <prev>`, `docker compose pull && up -d` for the prior tag).
+
+```bash
+tutti-ai deploy rollback
+```
 
 ---
 
