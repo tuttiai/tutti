@@ -39,6 +39,10 @@
     "node": ">=24"
   },
   "overrides": {
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "fast-uri": "^3.1.2",
+    "hono": "^4.12.18",
+    "ip-address": "^10.2.0",
+    "express-rate-limit": "^8.5.1"
   }
 }

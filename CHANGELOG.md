@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Security
+- Repo-wide `npm audit --audit-level=high` returns 0 vulnerabilities again. Added root `overrides` for `fast-uri ^3.1.2` (`GHSA-q3j6-qgpj-74h6` path traversal high, `GHSA-v39h-62p7-jpjc` host confusion), `hono ^4.12.18` (`GHSA-9vqf-7f2p-gf9v`, `GHSA-69xw-7hcm-h432`, `GHSA-qp7p-654g-cw7p`, `GHSA-hm8q-7f3q-5f36`, `GHSA-p77w-8qqv-26rm`), `ip-address ^10.2.0` (`GHSA-v2v4-37r5-5v8g`), and `express-rate-limit ^8.5.1`. All four are transitive deps of `@modelcontextprotocol/sdk` (via `@tuttiai/mcp`) and `fastify` (via `@tuttiai/server`); no public API change.
+
 ### Breaking
 - **@tuttiai/types / @tuttiai/core** — `AgentConfig.semantic_memory` moved to `AgentConfig.memory.semantic`. Score files using the old top-level `semantic_memory` field must rename it. The `AgentMemoryConfig` shape itself is unchanged at its core (`enabled`, `max_memories`, `inject_system`); see "New" below for the additional fields.
 
