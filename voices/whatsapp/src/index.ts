@@ -1,6 +1,5 @@
 import type { Permission, Tool, Voice } from "@tuttiai/types";
 import {
-  WhatsAppClientWrapper,
   createWhatsAppClient,
   type WhatsAppClient,
   type WhatsAppClientOptions,
