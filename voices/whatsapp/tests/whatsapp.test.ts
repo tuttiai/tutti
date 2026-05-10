@@ -344,6 +344,75 @@ describe("WhatsAppClientWrapper webhook routes", () => {
     expect(b).toHaveBeenCalledTimes(1);
   });
 
+  it("rate-limits POST /webhook beyond the configured per-IP cap", async () => {
+    const wrapper = new WhatsAppClientWrapper({
+      ...baseConfig,
+      fetchFn: makeFetchOk({}),
+      rateLimit: { max: 2, windowMs: 60_000 },
+    });
+    const app = wrapper._app!;
+    const payload = makePayload({
+      messages: [{ from: "1", id: "x", timestamp: "1700000000", type: "text", text: { body: "hi" } }],
+    });
+    const body = JSON.stringify(payload);
+    const sig = signBody(body, "app-secret");
+    const send = () =>
+      app.inject({
+        method: "POST",
+        url: "/webhook",
+        headers: { "content-type": "application/json", "x-hub-signature-256": sig },
+        payload: body,
+      });
+    expect((await send()).statusCode).toBe(200);
+    expect((await send()).statusCode).toBe(200);
+    const third = await send();
+    expect(third.statusCode).toBe(429);
+    expect(third.json()).toEqual({ error: "rate_limited" });
+  });
+
+  it("rate-limits GET /webhook verification too (DoS defence)", async () => {
+    const wrapper = new WhatsAppClientWrapper({
+      ...baseConfig,
+      fetchFn: makeFetchOk({}),
+      rateLimit: { max: 1, windowMs: 60_000 },
+    });
+    const app = wrapper._app!;
+    const params = {
+      "hub.mode": "subscribe",
+      "hub.verify_token": "verify-secret",
+      "hub.challenge": "abc",
+    };
+    expect((await app.inject({ method: "GET", url: "/webhook", query: params })).statusCode).toBe(
+      200,
+    );
+    expect((await app.inject({ method: "GET", url: "/webhook", query: params })).statusCode).toBe(
+      429,
+    );
+  });
+
+  it("rateLimit: false disables the limiter (high-volume trusted upstream)", async () => {
+    const wrapper = new WhatsAppClientWrapper({
+      ...baseConfig,
+      fetchFn: makeFetchOk({}),
+      rateLimit: false,
+    });
+    const app = wrapper._app!;
+    const payload = makePayload({
+      messages: [{ from: "1", id: "x", timestamp: "1700000000", type: "text", text: { body: "hi" } }],
+    });
+    const body = JSON.stringify(payload);
+    const sig = signBody(body, "app-secret");
+    for (let i = 0; i < 5; i++) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/webhook",
+        headers: { "content-type": "application/json", "x-hub-signature-256": sig },
+        payload: body,
+      });
+      expect(res.statusCode).toBe(200);
+    }
+  });
+
   it("redacts secrets in the dispatched text by default", async () => {
     const wrapper = new WhatsAppClientWrapper({ ...baseConfig, fetchFn: makeFetchOk({}) });
     const handler = vi.fn();

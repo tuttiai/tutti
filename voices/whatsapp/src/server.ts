@@ -17,6 +17,19 @@ declare module "fastify" {
 /** Handler invoked for every authenticated inbound payload. */
 export type WebhookHandler = (payload: InboundWebhookPayload) => void | Promise<void>;
 
+/**
+ * Per-source rate limit applied at the HTTP boundary, before signature
+ * verification. Defence-in-depth against floods that could DoS the
+ * server or the downstream `onPayload` dispatcher even when their HMAC
+ * is invalid.
+ */
+export interface WebhookRateLimit {
+  /** Max requests per source per window. Default 100. */
+  max?: number;
+  /** Window length in milliseconds. Default 60_000 (1 minute). */
+  windowMs?: number;
+}
+
 export interface WebhookServerOptions {
   verifyToken: string;
   appSecret: string;
@@ -24,6 +37,48 @@ export interface WebhookServerOptions {
   bodyLimit?: number;
   /** Inbound dispatch handler — called AFTER the 200 ack is sent. */
   onPayload: WebhookHandler;
+  /**
+   * HTTP-level rate limit applied per source IP before signature
+   * verification. Defaults to 100 requests / 60s per IP. Set
+   * `rateLimit: false` to disable (only safe behind a trusted upstream
+   * that already rate-limits).
+   */
+  rateLimit?: WebhookRateLimit | false;
+}
+
+const DEFAULT_RATE_LIMIT_MAX = 100;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
+/** Cap on tracked source IPs to bound memory under attack. */
+const RATE_LIMIT_MAX_KEYS = 10_000;
+
+/**
+ * Tiny per-key fixed-window counter used by the webhook server. Drops
+ * the oldest key when the map exceeds {@link RATE_LIMIT_MAX_KEYS} so a
+ * pathological IP-spoofing flood cannot grow memory without bound.
+ */
+class WebhookRateLimiter {
+  private readonly buckets = new Map<string, { resetAt: number; count: number }>();
+  constructor(private readonly max: number, private readonly windowMs: number) {}
+
+  allow(key: string, now: number): boolean {
+    const bucket = this.buckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      if (this.buckets.size >= RATE_LIMIT_MAX_KEYS) {
+        const oldest = this.buckets.keys().next().value;
+        if (oldest !== undefined) this.buckets.delete(oldest);
+      }
+      this.buckets.set(key, { resetAt: now + this.windowMs, count: 1 });
+      return true;
+    }
+    if (bucket.count >= this.max) return false;
+    bucket.count += 1;
+    return true;
+  }
+
+  /** Test-only — clear all tracked buckets. */
+  clear(): void {
+    this.buckets.clear();
+  }
 }
 
 /**
@@ -47,6 +102,29 @@ export function buildWebhookServer(options: WebhookServerOptions): FastifyInstan
     logger: false,
     bodyLimit: options.bodyLimit ?? 5 * 1024 * 1024,
   });
+
+  const limiter =
+    options.rateLimit === false
+      ? null
+      : new WebhookRateLimiter(
+          options.rateLimit?.max ?? DEFAULT_RATE_LIMIT_MAX,
+          options.rateLimit?.windowMs ?? DEFAULT_RATE_LIMIT_WINDOW_MS,
+        );
+
+  if (limiter) {
+    server.addHook("onRequest", (req, reply, done) => {
+      if (req.method !== "POST" && req.method !== "GET") {
+        done();
+        return;
+      }
+      const key = req.ip || "unknown";
+      if (!limiter.allow(key, Date.now())) {
+        reply.code(429).send({ error: "rate_limited" });
+        return;
+      }
+      done();
+    });
+  }
 
   // Preserve the raw body so we can verify Meta's HMAC signature.
   // Fastify's default JSON parser discards the buffer, which silently

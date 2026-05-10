@@ -44,6 +44,12 @@ export interface WhatsAppClientWrapperOptions {
   redactRawText?: boolean;
   /** Body limit on the webhook endpoint. Default 5 MB. */
   bodyLimit?: number;
+  /**
+   * Per-source-IP rate limit at the webhook HTTP boundary. Defaults to
+   * 100 req / 60s per IP. Pass `false` to disable when running behind
+   * a trusted upstream that already rate-limits.
+   */
+  rateLimit?: { max?: number; windowMs?: number } | false;
   /** Test-only — inject a mock fetch for outbound Graph calls. */
   fetchFn?: FetchLike;
 }
@@ -117,6 +123,7 @@ export class WhatsAppClientWrapper {
       verifyToken: options.verifyToken,
       appSecret: options.appSecret,
       ...(options.bodyLimit !== undefined ? { bodyLimit: options.bodyLimit } : {}),
+      ...(options.rateLimit !== undefined ? { rateLimit: options.rateLimit } : {}),
       onPayload: (payload) => this.handlePayload(payload),
     });
   }
@@ -318,6 +325,12 @@ export interface WhatsAppClientOptions {
   graphApiVersion?: string;
   redactRawText?: boolean;
   bodyLimit?: number;
+  /**
+   * Per-source-IP rate limit at the webhook HTTP boundary. Defaults to
+   * 100 req / 60s per IP. Pass `false` to disable when running behind
+   * a trusted upstream that already rate-limits.
+   */
+  rateLimit?: { max?: number; windowMs?: number } | false;
   /** Test-only — injectable fetch for outbound Graph calls. */
   fetchFn?: FetchLike;
 }
@@ -362,6 +375,7 @@ export function createWhatsAppClient(options: WhatsAppClientOptions): WhatsAppCl
   if (options.graphApiVersion !== undefined) wrapperOptions.graphApiVersion = options.graphApiVersion;
   if (options.redactRawText !== undefined) wrapperOptions.redactRawText = options.redactRawText;
   if (options.bodyLimit !== undefined) wrapperOptions.bodyLimit = options.bodyLimit;
+  if (options.rateLimit !== undefined) wrapperOptions.rateLimit = options.rateLimit;
   if (options.fetchFn !== undefined) wrapperOptions.fetchFn = options.fetchFn;
 
   const key = WhatsAppClientWrapper.keyFor({ phoneNumberId: options.phoneNumberId });
