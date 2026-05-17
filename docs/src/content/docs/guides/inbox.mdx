@@ -1,11 +1,11 @@
 ---
 title: "Inbox — Inbound Messaging"
-description: "Wire Telegram (and future Slack/Discord) inbound messages to a Tutti agent with @tuttiai/inbox"
+description: "Wire Telegram, Slack, Discord, email and WhatsApp inbound messages to a Tutti agent with @tuttiai/inbox"
 sidebar:
   order: 11
 ---
 
-`@tuttiai/inbox` turns a Tutti agent into something users can actually message — Telegram in v0.25.0, with Slack/Discord/Twitter to follow. It's a thin orchestrator on top of platform adapters: every adapter dispatches inbound messages to one score-defined agent, the agent's reply is shipped back through the same adapter, and the orchestrator applies allow-list, rate-limit, queue, and error policy uniformly.
+`@tuttiai/inbox` turns a Tutti agent into something users can actually message — Telegram, Slack, Discord, email and WhatsApp all ship in v0.25.0; Twitter follows once its voice's shared client lands. It's a thin orchestrator on top of platform adapters: every adapter dispatches inbound messages to one score-defined agent, the agent's reply is shipped back through the same adapter, and the orchestrator applies allow-list, rate-limit, queue, and error policy uniformly.
 
 ## Quick start (Telegram)
 

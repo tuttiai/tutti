@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-Tutti ships with three built-in LLM providers. They all implement the same `LLMProvider` interface, so you can swap them with a single line change.
+Tutti ships with four built-in LLM providers. They all implement the same `LLMProvider` interface, so you can swap them with a single line change.
 
 ## Anthropic (Claude)
 
@@ -62,6 +62,39 @@ const provider = new GeminiProvider({ api_key: "AIza..." });
 :::caution
 Gemini requires an API key — it will throw at construction time if neither `api_key` nor `GEMINI_API_KEY` is set.
 :::
+
+## OpenRouter (300+ models, one API key)
+
+OpenRouter is an OpenAI-compatible aggregator that routes requests to 300+ models across providers (Anthropic, OpenAI, Google, Meta, Mistral, …) through a single API key. Use it when you want to try many models without juggling provider-specific keys, or when you want OpenRouter's cross-provider failover.
+
+```ts
+import { OpenRouterProvider } from "@tuttiai/core";
+
+const provider = new OpenRouterProvider();
+// or with explicit options:
+const provider = new OpenRouterProvider({
+  api_key: "sk-or-...",
+  http_referer: "https://example.com",  // opt-in attribution for openrouter.ai/rankings
+  x_title: "My App",                     // opt-in attribution for openrouter.ai/rankings
+  route: "fallback",                     // retry against backup providers on error
+  models: ["anthropic/claude-sonnet-4", "openai/gpt-4o"], // ordered fallback list
+});
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `api_key` | `OPENROUTER_API_KEY` env var | API key |
+| `base_url` | `https://openrouter.ai/api/v1` | Override for self-hosted OpenRouter forks |
+| `http_referer` | unset | Opt-in `HTTP-Referer` attribution header |
+| `x_title` | unset | Opt-in `X-Title` attribution header |
+| `route` | unset | `'fallback'` enables OpenRouter's cross-provider retry |
+| `models` | unset | Ordered list of fallback model ids |
+
+**Models:** namespaced — e.g. `anthropic/claude-sonnet-4`, `openai/gpt-4o`, `google/gemini-2.0-flash`, `meta-llama/llama-3.3-70b-instruct`. See [openrouter.ai/models](https://openrouter.ai/models) for the live catalogue.
+
+**Cost reporting:** OpenRouter returns per-call USD cost inline via its `usage: { include: true }` extension. The cost is surfaced on `ChatResponse.usage.cost_usd` and `StreamChunk.usage.cost_usd` — no second `/generation` round trip required. Your `RunCostStore`-backed daily/monthly budgets work identically to the native providers.
+
+**Errors:** 401 → `AuthenticationError`, 429 → `RateLimitError` (with `Retry-After` parsing), other HTTP errors → `ProviderError` with `status` preserved. Same shape as the other providers, so retry/backoff policy is unchanged.
 
 ## Switching providers
 

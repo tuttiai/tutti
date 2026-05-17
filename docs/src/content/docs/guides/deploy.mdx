@@ -76,8 +76,12 @@ Tutti generates the bundle in `./tutti-deploy/`, writes `.env.deploy.example`, a
 | `docker` | `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `deploy.sh` | `docker compose build && docker compose up -d` |
 | `railway` | All Docker files + `railway.json` | `railway up` |
 | `fly` | All Docker files + `fly.toml` | `fly deploy` |
+| `modal` | `modal_app.py`, `tutti.score.ts`, `.env.modal.example`, `deploy.sh` | `modal deploy modal_app.py` |
+| `daytona` | `.devcontainer/devcontainer.json`, `.daytona/snapshots.yaml`, `.gitignore`, `daytona.sh` | `daytona create --no-ide` |
 
 The Docker bundle runs as non-root user `tutti` (uid 1001), exposes port 3000 (configurable), and includes a healthcheck against the `health.path` you set. `NODE_OPTIONS --max-old-space-size` is computed from `scale.memory` so the runtime won't OOM under platform-imposed memory caps.
+
+The Daytona bundle stands up a persistent dev environment from `mcr.microsoft.com/devcontainers/typescript-node:22`, installs `tutti-ai` via `postCreateCommand`, and forwards port 3000. After `daytona create` finishes, `daytona.sh` SSHes in and starts `tutti-ai serve`. The emitted `.daytona/snapshots.yaml` requests idle-hibernation (5 min) and auto-resume — its field names are not yet verified against the current Daytona schema, so the file ships with a TODO banner; treat hibernation as best-effort until that's confirmed.
 
 ### Conditional services
 

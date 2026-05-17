@@ -115,6 +115,16 @@ House rules:
     brand/positioning.md.
   - Keep outputs concise. Tweets under 240 characters. Discord
     messages under 400.`,
+      // Deploy block exists for the CI Modal smoke test in
+      // .github/workflows/modal-smoke.yml — `name: "tutti-smoke"` pins the
+      // Modal app id so the workflow can `modal app stop tutti-smoke` after
+      // a successful health-check poll.
+      deploy: {
+        target: "modal",
+        name: "tutti-smoke",
+        secrets: ["ANTHROPIC_API_KEY"],
+        scale: { memory: "512mb" },
+      },
     },
 
     twitter: {
@@ -246,6 +256,67 @@ whether to post.
 Do not invent product features, versions, or metrics. If the brand
 docs don't mention something, say so and ask the orchestrator for
 approval before inventing it.`,
+    },
+
+    // ── Scheduled — Friday 5pm weekly recap to #marketing ────────────
+    // Cron drives this agent; the scheduler delivers the agent's
+    // markdown reply to Slack via the @tuttiai/slack voice. The agent
+    // never calls a write tool directly, so HITL isn't required here.
+    // Cron is evaluated in the runtime process's local time — set TZ
+    // on the process if you need a fixed timezone.
+    "weekly-recap": {
+      name: "Weekly Recap Bot",
+      role: "specialist",
+      model: "claude-sonnet-4-6",
+      permissions: ["network"],
+      voices: [new TwitterVoice(), new SlackVoice()],
+      // The agent prompt forbids posting, but TwitterVoice and SlackVoice
+      // both ship destructive tools — gate them at the runtime so a
+      // misbehaving run can't bypass the prompt and emit on either
+      // platform. Delivery to #marketing is handled by the scheduler.
+      requireApproval: [
+        "post_tweet",
+        "post_thread",
+        "delete_tweet",
+        "post_message",
+        "update_message",
+        "delete_message",
+        "add_reaction",
+        "send_dm",
+      ],
+      budget: { max_cost_usd: 0.15 },
+      schedule: {
+        cron: "0 17 * * 5",
+        input:
+          "Summarise this week's Twitter engagement: top tweets by impressions " +
+          "and replies, mention spikes, follower delta, and one note on what " +
+          "to repeat next week.",
+        deliver: { platform: "slack", channel: "#marketing" },
+        deliver_format: "markdown",
+      },
+      system_prompt: `You produce the weekly Twitter recap for the
+marketing channel.
+
+Data gathering — read-only Twitter tools only:
+  - get_timeline / search_tweets — the past 7 days of own-account tweets
+    and mentions.
+  - list_mentions / list_replies — engagement quality, not just volume.
+  - get_user — current follower count to compute the week-over-week
+    delta (you'll need to remember last week's count from prior runs;
+    if you don't have it, report only the absolute number).
+
+Output rules:
+  - Markdown. Four short sections: Top tweets, Mention spikes, Follower
+    delta, Repeat next week.
+  - Top tweets: max 3, with one-line tweet preview + impressions +
+    replies + permalink.
+  - Mention spikes: anything notably above the weekly baseline; skip if
+    the week was quiet.
+  - "Repeat next week": one sentence — what worked, said as an action.
+  - Total length under 1500 characters.
+
+Do NOT post anything from this agent. Return the markdown as your
+final reply; the scheduler delivers it to #marketing.`,
     },
   },
 

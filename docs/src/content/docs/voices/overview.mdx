@@ -17,8 +17,11 @@ A **voice** is a pluggable package that gives agents tools and capabilities. Eac
 | [Web](/voices/web) | `@tuttiai/web` | `network` | 3 | Search the web, fetch URLs, parse sitemaps |
 | [Sandbox](/voices/sandbox) | `@tuttiai/sandbox` | `shell` | 4 | Execute TypeScript, Python, Bash + sandboxed file I/O |
 | [RAG](/voices/rag) | `@tuttiai/rag` | `filesystem`, `network` | ingest, chunk, embed, search | Retrieval-augmented generation over your own documents |
-| [Slack](/voices/slack) | `@tuttiai/slack` | `network` | 11 (5 destructive) | Channels, threads, DMs, reactions |
-| [Discord](/voices/discord) | `@tuttiai/discord` | `network` | 11 (5 destructive) | Messages, channels, members, reactions, DMs |
+| [Slack](/voices/slack) | `@tuttiai/slack` | `network` | 11 (5 destructive) | Channels, threads, DMs, reactions — Socket Mode inbound for `@tuttiai/inbox` |
+| [Discord](/voices/discord) | `@tuttiai/discord` | `network` | 11 (5 destructive) | Messages, channels, members, reactions, DMs — Gateway inbound for `@tuttiai/inbox` |
+| [Telegram](/voices/telegram) | `@tuttiai/telegram` | `network` | 4 (4 destructive) | Send / edit / delete messages + photo + shared bot client for `@tuttiai/inbox` |
+| [Email](/voices/email) | `@tuttiai/email` | `network` | 3 (2 destructive) | IMAP IDLE inbox + SMTP outbound with RFC 5322 threading |
+| [WhatsApp](/voices/whatsapp) | `@tuttiai/whatsapp` | `network` | 2 (2 destructive) | Meta Cloud API — text + Message Templates + signed-webhook server |
 | [Twitter](/voices/twitter) | `@tuttiai/twitter` | `network` | 9 (3 destructive) | Tweets, threads, mentions, timeline |
 | [Postgres](/voices/postgres) | `@tuttiai/postgres` | `network` | 8 (1 destructive) | Read-only query + schema introspection + write escape hatch |
 | [Stripe](/voices/stripe) | `@tuttiai/stripe` | `network` | 27 (9 destructive) | Customers, payments, subs, invoices, balance |
@@ -38,6 +41,9 @@ npx tutti-ai add sandbox
 npx tutti-ai add rag
 npx tutti-ai add slack
 npx tutti-ai add discord
+npx tutti-ai add telegram
+npx tutti-ai add email
+npx tutti-ai add whatsapp
 npx tutti-ai add twitter
 npx tutti-ai add postgres
 npx tutti-ai add stripe

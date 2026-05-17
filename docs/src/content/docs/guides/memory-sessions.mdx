@@ -5,10 +5,14 @@ sidebar:
   order: 6
 ---
 
-Tutti has two kinds of memory:
+Tutti has four kinds of memory:
 
 - **Session memory** — conversation history within a single session (short-term)
-- **Semantic memory** — facts the agent remembers across sessions (long-term)
+- **Semantic memory** — facts the agent remembers about its own work, across sessions (long-term, agent-scoped)
+- **User memory** — per-fact entries attached to an end-user identifier, scoped across agents (long-term, user-scoped)
+- **User model** — one rolling LLM-summarised profile per end-user — `summary`, `preferences`, `ongoing_projects` — that complements the per-fact `user_memory` store
+
+The four are independent: enable whichever fit the agent. `semantic` and the `user_*` stores share no rows; `user_model` summarises `user_memory` but does not replace it.
 
 ## Session memory
 
@@ -187,6 +191,62 @@ This is simple and predictable. Future versions will support embedding-based sea
 | `store.search(query, agent_name, limit)` | Search by keyword overlap |
 | `store.delete(id)` | Delete one memory |
 | `store.clear(agent_name)` | Delete all memories for an agent |
+
+:::caution[Migrating from < v0.25.0]
+The agent-level `semantic_memory` field has moved to `memory.semantic`. Update your scores:
+
+```diff
+agents: {
+  coder: {
+-   semantic_memory: { enabled: true, max_memories: 5 },
++   memory: { semantic: { enabled: true, max_memories: 5 } },
+  }
+}
+```
+
+The shape of the inner object is unchanged.
+:::
+
+## User model (dialectic profile)
+
+`memory.user_model` is a per-user rolling profile — `summary`, `preferences`, `ongoing_projects` — re-summarised by an LLM every N turns. It complements (does not replace) `user_memory`: per-fact entries continue to live in the `UserMemoryStore` exactly as before, and the consolidator reads from that store to produce a holistic profile that gets injected into the system prompt above the existing "What I remember about you:" block.
+
+```ts
+{
+  assistant: {
+    memory: {
+      user_memory: { enabled: true, auto_extract: true },
+      user_model: {
+        enabled: true,
+        every_n_turns: 20,             // consolidate every N turns (default 20)
+        recent_memory_limit: 50,        // entries fed to the consolidator (default 50)
+        // consolidation_model: "claude-haiku-4-20250514", // optional small/cheap model
+      },
+    },
+  },
+}
+
+// Pass the user_id so the profile is scoped correctly:
+await tutti.run("assistant", "Hi again", undefined, { user_id: "alice" });
+```
+
+**Behaviour:**
+
+- The runtime injects the profile into the system prompt at run start. Empty/bootstrap profiles do not inject — no dead weight on brand-new users.
+- Consolidation is **fire-and-forget**: failures are caught, logged, and never crash the run. The previous profile is preserved on JSON parse / schema-validation failure.
+- Empty profiles are skipped by the consolidator entirely — no LLM cost on a brand-new `user_id`.
+- The consolidation prompt explicitly forbids storing sensitive data (passwords, API keys, SSNs, payment-card numbers, government identifiers).
+- Subscribe to `user_model:consolidated` for telemetry / sync to a downstream system.
+
+```ts
+tutti.events.on("user_model:consolidated", (e) => {
+  console.log(`profile updated for ${e.user_id} (turns since last: ${e.turns_since_last})`);
+});
+```
+
+The `UserModelStore` interface is pluggable. `InMemoryUserModelStore` ships in v0.25.0; a Postgres backend will land behind the same interface (mirroring the `UserMemoryStore` factory pattern). Tests can swap in a mock via `runtime.setUserModelStore(...)`.
+
+A 25-turn end-to-end demonstration with a mock LLM provider lives at [`examples/user-model.ts`](https://github.com/tuttiai/tutti/blob/main/examples/user-model.ts) — it shows the consolidator triggering at every-5-turn cadence, the profile evolving, and the final dump.
 
 ## Multi-turn sessions
 

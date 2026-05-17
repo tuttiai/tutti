@@ -31,7 +31,7 @@ message.
 ## Command groups
 
 - **Project lifecycle** — [`init`](#tutti-ai-init-project-name), [`templates`](#tutti-ai-templates), [`check`](#tutti-ai-check-score) / [`doctor`](#tutti-ai-doctor-score), [`info`](#tutti-ai-info-score)
-- **Running agents** — [`run`](#tutti-ai-run-score), [`serve`](#tutti-ai-serve-score), [`studio`](#tutti-ai-studio-score), [`resume`](#tutti-ai-resume-session-id), [`replay`](#tutti-ai-replay-session-id)
+- **Running agents** — [`run`](#tutti-ai-run-score), [`serve`](#tutti-ai-serve-score), [`studio`](#tutti-ai-studio-score), [`inbox start`](#tutti-ai-inbox-start-score), [`resume`](#tutti-ai-resume-session-id), [`replay`](#tutti-ai-replay-session-id)
 - **Deployment** — [`deploy`](#tutti-ai-deploy)
 - **Voices** — [`add`](#tutti-ai-add-voice), [`voices`](#tutti-ai-voices), [`search`](#tutti-ai-search-query), [`publish`](#tutti-ai-publish)
 - **Packages** — [`update`](#tutti-ai-update), [`outdated`](#tutti-ai-outdated), [`upgrade`](#tutti-ai-upgrade-voice)
@@ -41,6 +41,7 @@ message.
 - **Memory** — [`memory`](#tutti-ai-memory)
 - **Evaluation** — [`eval`](#tutti-ai-eval)
 - **Human-in-the-loop** — [`interrupts`](#tutti-ai-interrupts) / [`approve`](#tutti-ai-approve)
+- **Skills** — [`skills`](#tutti-ai-skills)
 
 ---
 
@@ -350,6 +351,61 @@ Opens the browser automatically. Four panels:
 4. **Token usage** — running total of input/output tokens and cost estimate
 
 Also exposes a REST API for programmatic access: `/api/score`, `/api/sessions`, `/api/run`.
+
+### `tutti-ai inbox start [score]`
+
+Start the inbound messaging orchestrator — wires platform adapters declared on `score.inbox.adapters` to the agent named in `score.inbox.agent`, and runs until SIGINT/SIGTERM. Telegram, Slack, Discord, email, and WhatsApp ship in v0.25.0; Twitter follows once its voice's shared client lands.
+
+```bash
+tutti-ai inbox start                    # defaults to ./tutti.score.ts
+tutti-ai inbox start ./path/to/score.ts # custom path
+```
+
+**Score example:**
+
+```ts
+import { defineScore } from "@tuttiai/core";
+import { TelegramVoice } from "@tuttiai/telegram";
+
+export default defineScore({
+  agents: {
+    support: {
+      name: "support",
+      system_prompt: "You are a Telegram support agent.",
+      voices: [new TelegramVoice()],
+      permissions: ["network"],
+    },
+  },
+  inbox: {
+    agent: "support",
+    adapters: [{ platform: "telegram" }],
+    // Optional:
+    // allowedUsers: { telegram: ["123456789"] },
+    // rateLimit: { messagesPerWindow: 60, windowMs: 60_000, burst: 20 },
+    // maxQueuePerChat: 10,
+  },
+});
+```
+
+**Behaviour:**
+
+- Loads the score, builds adapters from `score.inbox.adapters`, constructs `TuttiInbox`, and calls `.start()`.
+- Each adapter logs a "connected" line on start.
+- `inbox:message_received` / `inbox:message_replied` / `inbox:message_blocked` / `inbox:error` events stream through the runtime's event bus.
+- SIGINT/SIGTERM trigger parallel adapter teardown — every platform connection (Telegram poll, Slack Socket Mode socket, Discord Gateway, IMAP IDLE, WhatsApp Fastify webhook server) is closed cleanly before exit.
+- The `buildAdapter` switch is exhaustively typed — adding a new platform to the `InboxAdapterConfig` union without updating the CLI fails the typecheck.
+
+**Required env vars (per platform):**
+
+| Platform | Vars |
+| -------- | ---- |
+| Telegram | `TELEGRAM_BOT_TOKEN` |
+| Slack | `SLACK_BOT_TOKEN` (`xoxb-…`) + `SLACK_APP_TOKEN` (`xapp-…` for Socket Mode) |
+| Discord | `DISCORD_BOT_TOKEN` |
+| Email | `TUTTI_EMAIL_PASSWORD` (or `TUTTI_EMAIL_IMAP_PASSWORD` + `TUTTI_EMAIL_SMTP_PASSWORD`) |
+| WhatsApp | `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_VERIFY_TOKEN` + `WHATSAPP_APP_SECRET` (+ a public tunnel pointing at port 3848) |
+
+See the [Inbox guide](/guides/inbox) for adapter-specific setup, identity linking, and per-platform safety defaults.
 
 ### `tutti-ai resume <session-id>`
 
@@ -843,6 +899,38 @@ Alias for the interactive TUI (`tutti-ai interrupts` with no subcommand). Same f
 ```bash
 tutti-ai approve
 ```
+
+---
+
+## Skills
+
+### `tutti-ai skills`
+
+Review and approve skill candidates synthesised from agent trajectories. Backed by the `@tuttiai/skills` store; today the CLI uses a process-scoped in-memory store, so review sessions are most useful alongside a long-running `tutti-ai serve` or `tutti-ai run --watch` that emits proposals.
+
+```bash
+tutti-ai skills list                          # approved skills
+tutti-ai skills proposed                      # pending candidates
+tutti-ai skills review                        # walk every pending candidate
+tutti-ai skills review <candidate-id>         # review one
+tutti-ai skills reject <candidate-id> --reason "..."
+```
+
+**Common options:**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `-s, --score <path>` | `./tutti.score.ts` | Score file path. |
+| `--by <name>` | unset | Reviewer identifier (stored as `reviewed_by` on the audit record). |
+
+The interactive review screen shows the candidate's name, agent (resolved from its first evidence trajectory), input/output signature, constituent tools, computed `is_destructive` flag, the union of `required_permissions`, and a sample of evidence trajectories. The action prompt accepts:
+
+- `a` — approve with the synthesiser's description as the system prompt
+- `e` — edit the system prompt, then approve
+- `r` — reject (prompts for a free-text reason)
+- `s` — skip to the next candidate
+
+**Constituent-tool resolution.** Approval computes `is_destructive` as the union of each constituent tool's `destructive` flag and `required_permissions` as the union of the owning voices' permissions. If any constituent tool no longer resolves against the loaded score (typically because the voice was removed since the candidate was proposed), approval is blocked with an actionable error pointing at `tutti-ai skills reject`. Reviewers should add the voice back to an agent in the score or reject the candidate.
 
 ---
 
