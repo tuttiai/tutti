@@ -36,6 +36,9 @@ export default defineConfig({
         "src/commands/traces.ts",
         "src/commands/memory.ts",
         "src/commands/interrupts.ts",
+        // skills.ts orchestrates score loading + enquirer-driven review;
+        // pure helpers and rendering are tested directly via re-exports.
+        "src/commands/skills.ts",
         // deploy.ts has thoroughly-tested pure helpers and orchestrator
         // branches that spawn real CLIs; the latter are E2E-only.
       ],

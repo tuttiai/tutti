@@ -78,7 +78,14 @@ import {
   deployRollbackCommand,
   type DeployOptions,
 } from "./commands/deploy.js";
+import { verifyHibernateCommand } from "./commands/deploy-verify-hibernate.js";
 import { inboxStartCommand } from "./commands/inbox.js";
+import {
+  skillsListCommand,
+  skillsProposedCommand,
+  skillsRejectCommand,
+  skillsReviewCommand,
+} from "./commands/skills.js";
 
 const program = new Command();
 
@@ -618,9 +625,9 @@ program
 
 const deployCmd = program
   .command("deploy")
-  .description("Bundle and deploy the score to docker, railway, or fly")
+  .description("Bundle and deploy the score to docker, railway, fly, or modal")
   .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
-  .option("-t, --target <target>", "Override the score's deploy target: docker | railway | fly")
+  .option("-t, --target <target>", "Override the score's deploy target: docker | railway | fly | modal")
   .option("-o, --out-dir <path>", "Output directory for generated files (default: ./.tutti/deploy)")
   .option("--dry-run", "Generate files and print the commands that would run, without executing them")
   .action(async (opts: { score?: string; target?: string; outDir?: string; dryRun?: boolean }) => {
@@ -658,6 +665,16 @@ deployCmd
     await deployRollbackCommand(opts);
   });
 
+deployCmd
+  .command("verify-hibernate")
+  .description("Check the score against the serverless-hibernation contract")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (opts: { score?: string }) => {
+    await verifyHibernateCommand(
+      opts.score !== undefined ? { score: opts.score } : {},
+    );
+  });
+
 const inboxCmd = program
   .command("inbox")
   .description("Inbound messaging — dispatch platform messages (Telegram, ...) to a score-defined agent");
@@ -667,6 +684,56 @@ inboxCmd
   .description("Start the inbox: connect every adapter declared in score.inbox.adapters and run until Ctrl+C")
   .action(async (score: string | undefined) => {
     await inboxStartCommand(score);
+  });
+
+const skillsCmd = program
+  .command("skills")
+  .description("Review and approve skill candidates synthesised from agent trajectories");
+
+skillsCmd
+  .command("list")
+  .description("List approved skills (newest first)")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (opts: { score?: string }) => {
+    await skillsListCommand(opts.score);
+  });
+
+skillsCmd
+  .command("proposed")
+  .description("List pending skill candidates awaiting review")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .action(async (opts: { score?: string }) => {
+    await skillsProposedCommand(opts.score);
+  });
+
+skillsCmd
+  .command("review [candidate-id]")
+  .description("Interactively review pending candidates (one specific id, or walk them all)")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .option("--by <name>", "Reviewer identifier (reviewed_by field)")
+  .action(async (candidateId: string | undefined, opts: { score?: string; by?: string }) => {
+    const reviewOpts: Parameters<typeof skillsReviewCommand>[1] = {
+      ...(opts.score !== undefined ? { scorePath: opts.score } : {}),
+      ...(opts.by !== undefined ? { reviewedBy: opts.by } : {}),
+    };
+    await skillsReviewCommand(candidateId, reviewOpts);
+  });
+
+skillsCmd
+  .command("reject <candidate-id>")
+  .description("Reject a pending candidate without entering the interactive review")
+  .requiredOption("--reason <text>", "Free-text rejection reason (stored in the audit record)")
+  .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
+  .option("--by <name>", "Reviewer identifier (reviewed_by field)")
+  .action(async (
+    candidateId: string,
+    opts: { reason: string; score?: string; by?: string },
+  ) => {
+    await skillsRejectCommand(candidateId, {
+      reason: opts.reason,
+      ...(opts.score !== undefined ? { scorePath: opts.score } : {}),
+      ...(opts.by !== undefined ? { reviewedBy: opts.by } : {}),
+    });
   });
 
 program.parse();

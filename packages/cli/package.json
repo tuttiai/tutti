@@ -29,6 +29,7 @@
     "@tuttiai/deploy": "*",
     "@tuttiai/inbox": "*",
     "@tuttiai/server": "*",
+    "@tuttiai/skills": "*",
     "@tuttiai/studio": "*",
     "@tuttiai/types": "*",
     "chalk": "5.6.2",

@@ -44,8 +44,8 @@ describe("parseTargetFlag", () => {
   });
 
   it("rejects cloudflare even though @tuttiai/deploy supports it as a manifest target", () => {
-    // The CLI deliberately ships only docker / railway / fly today; cloudflare
-    // would silently produce no Worker bundle.
+    // The CLI deliberately does not ship a Cloudflare Worker bundler yet —
+    // accepting the flag would silently produce no Worker bundle.
     expect(() => parseTargetFlag("cloudflare")).toThrow();
   });
 });
@@ -64,7 +64,13 @@ describe("resolveDeployTarget", () => {
   it("throws when the manifest is cloudflare and no override is supplied", () => {
     expect(() =>
       resolveDeployTarget(baseManifest({ target: "cloudflare" }), null),
-    ).toThrow(/Cloudflare/);
+    ).toThrow(/cloudflare deployment is not yet wired up/);
+  });
+
+  it("resolves a daytona manifest target now that the bundler is wired up", () => {
+    expect(resolveDeployTarget(baseManifest({ target: "daytona" }), null)).toBe(
+      "daytona",
+    );
   });
 
   it("allows --target to rescue a cloudflare manifest", () => {

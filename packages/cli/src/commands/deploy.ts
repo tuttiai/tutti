@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile, chmod } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { execSync, spawnSync } from "node:child_process";
@@ -11,6 +11,13 @@ import {
   buildDockerCompose,
   buildDeployScript,
   buildFlyConfig,
+  buildModalApp,
+  buildModalEnvExample,
+  buildModalDeployScript,
+  buildDevcontainer,
+  buildSnapshotsYaml,
+  buildDaytonaGitignore,
+  buildDaytonaScript,
   scanForSecrets,
   validateSecrets,
   buildEnvExample,
@@ -22,11 +29,17 @@ import type {
 
 /**
  * Targets the CLI knows how to deploy. Strict subset of `DEPLOY_TARGETS`
- * exported by `@tuttiai/deploy`: `cloudflare` is intentionally excluded
- * here because no Worker bundler is wired up yet — we'd rather error loudly
- * than half-deploy.
+ * exported by `@tuttiai/deploy`: `cloudflare` is intentionally excluded here
+ * because no bundler is wired up for it yet — we'd rather error loudly than
+ * half-deploy.
  */
-export const CLI_DEPLOY_TARGETS = ["docker", "railway", "fly"] as const;
+export const CLI_DEPLOY_TARGETS = [
+  "docker",
+  "railway",
+  "fly",
+  "modal",
+  "daytona",
+] as const;
 export type CliDeployTarget = (typeof CLI_DEPLOY_TARGETS)[number];
 
 /**
@@ -111,7 +124,7 @@ export function parseTargetFlag(raw: string | undefined): CliDeployTarget | null
 /**
  * Pick the final target. The `--target` flag wins when set; otherwise the
  * manifest's target is used. The CLI does not yet ship a Cloudflare
- * bundler — fail loud if that's what the score declared.
+ * bundler — fail loud if that is what the score declared.
  */
 export function resolveDeployTarget(
   manifest: DeployManifest,
@@ -120,7 +133,7 @@ export function resolveDeployTarget(
   if (flag !== null) return flag;
   if (manifest.target === "cloudflare") {
     throw new Error(
-      "Cloudflare deployment is not yet wired up in the CLI. Pass --target docker|railway|fly to override.",
+      `${manifest.target} deployment is not yet wired up in the CLI. Pass --target ${CLI_DEPLOY_TARGETS.join("|")} to override.`,
     );
   }
   return manifest.target;
@@ -190,6 +203,109 @@ function planRailway(manifest: DeployManifest): DeployPlan {
 }
 
 /**
+ * Build the deploy plan for modal. Emits `modal_app.py`, a copy of the score,
+ * `.env.modal.example`, and an executable `deploy.sh`, then runs
+ * `modal deploy modal_app.py` from `outDir`.
+ *
+ * Unlike docker/railway/fly, modal needs the score file inside the bundle
+ * (it's referenced by `add_local_file` in the generated python), so the score
+ * path is required and threaded through the file list.
+ */
+function planModal(
+  manifest: DeployManifest,
+  outDir: string,
+  scoreContents: string,
+): DeployPlan {
+  const files: DeployFileStep[] = [
+    { path: resolve(outDir, "modal_app.py"), contents: buildModalApp(manifest) },
+    { path: resolve(outDir, "tutti.score.ts"), contents: scoreContents },
+    {
+      path: resolve(outDir, ".env.modal.example"),
+      contents: buildModalEnvExample(manifest),
+    },
+    {
+      path: resolve(outDir, "deploy.sh"),
+      contents: buildModalDeployScript(manifest),
+      executable: true,
+    },
+  ];
+
+  return {
+    target: "modal",
+    manifest,
+    files,
+    commands: [
+      {
+        argv: ["modal", "deploy", "modal_app.py"],
+        description: "Deploy to Modal",
+      },
+    ],
+    requiredBinaries: [
+      {
+        name: "modal",
+        installHint: "Install Modal CLI: pip install modal",
+      },
+    ],
+    nextSteps: [
+      `modal app logs ${manifest.name}    # tail function logs`,
+      `modal app stop ${manifest.name}    # stop the deployment`,
+    ],
+  };
+}
+
+/**
+ * Build the deploy plan for daytona. Emits a devcontainer bundle
+ * (`.devcontainer/devcontainer.json`, `.daytona/snapshots.yaml`, `.gitignore`,
+ * `daytona.sh`) into `outDir`, then runs `daytona create --no-ide` from
+ * `outDir`. The Tutti server is started over SSH inside the workspace by
+ * `daytona.sh`, so the only platform command run from `outDir` is `create`.
+ */
+function planDaytona(manifest: DeployManifest, outDir: string): DeployPlan {
+  const files: DeployFileStep[] = [
+    {
+      path: resolve(outDir, ".devcontainer", "devcontainer.json"),
+      contents: buildDevcontainer(manifest),
+    },
+    {
+      path: resolve(outDir, ".daytona", "snapshots.yaml"),
+      contents: buildSnapshotsYaml(),
+    },
+    {
+      path: resolve(outDir, ".gitignore"),
+      contents: buildDaytonaGitignore(),
+    },
+    {
+      path: resolve(outDir, "daytona.sh"),
+      contents: buildDaytonaScript(manifest),
+      executable: true,
+    },
+  ];
+
+  return {
+    target: "daytona",
+    manifest,
+    files,
+    commands: [
+      {
+        argv: ["daytona", "create", "--no-ide"],
+        description: "Create Daytona workspace",
+      },
+    ],
+    requiredBinaries: [
+      {
+        name: "daytona",
+        installHint:
+          "Install Daytona CLI: https://www.daytona.io/docs/installation",
+      },
+    ],
+    nextSteps: [
+      "daytona list                              # show workspaces",
+      `daytona ssh -- tutti-ai serve --score /workspaces/${manifest.name}/tutti.score.ts`,
+    ],
+  };
+}
+
+/**
  * Build the deploy plan for fly. Generates `fly.toml` and reuses the docker
  * Dockerfile (fly's `--dockerfile` build path) — both files go in `outDir`
  * — then runs `fly deploy --config fly.toml` from `outDir`.
@@ -229,11 +345,17 @@ function planFly(manifest: DeployManifest, outDir: string): DeployPlan {
  * Build a deploy plan for the chosen target. Pure: same inputs always yield
  * the same plan, so tests compare plans directly without temp dirs or
  * spawned processes.
+ *
+ * `scoreContents` is only required for `modal`, which embeds the score file
+ * in the bundle. Pass `""` (or omit) for docker / railway / fly — they ignore
+ * it. The function throws if `modal` is requested without contents to
+ * surface the misuse early rather than emitting an empty score.
  */
 export function buildDeployPlan(
   manifest: DeployManifest,
   target: CliDeployTarget,
   outDir: string,
+  scoreContents: string = "",
 ): DeployPlan {
   switch (target) {
     case "docker":
@@ -242,6 +364,15 @@ export function buildDeployPlan(
       return planRailway(manifest);
     case "fly":
       return planFly(manifest, outDir);
+    case "modal":
+      if (scoreContents === "") {
+        throw new Error(
+          "buildDeployPlan('modal', ...) requires the score file contents — pass them as the fourth argument.",
+        );
+      }
+      return planModal(manifest, outDir, scoreContents);
+    case "daytona":
+      return planDaytona(manifest, outDir);
   }
 }
 
@@ -414,7 +545,10 @@ export async function deployCommand(
   }
 
   const outDir = resolve(opts.outDir ?? DEFAULT_OUT_DIR);
-  const plan = buildDeployPlan(manifest, target, outDir);
+  // Modal embeds the score file in the bundle — read it once here and pass
+  // the contents into the (pure) plan builder. Other targets ignore it.
+  const scoreContents = target === "modal" ? readFileSync(scorePath, "utf-8") : "";
+  const plan = buildDeployPlan(manifest, target, outDir, scoreContents);
   const envExamplePath = resolve(dirname(scorePath), ".env.deploy.example");
 
   if (opts.dryRun === true) {
@@ -453,7 +587,10 @@ export async function deployCommand(
 
   for (const cmd of plan.commands) {
     console.log(chalk.dim(`  ${cmd.description}: ${cmd.argv.join(" ")}`));
-    const cwd = target === "fly" ? outDir : process.cwd();
+    const cwd =
+      target === "fly" || target === "modal" || target === "daytona"
+        ? outDir
+        : process.cwd();
     const { status } = runner.spawn(cmd.argv, { cwd });
     if (status !== 0) {
       fail(`Command failed (exit ${String(status)}): ${cmd.argv.join(" ")}`);
@@ -472,22 +609,26 @@ export async function deployCommand(
 }
 
 /**
- * Map each target to the platform CLI invocations behind `status`, `logs`,
- * and `rollback`. Centralised so adding a target later (cloudflare,
- * heroku) is a one-place edit. Docker has no platform service to query,
- * so its entries are `null` and the subcommands fail with a clean
- * "not applicable" message.
+ * One target's platform CLI invocations for `status` / `logs` / `rollback`.
+ * Each entry is a function of the manifest so targets that need the app name
+ * on the command line (modal) can templatise it; targets that read from a
+ * CWD config file (railway, fly) just ignore the argument.
  */
-const SUBCOMMAND_DISPATCH: Record<
-  CliDeployTarget,
-  {
-    status: string[] | null;
-    logs: string[] | null;
-    logsTail: string[] | null;
-    rollback: string[] | null;
-    binary: string;
-  }
-> = {
+interface SubcommandDispatchEntry {
+  status: ((m: DeployManifest) => string[]) | null;
+  logs: ((m: DeployManifest) => string[]) | null;
+  logsTail: ((m: DeployManifest) => string[]) | null;
+  rollback: ((m: DeployManifest) => string[]) | null;
+  binary: string;
+}
+
+/**
+ * Map each target to its platform CLI invocations. Centralised so adding a
+ * target later is a one-place edit. Docker has no platform service to query,
+ * so its entries are `null` and the subcommands fail with a clean "not
+ * applicable" message.
+ */
+const SUBCOMMAND_DISPATCH: Record<CliDeployTarget, SubcommandDispatchEntry> = {
   docker: {
     status: null,
     logs: null,
@@ -496,18 +637,35 @@ const SUBCOMMAND_DISPATCH: Record<
     binary: "docker",
   },
   railway: {
-    status: ["railway", "status"],
-    logs: ["railway", "logs"],
-    logsTail: ["railway", "logs", "--follow"],
-    rollback: ["railway", "rollback"],
+    status: () => ["railway", "status"],
+    logs: () => ["railway", "logs"],
+    logsTail: () => ["railway", "logs", "--follow"],
+    rollback: () => ["railway", "rollback"],
     binary: "railway",
   },
   fly: {
-    status: ["fly", "status"],
-    logs: ["fly", "logs", "--no-tail"],
-    logsTail: ["fly", "logs"],
-    rollback: ["fly", "releases", "rollback"],
+    status: () => ["fly", "status"],
+    logs: () => ["fly", "logs", "--no-tail"],
+    logsTail: () => ["fly", "logs"],
+    rollback: () => ["fly", "releases", "rollback"],
     binary: "fly",
+  },
+  modal: {
+    status: () => ["modal", "app", "list"],
+    logs: (m) => ["modal", "app", "logs", m.name],
+    logsTail: (m) => ["modal", "app", "logs", m.name],
+    rollback: null,
+    binary: "modal",
+  },
+  daytona: {
+    status: () => ["daytona", "list"],
+    // Daytona has no first-class `logs` subcommand — users tail Tutti logs
+    // by SSHing into the workspace. Surface that as "not applicable" rather
+    // than inventing a command that doesn't exist.
+    logs: null,
+    logsTail: null,
+    rollback: null,
+    binary: "daytona",
   },
 };
 
@@ -515,7 +673,7 @@ const SUBCOMMAND_DISPATCH: Record<
  * Dispatch helper expressed as a switch so the linter sees a static lookup
  * instead of a computed property access on an object literal.
  */
-function dispatchFor(target: CliDeployTarget): (typeof SUBCOMMAND_DISPATCH)[CliDeployTarget] {
+function dispatchFor(target: CliDeployTarget): SubcommandDispatchEntry {
   switch (target) {
     case "docker":
       return SUBCOMMAND_DISPATCH.docker;
@@ -523,14 +681,16 @@ function dispatchFor(target: CliDeployTarget): (typeof SUBCOMMAND_DISPATCH)[CliD
       return SUBCOMMAND_DISPATCH.railway;
     case "fly":
       return SUBCOMMAND_DISPATCH.fly;
+    case "modal":
+      return SUBCOMMAND_DISPATCH.modal;
+    case "daytona":
+      return SUBCOMMAND_DISPATCH.daytona;
   }
 }
 
 async function dispatchSubcommand(
   scorePath: string | undefined,
-  pick: (
-    entry: typeof SUBCOMMAND_DISPATCH[CliDeployTarget],
-  ) => string[] | null,
+  pick: (entry: SubcommandDispatchEntry) => ((m: DeployManifest) => string[]) | null,
   label: string,
   runner: DeployRunner,
 ): Promise<void> {
@@ -538,16 +698,17 @@ async function dispatchSubcommand(
   const manifest = await loadManifest(file);
 
   if (manifest.target === "cloudflare") {
-    fail(`${label} is not implemented for cloudflare yet.`);
+    fail(`${label} is not implemented for ${manifest.target} yet.`);
   }
   const target: CliDeployTarget = manifest.target;
   const entry = dispatchFor(target);
-  const argv = pick(entry);
-  if (argv === null) {
+  const fn = pick(entry);
+  if (fn === null) {
     fail(
       `${label} is not applicable for target "${target}" — there is no platform service to query.`,
     );
   }
+  const argv = fn(manifest);
   if (!runner.which(entry.binary)) {
     fail(`${entry.binary} CLI not found.`);
   }
