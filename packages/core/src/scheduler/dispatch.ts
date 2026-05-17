@@ -89,12 +89,89 @@ export function deliveryTargetSummary(target: ScheduleDeliveryTarget): string {
   }
 }
 
+// Minimal structural typings for the voice module shapes dispatch touches.
+// dispatch.ts deliberately does NOT type-import @tuttiai/<voice> packages —
+// each voice already imports `SecretsManager` from @tuttiai/core, so a
+// reverse type-edge would close the build-graph loop and turbo would
+// refuse to order the workspace builds. Runtime is still a dynamic
+// `import(spec)` against the real voice module; only the type surface is
+// local. The `engine-delivery` integration tests catch drift if a voice's
+// wrapper shape ever diverges from these.
+
+interface WrapperCache<W> {
+  get(key: string): W | undefined;
+}
+
+interface SlackVoice {
+  SlackClientWrapper: {
+    cache: WrapperCache<SlackWrapper>;
+    forToken(token: string): SlackWrapper;
+  };
+}
+interface SlackWrapper {
+  getClient(): Promise<{
+    chat: { postMessage(args: { channel: string; text: string }): Promise<unknown> };
+  }>;
+}
+
+interface DiscordVoice {
+  DiscordClientWrapper: {
+    cache: WrapperCache<DiscordWrapper>;
+    forToken(token: string): DiscordWrapper;
+  };
+}
+interface DiscordChannel {
+  send(content: string): Promise<unknown>;
+}
+interface DiscordWrapper {
+  getClient(): Promise<{
+    channels: { fetch(id: string): Promise<DiscordChannel | null> };
+  }>;
+}
+
+interface TelegramVoice {
+  TelegramClientWrapper: {
+    cache: WrapperCache<TelegramWrapper>;
+    forToken(token: string): TelegramWrapper;
+  };
+}
+interface TelegramWrapper {
+  telegram: {
+    sendMessage(
+      chatId: string,
+      content: string,
+      opts?: { parse_mode: "MarkdownV2" },
+    ): Promise<unknown>;
+  };
+}
+
+interface EmailVoice {
+  EmailClientWrapper: {
+    cache: WrapperCache<EmailWrapper>;
+    forKey(key: string, opts: EmailWrapperOptions): EmailWrapper;
+    keyFor(opts: { imap: EmailWrapperOptions["imap"] }): string;
+  };
+}
+interface EmailWrapper {
+  send(args: { to: string; subject: string; text: string }): Promise<unknown>;
+}
+
+interface WhatsAppVoice {
+  WhatsAppClientWrapper: {
+    cache: WrapperCache<WhatsAppWrapper>;
+    keyFor(opts: { phoneNumberId: string }): string;
+  };
+}
+interface WhatsAppWrapper {
+  sendText(phoneNumber: string, body: string): Promise<unknown>;
+}
+
 async function deliverSlack(
   target: Extract<ScheduleDeliveryTarget, { platform: "slack" }>,
   content: string,
   importFn: DynamicImportFn,
 ): Promise<void> {
-  const mod = await loadVoice<typeof import("@tuttiai/slack")>("@tuttiai/slack", importFn);
+  const mod = await loadVoice<SlackVoice>("@tuttiai/slack", importFn);
   const token = SecretsManager.require("SLACK_BOT_TOKEN");
   const wrapper =
     mod.SlackClientWrapper.cache.get(token) ?? mod.SlackClientWrapper.forToken(token);
@@ -107,7 +184,7 @@ async function deliverDiscord(
   content: string,
   importFn: DynamicImportFn,
 ): Promise<void> {
-  const mod = await loadVoice<typeof import("@tuttiai/discord")>("@tuttiai/discord", importFn);
+  const mod = await loadVoice<DiscordVoice>("@tuttiai/discord", importFn);
   const token = SecretsManager.require("DISCORD_BOT_TOKEN");
   const wrapper =
     mod.DiscordClientWrapper.cache.get(token) ?? mod.DiscordClientWrapper.forToken(token);
@@ -125,7 +202,7 @@ async function deliverTelegram(
   format: "text" | "markdown",
   importFn: DynamicImportFn,
 ): Promise<void> {
-  const mod = await loadVoice<typeof import("@tuttiai/telegram")>("@tuttiai/telegram", importFn);
+  const mod = await loadVoice<TelegramVoice>("@tuttiai/telegram", importFn);
   const token = SecretsManager.require("TELEGRAM_BOT_TOKEN");
   const wrapper =
     mod.TelegramClientWrapper.cache.get(token) ?? mod.TelegramClientWrapper.forToken(token);
@@ -142,7 +219,7 @@ async function deliverEmail(
   agentName: string,
   importFn: DynamicImportFn,
 ): Promise<void> {
-  const mod = await loadVoice<typeof import("@tuttiai/email")>("@tuttiai/email", importFn);
+  const mod = await loadVoice<EmailVoice>("@tuttiai/email", importFn);
   const wrapperOptions = buildEmailOptions();
   const key = mod.EmailClientWrapper.keyFor({ imap: wrapperOptions.imap });
   const wrapper =
@@ -157,10 +234,7 @@ async function deliverWhatsApp(
   format: "text" | "markdown",
   importFn: DynamicImportFn,
 ): Promise<void> {
-  const mod = await loadVoice<typeof import("@tuttiai/whatsapp")>(
-    "@tuttiai/whatsapp",
-    importFn,
-  );
+  const mod = await loadVoice<WhatsAppVoice>("@tuttiai/whatsapp", importFn);
   const phoneNumberId = SecretsManager.require("WHATSAPP_PHONE_NUMBER_ID");
   const key = mod.WhatsAppClientWrapper.keyFor({ phoneNumberId });
   // WhatsApp's wrapper constructor allocates a Fastify webhook server,

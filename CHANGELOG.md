@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## v0.26.2 — Fix CI build cycle in scheduled-delivery dispatcher. (2026-05-18)
+
+### Fixed
+
+CI (`turbo run build typecheck`) failed on `chore(release): v0.26.1` ([run 26003875482](https://github.com/tuttiai/tutti/actions/runs/26003875482)) — and had been failing on every commit since v0.26.0 — with `TS2307: Cannot find module '@tuttiai/slack' …` against five voice packages (`@tuttiai/slack`, `@tuttiai/discord`, `@tuttiai/telegram`, `@tuttiai/email`, `@tuttiai/whatsapp`).
+
+The scheduled-delivery dispatcher in [packages/core/src/scheduler/dispatch.ts](packages/core/src/scheduler/dispatch.ts) typed each voice's module shape with `typeof import("@tuttiai/<voice>")`. On a cold checkout (CI, fresh clone) the voice `.d.ts` files don't exist until their `build` task runs — but core didn't declare the voices as workspace dependencies, so turbo had no reason to build voices before typechecking core. Adding voices as devDeps would resolve the types but each voice already imports `SecretsManager` from `@tuttiai/core`, so the reverse edge closes a turbo build cycle (the same cycle [`0803dfe`](https://github.com/tuttiai/tutti/commit/0803dfe) broke for skills).
+
+Fix: replace the five `typeof import(...)` annotations with file-local structural interfaces (`SlackVoice` / `SlackWrapper`, `DiscordVoice` / `DiscordWrapper`, `TelegramVoice` / `TelegramWrapper`, `EmailVoice` / `EmailWrapper`, `WhatsAppVoice` / `WhatsAppWrapper`) describing only the surface dispatch actually calls. Runtime is unchanged — still a dynamic `import(spec)` against the real voice module — and the existing `engine-delivery` integration tests still catch drift if a voice's wrapper shape ever diverges. No public-API change; no migration required.
+
+### Dependency bumps
+
+- **@tuttiai/core 0.23.1 → 0.23.2** (patch) — `dispatch.ts` source change only; no dependency changes.
+
 ## v0.26.1 — Security patch: clear OpenTelemetry / protobufjs advisories. (2026-05-17)
 
 ### Security

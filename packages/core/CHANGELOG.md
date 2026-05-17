@@ -1,5 +1,11 @@
 # @tuttiai/core
 
+## 0.23.2
+
+### Patch Changes
+
+- v0.26.2 — Fix the CI build cycle introduced by scheduled delivery in v0.26.0. `packages/core/src/scheduler/dispatch.ts` typed each voice's module shape with `typeof import("@tuttiai/<voice>")`, which on a cold checkout requires the voice's dist `.d.ts` to exist. Adding the voices as workspace devDeps would resolve the types but every voice already imports `SecretsManager` from `@tuttiai/core`, so the reverse edge closes a turbo build cycle (the same cycle [`0803dfe`](https://github.com/tuttiai/tutti/commit/0803dfe) broke for skills). Fix: replace the five module-level type imports with file-local structural interfaces (`SlackVoice`, `DiscordVoice`, `TelegramVoice`, `EmailVoice`, `WhatsAppVoice` and their matching wrapper interfaces) describing only the surface dispatch actually calls. Runtime is unchanged — still a dynamic `import(spec)` against the real voice module. No public-API change. Restores green CI ([CI run 26003875482](https://github.com/tuttiai/tutti/actions/runs/26003875482) was the failing baseline).
+
 ## 0.23.1
 
 ### Patch Changes
