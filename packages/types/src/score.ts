@@ -214,6 +214,31 @@ export interface InboxConfig {
   maxQueuePerChat?: number;
 }
 
+/**
+ * Score-level configuration for `@tuttiai/skills` — the "watch what works"
+ * trajectory layer. When `enabled`, the runtime constructs a
+ * `TrajectoryObserver` and records every successful run's tool-call
+ * sequence to the configured `SkillStore` (defaults to an
+ * `InMemorySkillStore` constructed by the runtime when no store is
+ * supplied via `TuttiRuntimeOptions.skillStore`).
+ *
+ * `auto_propose_threshold` is forward-looking — consumed by the
+ * synthesiser package, not by the observer itself. Kept on the config
+ * here so a single block in the score governs the full skills
+ * pipeline.
+ */
+export interface SkillsConfig {
+  /** Master switch. When false the runtime never constructs the observer. */
+  enabled: boolean;
+  /**
+   * Minimum trajectories of the same shape before the synthesiser
+   * proposes a `SkillCandidate`. Default 5. The observer itself does
+   * not read this — it's passed through to the synthesiser when one
+   * is wired in.
+   */
+  auto_propose_threshold?: number;
+}
+
 export interface ScoreConfig {
   name?: string;
   description?: string;
@@ -238,4 +263,12 @@ export interface ScoreConfig {
    * declared adapters.
    */
   inbox?: InboxConfig;
+  /**
+   * Skill-trajectory observation. When `enabled`, the runtime records
+   * every completed run's tool-call sequence to the `SkillStore`
+   * supplied via `TuttiRuntimeOptions.skillStore` (or an
+   * `InMemorySkillStore` it constructs itself when no store is
+   * supplied). See {@link SkillsConfig}.
+   */
+  skills?: SkillsConfig;
 }

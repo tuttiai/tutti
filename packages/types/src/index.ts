@@ -33,6 +33,7 @@ export type {
   AgentCacheConfig,
   AgentDurableConfig,
   AgentScheduleConfig,
+  ScheduleDeliveryTarget,
   DeployTarget,
   DeployConfig,
   RealtimeAgentConfig,
@@ -51,6 +52,7 @@ export type {
   InboxPlatform,
   InboxAdapterConfig,
   InboxConfig,
+  SkillsConfig,
 } from "./score.js";
 
 export type {

@@ -183,6 +183,46 @@ export interface AgentCacheConfig {
  * guardrail hooks, giving them access to the agent name and session.
  */
 /**
+ * Where to deliver the text output of a scheduled run. The discriminator
+ * is `platform`; each branch carries the addressing info that platform's
+ * inbox adapter needs to dispatch a message. Credentials are NOT taken
+ * here — the scheduler reuses whichever client the matching `@tuttiai/<platform>`
+ * voice has already set up (token-keyed wrapper cache; see voices/<platform>).
+ *
+ * Adding a new platform requires (1) extending this union, (2) extending
+ * `ScheduleDeliverySchema` in `@tuttiai/core/score-schema`, and (3) wiring
+ * the dispatcher in the scheduler engine to look up the voice's send tool.
+ */
+export type ScheduleDeliveryTarget =
+  | {
+      platform: "slack";
+      /** Channel id (`C01234567`) or `#channel-name`. */
+      channel: string;
+    }
+  | {
+      platform: "discord";
+      /** Discord channel snowflake id. */
+      channel_id: string;
+    }
+  | {
+      platform: "telegram";
+      /** Telegram `chat_id` (numeric string or `@channel_username`). */
+      chat_id: string;
+    }
+  | {
+      platform: "email";
+      /** Recipient email address. */
+      to: string;
+      /** Optional subject line. Default: agent name + ISO date. */
+      subject?: string;
+    }
+  | {
+      platform: "whatsapp";
+      /** Recipient phone in E.164 format, e.g. `+15555550123`. */
+      phone_number: string;
+    };
+
+/**
  * Schedule configuration for automatic agent execution.
  *
  * Exactly one of `cron`, `every`, or `at` must be provided.
@@ -198,6 +238,22 @@ export interface AgentScheduleConfig {
   input: string;
   /** Auto-disable the schedule after this many runs. */
   max_runs?: number;
+  /**
+   * When set, the agent's text output is dispatched to this platform
+   * target after each successful run. Failures surface as
+   * `schedule:delivery_failed` events and do NOT roll back the run.
+   * The matching `@tuttiai/<platform>` voice must be installed — the
+   * scheduler engine fails fast at registration time with a clear
+   * remediation message when it isn't.
+   */
+  deliver?: ScheduleDeliveryTarget;
+  /**
+   * How to format the agent output before dispatch. `"text"` (default)
+   * sends the raw string. `"markdown"` lets platforms that support it
+   * (Slack, Discord, Telegram) render formatted output; on platforms
+   * without markdown support the wrapper sends it as plain text.
+   */
+  deliver_format?: "text" | "markdown";
 }
 
 /**
@@ -236,8 +292,17 @@ export interface RealtimeAgentConfig {
 /**
  * Deployment target supported by `@tuttiai/deploy`. Bundlers in that package
  * consume the resolved manifest and emit a target-specific artefact.
+ *
+ * `daytona` is reserved in the union but not yet bundled — the CLI rejects it
+ * with a "not yet wired up" error in the same way as `cloudflare`.
  */
-export type DeployTarget = "docker" | "cloudflare" | "railway" | "fly";
+export type DeployTarget =
+  | "docker"
+  | "cloudflare"
+  | "railway"
+  | "fly"
+  | "modal"
+  | "daytona";
 
 /**
  * Per-agent deployment configuration consumed by `@tuttiai/deploy`. Authors

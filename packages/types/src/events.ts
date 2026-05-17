@@ -49,6 +49,33 @@ export type TuttiEvent =
   | { type: "schedule:triggered"; schedule_id: string; agent_name: string }
   | { type: "schedule:completed"; schedule_id: string; agent_name: string; duration_ms: number }
   | { type: "schedule:error"; schedule_id: string; agent_name: string; error: Error }
+  /**
+   * Emitted after a scheduled run's text output is successfully handed
+   * off to the dispatch wrapper for the configured `deliver.platform`.
+   * `target` is the addressing field for that platform (channel id,
+   * email address, etc.), redacted of any token-like content.
+   * `chars` is the dispatched payload length AFTER format transformation.
+   */
+  | {
+      type: "schedule:delivered";
+      agent_name: string;
+      platform: "slack" | "discord" | "telegram" | "email" | "whatsapp";
+      target: string;
+      chars: number;
+    }
+  /**
+   * Emitted when dispatch to the configured `deliver` target fails. The
+   * scheduled run itself completed — delivery is a side effect, so the
+   * agent's output is still recorded on the run. `error` is redacted via
+   * SecretsManager before emission.
+   */
+  | {
+      type: "schedule:delivery_failed";
+      agent_name: string;
+      platform: "slack" | "discord" | "telegram" | "email" | "whatsapp";
+      target: string;
+      error: string;
+    }
   | {
       type: "interrupt:requested";
       session_id: string;
@@ -210,6 +237,77 @@ export type TuttiEvent =
       /** Stage at which the error occurred. */
       stage: "receive" | "dispatch" | "reply";
       error_message: string;
+    }
+  /**
+   * Emitted by `@tuttiai/skills` when a synthesiser proposes a new skill
+   * candidate, before any human review. Subscribers typically forward
+   * this to a review UI or notification channel.
+   */
+  | {
+      type: "skill:candidate_proposed";
+      candidate_id: string;
+      name_suggestion: string;
+      /** Number of trajectories backing the proposal. */
+      evidence_count: number;
+    }
+  /**
+   * Emitted by the runtime's `SkillProposer` immediately after a new
+   * `SkillCandidate` is persisted. Carries the originating `agent_name`
+   * so subscribers can scope review UIs and notifications per agent —
+   * `skill:candidate_proposed` is store-level and agent-agnostic, this
+   * event is the runtime-level companion.
+   */
+  | {
+      type: "skill:proposed";
+      agent_name: string;
+      candidate_id: string;
+      name_suggestion: string;
+      /** Number of trajectories backing the proposal. */
+      evidence_count: number;
+    }
+  /** Emitted when an operator approves a candidate and it becomes a skill. */
+  | {
+      type: "skill:approved";
+      skill_id: string;
+      name: string;
+      /** Operator identifier — absent when approved programmatically. */
+      reviewed_by?: string;
+    }
+  /** Emitted when an operator rejects a candidate. */
+  | {
+      type: "skill:rejected";
+      candidate_id: string;
+      /** Operator identifier — absent when rejected programmatically. */
+      reviewed_by?: string;
+      /** Free-text reason — absent if the reviewer left it empty. */
+      reason?: string;
+    }
+  /**
+   * Emitted by the runtime's `TrajectoryObserver` after a completed run is
+   * persisted to the configured `SkillStore`. `tool_count` is the length of
+   * the recorded `tool_calls` array — post-truncation when the observer's
+   * `maxToolCallsPerRun` cap fired. Runs that fell below the duration
+   * threshold do not emit this event.
+   */
+  | {
+      type: "skill:trajectory_recorded";
+      agent_name: string;
+      trajectory_id: string;
+      tool_count: number;
+    }
+  /**
+   * Emitted by the runtime's `SkillExecutor` when an approved skill is
+   * invoked as a tool inside an agent run. `run_id` is the per-run
+   * identifier the runtime threads into the executor when it materialises
+   * tools at run start; it matches the trajectory id the
+   * `TrajectoryObserver` later records for the same run, so subscribers
+   * can correlate skill invocations with the parent run's trajectory.
+   */
+  | {
+      type: "skill:invoked";
+      agent_name: string;
+      skill_id: string;
+      run_id: string;
     };
 
 export type TuttiEventType = TuttiEvent["type"];
