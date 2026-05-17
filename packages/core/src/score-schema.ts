@@ -34,6 +34,60 @@ const CacheSchema = z
   })
   .strict();
 
+const ScheduleDeliverySchema = z.discriminatedUnion("platform", [
+  z
+    .object({
+      platform: z.literal("slack"),
+      channel: z.string().min(1, "schedule.deliver.channel is required"),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("discord"),
+      channel_id: z.string().min(1, "schedule.deliver.channel_id is required"),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("telegram"),
+      chat_id: z.string().min(1, "schedule.deliver.chat_id is required"),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("email"),
+      to: z.string().email("schedule.deliver.to must be a valid email"),
+      subject: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      platform: z.literal("whatsapp"),
+      phone_number: z
+        .string()
+        .regex(/^\+[1-9]\d{6,14}$/, "schedule.deliver.phone_number must be E.164 (e.g. +15555550123)"),
+    })
+    .strict(),
+]);
+
+const AgentScheduleSchema = z
+  .object({
+    cron: z.string().min(1).optional(),
+    every: z.string().min(1).optional(),
+    at: z.string().min(1).optional(),
+    input: z.string().min(1, "schedule.input is required"),
+    max_runs: z.number().int().positive("schedule.max_runs must be a positive integer").optional(),
+    deliver: ScheduleDeliverySchema.optional(),
+    deliver_format: z.enum(["text", "markdown"]).optional(),
+  })
+  .strict()
+  .refine(
+    (s) => [s.cron, s.every, s.at].filter((v) => v !== undefined).length === 1,
+    {
+      message: "schedule: exactly one of cron, every, or at must be set",
+    },
+  );
+
 const AgentSchema = z
   .object({
     name: z.string().min(1, "Agent name cannot be empty"),
@@ -51,6 +105,7 @@ const AgentSchema = z
     delegates: z.array(z.string()).optional(),
     role: z.enum(["orchestrator", "specialist"]).optional(),
     cache: CacheSchema.optional(),
+    schedule: AgentScheduleSchema.optional(),
   })
   .passthrough();
 

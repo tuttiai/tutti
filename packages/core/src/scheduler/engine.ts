@@ -8,6 +8,9 @@ import type { AgentConfig } from "@tuttiai/types";
 import type { AgentRunner } from "../agent-runner.js";
 import type { EventBus } from "../event-bus.js";
 import { logger } from "../logger.js";
+import { SecretsManager } from "../secrets.js";
+import { assertDeliveryVoiceInstalled } from "./delivery.js";
+import { deliverScheduleResult, deliveryTargetSummary } from "./dispatch.js";
 import type { ScheduleStore } from "./store.js";
 import type { ScheduleConfig, ScheduledRun, ScheduleRecord } from "./types.js";
 
@@ -116,6 +119,9 @@ export class SchedulerEngine {
       if (isNaN(d.getTime())) {
         throw new Error(`Schedule "${id}": invalid ISO datetime "${config.at}".`);
       }
+    }
+    if (config.deliver) {
+      await assertDeliveryVoiceInstalled(config.deliver);
     }
 
     const record: ScheduleRecord = {
@@ -306,6 +312,12 @@ export class SchedulerEngine {
         { schedule: record.id, agent: record.agent_id },
         "Scheduled run completed",
       );
+
+      // Delivery is a side effect of a successful run — a dispatch
+      // failure must never propagate up and tank the schedule timer.
+      if (record.config.deliver) {
+        await this.dispatchDelivery(record, agent, result.output);
+      }
     } catch (err) {
       run.completed_at = new Date();
       run.error = err instanceof Error ? err.message : String(err);
@@ -326,5 +338,42 @@ export class SchedulerEngine {
     }
 
     return run;
+  }
+
+  private async dispatchDelivery(
+    record: ScheduleRecord,
+    agent: AgentConfig,
+    content: string,
+  ): Promise<void> {
+    const target = record.config.deliver;
+    if (!target) return;
+    try {
+      await deliverScheduleResult({
+        target,
+        content,
+        format: record.config.deliver_format ?? "text",
+        agentName: agent.name,
+      });
+      this.events.emit({
+        type: "schedule:delivered",
+        agent_name: record.agent_id,
+        platform: target.platform,
+        target: deliveryTargetSummary(target),
+        chars: content.length,
+      } as never);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.events.emit({
+        type: "schedule:delivery_failed",
+        agent_name: record.agent_id,
+        platform: target.platform,
+        target: deliveryTargetSummary(target),
+        error: SecretsManager.redact(msg),
+      } as never);
+      logger.warn(
+        { schedule: record.id, platform: target.platform, error: msg },
+        "Scheduled delivery failed",
+      );
+    }
   }
 }

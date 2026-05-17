@@ -16,3 +16,13 @@ export {
   parseInterval,
   validateCron,
 } from "./engine.js";
+export {
+  assertDeliveryVoiceInstalled,
+  type DynamicImportFn,
+} from "./delivery.js";
+export {
+  deliverScheduleResult,
+  deliveryTargetSummary,
+  stripMarkdown,
+  type DeliverOptions,
+} from "./dispatch.js";

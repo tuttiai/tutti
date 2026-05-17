@@ -2,10 +2,16 @@
  * Type definitions for the Tutti scheduler engine.
  */
 
+import type { ScheduleDeliveryTarget } from "@tuttiai/types";
+
 /**
  * Schedule configuration — attach to an agent to run it automatically.
  *
  * Exactly one of `cron`, `every`, or `at` must be provided.
+ *
+ * Mirrors {@link import("@tuttiai/types").AgentScheduleConfig} — the engine
+ * uses this internal shape so the scheduler doesn't need to round-trip
+ * through the public type surface. Keep the two in lockstep.
  */
 export interface ScheduleConfig {
   /** Cron expression (5-field). E.g. `"0 9 * * *"` = 9 AM daily. */
@@ -18,6 +24,13 @@ export interface ScheduleConfig {
   input: string;
   /** Auto-disable the schedule after this many runs. */
   max_runs?: number;
+  /**
+   * Optional delivery target — when set, the agent's output is dispatched
+   * to the platform after each successful run.
+   */
+  deliver?: ScheduleDeliveryTarget;
+  /** Output format for delivery. Default `"text"`. */
+  deliver_format?: "text" | "markdown";
 }
 
 /**

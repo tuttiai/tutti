@@ -317,4 +317,93 @@ describe("validateScore", () => {
       }),
     ).toThrow("Invalid score file");
   });
+
+  // ── Schedule (incl. v0.26 delivery) ──
+
+  function scoreWithSchedule(schedule: Record<string, unknown>) {
+    return {
+      provider: { chat: async () => ({}) },
+      agents: {
+        reporter: {
+          name: "reporter",
+          system_prompt: "Report stuff.",
+          voices: [],
+          schedule,
+        },
+      },
+    };
+  }
+
+  it("accepts a schedule without deliver", () => {
+    expect(() =>
+      validateScore(
+        scoreWithSchedule({ cron: "0 9 * * *", input: "Daily report" }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("accepts deliver targets for each platform", () => {
+    const targets: Record<string, unknown>[] = [
+      { platform: "slack", channel: "#alerts" },
+      { platform: "discord", channel_id: "1234567890" },
+      { platform: "telegram", chat_id: "@my_channel" },
+      { platform: "email", to: "ops@example.com", subject: "Daily" },
+      { platform: "whatsapp", phone_number: "+15555550123" },
+    ];
+
+    for (const deliver of targets) {
+      expect(() =>
+        validateScore(
+          scoreWithSchedule({
+            cron: "0 9 * * *",
+            input: "Daily report",
+            deliver,
+            deliver_format: "markdown",
+          }),
+        ),
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects deliver with an invalid email address", () => {
+    expect(() =>
+      validateScore(
+        scoreWithSchedule({
+          cron: "0 9 * * *",
+          input: "Daily report",
+          deliver: { platform: "email", to: "not-an-email" },
+        }),
+      ),
+    ).toThrow("schedule.deliver.to must be a valid email");
+  });
+
+  it("rejects deliver with a non-E.164 whatsapp number", () => {
+    expect(() =>
+      validateScore(
+        scoreWithSchedule({
+          cron: "0 9 * * *",
+          input: "Daily report",
+          deliver: { platform: "whatsapp", phone_number: "5555550123" },
+        }),
+      ),
+    ).toThrow("schedule.deliver.phone_number must be E.164");
+  });
+
+  it("rejects deliver with an unknown platform", () => {
+    expect(() =>
+      validateScore(
+        scoreWithSchedule({
+          cron: "0 9 * * *",
+          input: "Daily report",
+          deliver: { platform: "sms", to: "+15555550123" },
+        }),
+      ),
+    ).toThrow("Invalid score file");
+  });
+
+  it("rejects schedule with no trigger (cron/every/at all missing)", () => {
+    expect(() =>
+      validateScore(scoreWithSchedule({ input: "Daily report" })),
+    ).toThrow("exactly one of cron, every, or at must be set");
+  });
 });
