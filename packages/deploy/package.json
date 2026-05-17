@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/deploy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Tutti deploy — bundles a Tutti score as a deployable container/worker for Docker, Cloudflare, Railway, or Fly",
   "type": "module",
   "exports": {
