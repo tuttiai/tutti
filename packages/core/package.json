@@ -60,7 +60,16 @@
     "directory": "packages/core"
   },
   "homepage": "https://tutti-ai.com",
+  "peerDependencies": {
+    "@tuttiai/skills": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@tuttiai/skills": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@tuttiai/skills": "*",
     "@types/pg": "8.20.0",
     "@types/pino": "^7.0.4"
   }

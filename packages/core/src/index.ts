@@ -162,6 +162,40 @@ export {
 } from "./memory/consolidator.js";
 export type { UserModelConsolidatorOptions } from "./memory/consolidator.js";
 
+// Skill trajectory observation
+export {
+  DEFAULT_MAX_TOOL_CALLS_PER_RUN,
+  DEFAULT_MIN_DURATION_MS,
+  DEFAULT_PROPOSE_EVERY_N,
+  TrajectoryObserver,
+  hashToolInput,
+} from "./skills/observer.js";
+export type {
+  SkillProposerLike,
+  TrajectoryObservationInput,
+  TrajectoryObserverOptions,
+} from "./skills/observer.js";
+export {
+  DEFAULT_AUTO_PROPOSE_THRESHOLD,
+  DEFAULT_PROPOSER_MODEL,
+  DEFAULT_TRAJECTORY_WINDOW_DAYS,
+  SkillCandidateProposalSchema,
+  SkillProposer,
+} from "./skills/proposer.js";
+export type {
+  SkillCandidateProposal,
+  SkillProposerOptions,
+} from "./skills/proposer.js";
+export {
+  DEFAULT_SKILL_EXECUTOR_MAX_TURNS,
+  DEFAULT_SKILL_EXECUTOR_MODEL,
+  SkillExecutor,
+} from "./skills/executor.js";
+export type {
+  SkillExecutorOptions,
+  SkillToolsContext,
+} from "./skills/executor.js";
+
 // Human-in-the-loop interrupts
 export {
   MemoryInterruptStore,
@@ -318,6 +352,7 @@ export type {
   MemoryConfig,
   TelemetryConfig,
   ScoreConfig,
+  SkillsConfig,
   ParallelEntryConfig,
   // Session
   Session,

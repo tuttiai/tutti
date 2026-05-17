@@ -6,7 +6,11 @@ import {
   type RunCostStore,
   type SpanExporter,
 } from "@tuttiai/telemetry";
+import type { SkillStore } from "@tuttiai/skills";
 import { AgentRunner } from "./agent-runner.js";
+import { TrajectoryObserver } from "./skills/observer.js";
+import { SkillProposer } from "./skills/proposer.js";
+import { SkillExecutor } from "./skills/executor.js";
 import { TuttiGraph } from "./graph/index.js";
 import type { GraphConfig } from "./graph/types.js";
 import type {
@@ -107,6 +111,15 @@ export interface TuttiRuntimeOptions {
    * worker sees a consistent total.
    */
   runCostStore?: RunCostStore;
+  /**
+   * Backing {@link SkillStore} for the runtime's `TrajectoryObserver`.
+   * Honoured only when `score.skills?.enabled` is true; ignored
+   * otherwise. When the score enables skills but no store is supplied,
+   * the runtime imports `@tuttiai/skills` lazily and constructs an
+   * `InMemorySkillStore` itself. Pass a custom store here for
+   * persistent or multi-process deployments.
+   */
+  skillStore?: SkillStore;
 }
 
 export class TuttiRuntime {
@@ -143,6 +156,16 @@ export class TuttiRuntime {
     this.toolCache = new InMemoryToolCache();
     this.interruptStore = options.interruptStore;
     this.runCostStore = options.runCostStore;
+    const trajectoryObserver = TuttiRuntime.createTrajectoryObserver(
+      score,
+      options,
+      this.events,
+    );
+    const skillExecutor = TuttiRuntime.createSkillExecutor(
+      score,
+      options,
+      this.events,
+    );
     this._runner = new AgentRunner(
       score.provider,
       this.events,
@@ -153,6 +176,8 @@ export class TuttiRuntime {
       options.checkpointStore,
       options.interruptStore,
       options.runCostStore,
+      trajectoryObserver,
+      skillExecutor,
     );
 
     if (score.telemetry) {
@@ -221,6 +246,66 @@ export class TuttiRuntime {
    *  a session by the id stored in a checkpoint before calling `run()`. */
   get sessions(): SessionStore {
     return this._sessions;
+  }
+
+  /**
+   * Build the runtime's {@link TrajectoryObserver}, when the score
+   * opts in via `skills.enabled`. Returns `undefined` when skills are
+   * disabled OR when enabled but no `skillStore` was supplied — the
+   * latter is logged at info level so operators see why observation
+   * is silently skipped. A future iteration may lazy-import
+   * `@tuttiai/skills` to construct an `InMemorySkillStore` here, but
+   * @tuttiai/types staying zero-runtime-dep means the import has to
+   * stay out of `runtime.ts`'s eager path.
+   */
+  private static createTrajectoryObserver(
+    score: ScoreConfig,
+    options: TuttiRuntimeOptions,
+    events: EventBus,
+  ): TrajectoryObserver | undefined {
+    if (!score.skills?.enabled) return undefined;
+    if (!options.skillStore) {
+      logger.info(
+        { agents: Object.keys(score.agents) },
+        "score.skills.enabled is true but no skillStore was supplied — trajectory observation skipped. Pass an InMemorySkillStore (or persistent store) via TuttiRuntimeOptions.skillStore.",
+      );
+      return undefined;
+    }
+    const proposer = new SkillProposer({
+      store: options.skillStore,
+      llm: score.provider,
+      ...(score.skills.auto_propose_threshold !== undefined
+        ? { autoProposeThreshold: score.skills.auto_propose_threshold }
+        : {}),
+      events,
+    });
+    return new TrajectoryObserver({
+      store: options.skillStore,
+      events,
+      proposer,
+    });
+  }
+
+  /**
+   * Build the runtime's {@link SkillExecutor}, when the score opts in
+   * via `skills.enabled`. Pairs with
+   * {@link TuttiRuntime.createTrajectoryObserver} — same gate, same
+   * lazy-import constraint. Returns `undefined` when skills are
+   * disabled or no `skillStore` was supplied; the runner then skips
+   * skill-tool aggregation entirely.
+   */
+  private static createSkillExecutor(
+    score: ScoreConfig,
+    options: TuttiRuntimeOptions,
+    events: EventBus,
+  ): SkillExecutor | undefined {
+    if (!score.skills?.enabled) return undefined;
+    if (!options.skillStore) return undefined;
+    return new SkillExecutor({
+      store: options.skillStore,
+      llm: score.provider,
+      events,
+    });
   }
 
   private static createStore(score: ScoreConfig): SessionStore {

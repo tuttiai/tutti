@@ -192,6 +192,17 @@ const ScoreSchema = z
     entry: EntrySchema.optional(),
     telemetry: TelemetrySchema.optional(),
     inbox: InboxSchema.optional(),
+    skills: z
+      .object({
+        enabled: z.boolean(),
+        auto_propose_threshold: z
+          .number()
+          .int()
+          .positive("skills.auto_propose_threshold must be a positive integer")
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .passthrough();
 

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type {
@@ -51,6 +52,10 @@ import {
   UserModelConsolidator,
   type UserModelConsolidatorOptions,
 } from "./memory/consolidator.js";
+import type { TrajectoryObserver } from "./skills/observer.js";
+import { hashToolInput } from "./skills/observer.js";
+import type { SkillExecutor } from "./skills/executor.js";
+import type { TrajectoryToolCall } from "@tuttiai/skills";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
 import { estimateCost, getDailyCost, getMonthlyCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
@@ -259,6 +264,8 @@ export class AgentRunner {
     private checkpointStore?: CheckpointStore,
     private interruptStore?: InterruptStore,
     private runCostStore?: RunCostStore,
+    private trajectoryObserver?: TrajectoryObserver,
+    private skillExecutor?: SkillExecutor,
   ) {
     this.installRouterEventHooks();
   }
@@ -659,12 +666,31 @@ export class AgentRunner {
         }
       }
 
+      // Per-run identifier shared between the SkillExecutor's
+      // `skill:invoked` emissions and the TrajectoryObserver at run
+      // end — same value at both call sites so subscribers can correlate.
+      const runId = randomUUID();
+
       // Collect all tools from all voices
       const allTools: Tool[] = [...agent.voices.flatMap((v) => v.tools)];
 
       // Inject HITL tool if enabled
       if (agent.allow_human_input) {
         allTools.push(this.createHitlTool(agent.name, session.id));
+      }
+
+      // Project the agent's approved skills onto callable tools. The
+      // executor closes over `runId` for `skill:invoked` correlation and
+      // over the voice-tool pool so each skill's constituents resolve
+      // against the tools this agent actually has. Permission breaches
+      // throw at this call site (run start), not at skill invocation.
+      if (this.skillExecutor) {
+        const skillTools = await this.skillExecutor.toolsForAgent(agent.name, {
+          tools: allTools,
+          grantedPermissions: agent.permissions ?? [],
+          runId,
+        });
+        allTools.push(...skillTools);
       }
 
       // Resolve the semantic memory config + store once per run. Both
@@ -806,6 +832,11 @@ export class AgentRunner {
           : { input_tokens: 0, output_tokens: 0 };
       let turns = resuming && checkpoint ? checkpoint.turn : 0;
       let totalToolCalls = 0;
+      // Trajectory audit: every successful or failed tool execution
+      // appends one entry. Drained at run end into the
+      // `TrajectoryObserver` (when wired). Skipped entirely when no
+      // observer is attached — keeps the no-observer path zero-cost.
+      const trajectoryAudit: TrajectoryToolCall[] = [];
       // Tracks the highest turn a checkpoint was successfully written for.
       // Used to log the last durable point if the loop later throws.
       let lastCheckpointedTurn = resuming && checkpoint ? checkpoint.turn : -1;
@@ -1202,6 +1233,9 @@ export class AgentRunner {
           toolContext.memory = createMemoryHelpers(memoryEnforcer);
         }
 
+        // Pass the audit array only when an observer is wired —
+        // executeTool short-circuits the hash + push when undefined.
+        const auditSink = this.trajectoryObserver ? trajectoryAudit : undefined;
         const toolResults: ToolResultBlock[] = await Promise.all(
           toolUseBlocks.map((block) =>
             this.executeTool(
@@ -1213,6 +1247,7 @@ export class AgentRunner {
               agentHooks,
               agent.cache,
               agent.requireApproval,
+              auditSink,
             ),
           ),
         );
@@ -1435,6 +1470,22 @@ export class AgentRunner {
         void userModel.consolidator.maybeConsolidate(userId, turns);
       }
 
+      // Fire-and-forget skill-trajectory recording. Same fire-and-forget
+      // contract as the consolidator above — the observer catches every
+      // error internally. Output is the final text of the agent's last
+      // assistant turn, when one exists.
+      if (this.trajectoryObserver) {
+        void this.trajectoryObserver.observe({
+          run_id: runId,
+          agent_name: agent.name,
+          ...(userId !== undefined ? { user_id: userId } : {}),
+          started_at: runStartedAt,
+          ended_at: new Date(),
+          tool_calls: trajectoryAudit,
+          ...(output !== "" ? { final_message: output } : {}),
+        });
+      }
+
       return agentResult;
     });
   }
@@ -1625,10 +1676,22 @@ export class AgentRunner {
     agentHooks?: TuttiHooks,
     cacheCfg?: { enabled: boolean; ttl_ms?: number; excluded_tools?: string[] },
     requireApproval?: AgentConfig["requireApproval"],
+    audit?: TrajectoryToolCall[],
   ): Promise<ToolResultBlock> {
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
       const available = tools.map((t) => t.name).join(", ") || "(none)";
+      // Tool-not-found is a structural failure — record it so the
+      // synthesiser can downweight trajectories where the model
+      // hallucinates tool names.
+      if (audit) {
+        audit.push({
+          tool: block.name,
+          input_hash: hashToolInput(block.input),
+          succeeded: false,
+          duration_ms: 0,
+        });
+      }
       return {
         type: "tool_result",
         tool_use_id: block.id,
@@ -1640,14 +1703,31 @@ export class AgentRunner {
     // Cache lookup happens inside the tracer span so cache hits still show
     // up in traces as zero-cost tool calls.
     return Tracing.toolCall(block.name, block.input, async () => {
+      // Audit timing/hash captured once per call; the closure-scoped
+      // `pushAudit` is a no-op when no observer is attached.
+      const auditStart = audit ? Date.now() : 0;
+      const auditHash = audit ? hashToolInput(block.input) : "";
+      const pushAudit = (succeeded: boolean): void => {
+        if (audit) {
+          audit.push({
+            tool: block.name,
+            input_hash: auditHash,
+            succeeded,
+            duration_ms: Date.now() - auditStart,
+          });
+        }
+      };
+
       // beforeToolCall hooks — return false to block, or modified input
       if (hookCtx) {
         const globalResult = await this.safeHook(() => this.globalHooks?.beforeToolCall?.(hookCtx, block.name, block.input));
         if (globalResult === false) {
+          pushAudit(false);
           return { type: "tool_result" as const, tool_use_id: block.id, content: "Tool call blocked by hook", is_error: true };
         }
         const agentResult = await this.safeHook(() => agentHooks?.beforeToolCall?.(hookCtx, block.name, block.input));
         if (agentResult === false) {
+          pushAudit(false);
           return { type: "tool_result" as const, tool_use_id: block.id, content: "Tool call blocked by hook", is_error: true };
         }
       }
@@ -1705,6 +1785,7 @@ export class AgentRunner {
               tool_name: block.name,
               result: cached,
             });
+            pushAudit(cached.is_error !== true);
             return {
               type: "tool_result" as const,
               tool_use_id: block.id,
@@ -1768,6 +1849,7 @@ export class AgentRunner {
           });
         }
 
+        pushAudit(result.is_error !== true);
         return {
           type: "tool_result" as const,
           tool_use_id: block.id,
@@ -1778,7 +1860,10 @@ export class AgentRunner {
         // Approval denials are intentional, operator-driven signals to
         // abort the run — they must propagate rather than be swallowed
         // into a tool_result error that the LLM could silently ignore.
-        if (error instanceof InterruptDeniedError) throw error;
+        if (error instanceof InterruptDeniedError) {
+          pushAudit(false);
+          throw error;
+        }
 
         const message = error instanceof Error ? error.message : String(error);
 
@@ -1791,6 +1876,7 @@ export class AgentRunner {
           error: error instanceof Error ? error : new Error(message),
         });
 
+        pushAudit(false);
         return {
           type: "tool_result" as const,
           tool_use_id: block.id,
