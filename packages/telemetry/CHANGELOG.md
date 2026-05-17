@@ -1,5 +1,11 @@
 # @tuttiai/telemetry
 
+## 0.4.1
+
+### Patch Changes
+
+- v0.26.1 — Security patch. Bump `@opentelemetry/otlp-transformer` `^0.214.0` → `^0.218.0` to keep the OpenTelemetry contrib set on a single coherent version after `@tuttiai/core`'s SDK upgrade. No public-API change.
+
 ## 0.4.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @tuttiai/core
 
+## 0.23.1
+
+### Patch Changes
+
+- v0.26.1 — Security patch. Clears the five OpenTelemetry / protobufjs advisories acknowledged in `SECURITY-NOTES-v0.26.0.md`. Bumps `@opentelemetry/sdk-node` `^0.214.0` → `^0.218.0`, `@opentelemetry/auto-instrumentations-node` `^0.72.0` → `^0.76.0`, and `@opentelemetry/exporter-trace-otlp-http` `^0.214.0` → `^0.218.0`. No public-API change — `NodeSDK`, `getNodeAutoInstrumentations`, and `OTLPTraceExporter` constructor signatures in `telemetry-setup.ts` continue to compile and pass the existing tests unchanged. `npm audit --audit-level=high` now reports zero advisories.
+
 ## 0.23.0
 
 ### Minor Changes
