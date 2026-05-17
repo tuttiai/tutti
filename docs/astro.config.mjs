@@ -53,6 +53,7 @@ export default defineConfig({
             { label: "Inbox — Inbound Messaging", slug: "guides/inbox" },
             { label: "Security", slug: "guides/security" },
             { label: "Deploying to Production", slug: "guides/deploy" },
+            { label: "Self-Improving Skills", slug: "guides/skills" },
           ],
         },
         {

@@ -1,0 +1,128 @@
+---
+title: "Self-improving skills"
+description: "Let agents grow new tools from observed trajectories. Operator-reviewed, permission-checked, opt-in."
+sidebar:
+  order: 9
+---
+
+A skill is a tool the agent has earned the right to call. After an agent has solved the same shape of problem several times — fetch this, read that, post the other — Tutti's trajectory observer notices, the proposer drafts a single replacement tool, and an operator decides whether to approve it. From the next run on, the agent invokes one `review_pr` call where it used to orchestrate three.
+
+The runnable example lives at [`examples/self-improving-skills/`](https://github.com/tuttiai/tutti/tree/main/examples/self-improving-skills).
+
+## The loop
+
+```
+  TrajectoryObserver  →  SkillProposer  →  operator review  →  SkillExecutor
+  records every run     proposes a       approve / reject     agent now calls
+                        recurring shape  via `tutti-ai`       review_pr as one tool
+```
+
+- **`TrajectoryObserver`** runs inside the runtime. After every successful agent run it records the `(tool, input_hash, succeeded, duration_ms)` tuples and pushes the trajectory onto a `SkillStore`.
+- **`SkillProposer`** wakes up when an agent crosses `auto_propose_threshold` similar trajectories. It asks the score's LLM to summarise the shape into a `SkillCandidate` — name, description, constituent tools, and an inner system prompt.
+- **Operator review** is the gate. `tutti-ai skills proposed` lists pending candidates; `tutti-ai skills review` walks each one. Nothing reaches the agent until you say yes.
+- **`SkillExecutor`** projects approved skills into callable `Tool`s. Permissions are the union of constituents' `required_permissions`, checked at run start.
+
+Runtime cost when skills are off is zero. The observer, proposer and executor are only constructed when `score.skills.enabled === true` *and* you pass a `skillStore`.
+
+## Turn it on
+
+```ts title="tutti.score.ts"
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { InMemorySkillStore } from "@tuttiai/skills";
+import { GitHubVoice } from "@tuttiai/github";
+import { FilesystemVoice } from "@tuttiai/filesystem";
+
+export default defineScore({
+  provider: new AnthropicProvider(),
+  default_model: "claude-sonnet-4-6",
+  entry: "code-reviewer",
+  agents: {
+    "code-reviewer": {
+      name: "Code Reviewer",
+      permissions: ["network", "filesystem"],
+      voices: [new GitHubVoice(), new FilesystemVoice()],
+      system_prompt:
+        "Review the user's PR. Read each changed file, post a consolidated review.",
+    },
+  },
+  skills: {
+    enabled: true,
+    auto_propose_threshold: 5,
+  },
+});
+
+export const skillStore = new InMemorySkillStore();
+```
+
+`InMemorySkillStore` is the reference implementation — fine for local dev, lost on process restart. For multi-process or durable use, implement `SkillStore` against Postgres.
+
+## The CLI
+
+```bash
+tutti-ai skills proposed                  # list pending candidates
+tutti-ai skills review                    # walk every candidate interactively
+tutti-ai skills review <candidate-id>     # review just one
+tutti-ai skills reject <candidate-id> \
+  --reason "duplicate of existing flow"   # reject without the interactive UI
+tutti-ai skills list                      # approved skills, newest first
+```
+
+The interactive review prints the proposed name, description, constituent tools, resolved `is_destructive` flag, the union of `required_permissions`, and a few sample trajectories. Pick `a` to approve as-is, `e` to edit the inner system prompt first, or `r` to reject with a reason.
+
+When a constituent tool has been removed from the score since the trajectory was recorded, `skills approve` refuses with an actionable error and points you at `skills reject` as the audit-trail-preserving fallback.
+
+## What gets stored
+
+A `SkillCandidate` looks roughly like this:
+
+```ts
+{
+  id: "sk_cand_review_pr_a1b2",
+  agent: "code-reviewer",
+  name: "review_pr",
+  description: "Review a pull request: fetch the diff, read each changed file, and post a consolidated review comment.",
+  constituents: ["get_pull_request", "get_file_contents", "comment_on_issue"],
+  evidence: { trajectories: 5, success_rate: 1.0 },
+  proposed_system_prompt: "You are reviewing a single GitHub pull request…",
+  status: "pending",
+}
+```
+
+On approval the candidate is removed and re-emerges as a `Skill` with the same id. Rejected candidates are kept with `status: "rejected"` so the proposer dedupes against past decisions and you're not asked twice about the same pattern.
+
+## Events
+
+Five new variants on the `EventBus`:
+
+| Event | Fires when |
+| --- | --- |
+| `skill:candidate_proposed` | Proposer writes a new pending candidate |
+| `skill:approved` | Operator approves a candidate |
+| `skill:rejected` | Operator rejects a candidate |
+| `skill:invoked` | Agent calls an approved skill at runtime |
+| `skill:trajectory_observed` | Run ends and observer records the trajectory |
+
+All flow through `redactObject`, so secrets in tool inputs never reach the bus.
+
+## Production guidance
+
+- **Threshold tuning.** `auto_propose_threshold: 5` is the default. Lower it for tighter loops (test fixtures, demos), raise it for production agents where you want stronger signal. Below 3 the proposer fires on coincidence; above 10 you rarely see a candidate.
+- **Use a persistent store.** `InMemorySkillStore` is for development. Back it with Postgres in production.
+- **Approve narrowly.** A skill that says "do a thing" should do exactly that thing. Edit the system prompt before approving, or reject and let the proposer try again with more evidence.
+- **Audit `skill:invoked`.** Subscribe to the event and send it to your trace store — that's the attribution line for every reduced turn count.
+
+## What's deliberately not in v0.26
+
+- **Persistent stores beyond memory.** The `SkillStore` interface is stable; implementations against Postgres / Redis land in a follow-up.
+- **JSON Schema export of `SkillSignature`.** Inputs/outputs stay Zod refs until the persistent backend lands.
+- **Cross-agent skills.** Skills are scoped to the agent that produced them. Lifting a skill across agents (with permission re-checks) is a v0.27 design pass.
+
+## Try it
+
+```bash
+git clone https://github.com/tuttiai/tutti && cd tutti
+npm install && npm run build
+npx tsx examples/self-improving-skills/tutti.score.ts --check
+```
+
+The `--check` mode validates the score without an API key. For the full walk-through with a real LLM and five PR reviews, follow the [example README](https://github.com/tuttiai/tutti/tree/main/examples/self-improving-skills).

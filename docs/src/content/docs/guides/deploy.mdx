@@ -1,11 +1,13 @@
 ---
 title: "Deploying to production"
-description: "Bundle a Tutti score and ship it to Docker, Railway, or Fly with one command."
+description: "Bundle a Tutti score and ship it to Docker, Railway, Fly, Modal, or Daytona with one command."
 sidebar:
   order: 8
 ---
 
-Tutti ships a deploy bundler — `@tuttiai/deploy` — and a CLI front-end on it. One command takes a score from `tutti-ai run` to a containerised service running on your platform of choice. The bundle includes a Dockerfile, `docker-compose.yml`, and platform-specific config (`fly.toml`, `railway.json`) generated from a `DeployConfig` block on your agent.
+Tutti ships a deploy bundler — `@tuttiai/deploy` — and a CLI front-end on it. One command takes a score from `tutti-ai run` to a running service on your platform of choice. The bundle includes whatever the target needs — a Dockerfile + `docker-compose.yml` for the container targets, a `modal_app.py` for Modal, a devcontainer + snapshot config for Daytona — generated from a `DeployConfig` block on your agent.
+
+v0.26 adds two serverless targets — **Modal** (scale-to-zero functions) and **Daytona** (always-warm dev sandboxes) — alongside the original Docker / Railway / Fly. Cloudflare Workers is recognised as a `DeployTarget` value but no bundler ships yet; the CLI errors loudly rather than half-deploying.
 
 ## Prerequisites
 
@@ -14,6 +16,8 @@ Tutti ships a deploy bundler — `@tuttiai/deploy` — and a CLI front-end on it
   - Docker — `docker compose` (built in)
   - Railway — `npm i -g @railway/cli && railway login`
   - Fly — `curl -L https://fly.io/install.sh | sh && fly auth login`
+  - Modal — `pip install modal && modal token new`
+  - Daytona — `brew install daytonaio/cli/daytona && daytona auth login`
 
 ## Step 1: Add a `deploy` block to one agent
 
@@ -81,7 +85,21 @@ Tutti generates the bundle in `./tutti-deploy/`, writes `.env.deploy.example`, a
 
 The Docker bundle runs as non-root user `tutti` (uid 1001), exposes port 3000 (configurable), and includes a healthcheck against the `health.path` you set. `NODE_OPTIONS --max-old-space-size` is computed from `scale.memory` so the runtime won't OOM under platform-imposed memory caps.
 
+### Modal (scale-to-zero)
+
+`tutti-ai deploy --target modal` runs the Tutti Node server inside `node:20-bookworm-slim` — Debian's apt `nodejs` is Node 18 and too old. The generated `modal_app.py` installs `tutti-ai@latest` + `@tuttiai/cli@latest` (pinnable via the `CLI_VERSION` constant before `modal deploy`), declares each `manifest.secrets` entry as `modal.Secret.from_name("tutti-<lowercase>")`, surfaces `manifest.env` as the function's `env=` dict, and exposes the server via `@modal.web_server(port=3000, startup_timeout=120)`. `manifest.scale.memory` (`"512mb"` / `"2gb"`) is converted to the integer Modal expects on `memory=`, defaulting to 2048.
+
+Because Modal redeploys are functions, not slot-based releases, `tutti-ai deploy rollback` is reported as not applicable. `deploy status` dispatches to `modal app list`; `deploy logs` to `modal app logs <name>`.
+
+Modal is a **serverless** target — between invocations the function hibernates. Anything held in-process memory (a non-persistent session store, a setInterval, a long-lived voice client cache) silently evaporates. Run [`tutti-ai deploy verify-hibernate`](/cli/reference#tutti-ai-deploy-verify-hibernate) on your score first; it checks for stores and timers that wouldn't survive the next cold start.
+
+### Daytona (always-warm dev environment)
+
 The Daytona bundle stands up a persistent dev environment from `mcr.microsoft.com/devcontainers/typescript-node:22`, installs `tutti-ai` via `postCreateCommand`, and forwards port 3000. After `daytona create` finishes, `daytona.sh` SSHes in and starts `tutti-ai serve`. The emitted `.daytona/snapshots.yaml` requests idle-hibernation (5 min) and auto-resume — its field names are not yet verified against the current Daytona schema, so the file ships with a TODO banner; treat hibernation as best-effort until that's confirmed.
+
+### Cloudflare Workers (recognised, not yet wired up)
+
+`DeployTarget` includes `"cloudflare"` so a score can declare it ahead of time, but no bundler ships in v0.26. The CLI errors loudly with *cloudflare deployment is not yet wired up in the CLI. Pass --target docker|railway|fly|modal|daytona to override.* rather than half-deploying.
 
 ### Conditional services
 
@@ -128,6 +146,8 @@ Top runs by cost, daily-spend sparkline, and burn-rate optimisation hints. See [
 
 ## What's not yet shipped
 
+- **Cloudflare Workers bundler.** The target value is recognised but the bundler is a follow-up. Until then, the CLI rejects `--target cloudflare` with a clear error.
 - **AWS / GCP / Azure** — not yet. The bundler is structured around platforms with a single deploy verb; the cloud providers need an opinion about ECS vs Lambda vs Fargate, GKE vs Cloud Run, etc., that we haven't picked yet. For now use the Docker bundle and ship via your existing infra-as-code.
 - **Multi-region** — `region: "auto"` picks one region. Multi-region active-active is platform-specific (Fly supports it natively, others don't) and not abstracted yet.
 - **Blue/green** — rollback is single-step, not slot-based. We rely on the platform's release history rather than maintaining two deployments.
+- **Modal rollback** — Modal redeploys are functions, not slot-based releases; `tutti-ai deploy rollback` reports as not applicable on Modal.

@@ -32,7 +32,7 @@ message.
 
 - **Project lifecycle** — [`init`](#tutti-ai-init-project-name), [`templates`](#tutti-ai-templates), [`check`](#tutti-ai-check-score) / [`doctor`](#tutti-ai-doctor-score), [`info`](#tutti-ai-info-score)
 - **Running agents** — [`run`](#tutti-ai-run-score), [`serve`](#tutti-ai-serve-score), [`studio`](#tutti-ai-studio-score), [`inbox start`](#tutti-ai-inbox-start-score), [`resume`](#tutti-ai-resume-session-id), [`replay`](#tutti-ai-replay-session-id)
-- **Deployment** — [`deploy`](#tutti-ai-deploy)
+- **Deployment** — [`deploy`](#tutti-ai-deploy), [`deploy verify-hibernate`](#tutti-ai-deploy-verify-hibernate)
 - **Voices** — [`add`](#tutti-ai-add-voice), [`voices`](#tutti-ai-voices), [`search`](#tutti-ai-search-query), [`publish`](#tutti-ai-publish)
 - **Packages** — [`update`](#tutti-ai-update), [`outdated`](#tutti-ai-outdated), [`upgrade`](#tutti-ai-upgrade-voice)
 - **Scheduling** — [`schedule`](#tutti-ai-schedule-score), [`schedules`](#tutti-ai-schedules)
@@ -456,12 +456,14 @@ Interactive controls: `n` (next turn), `p` (prev turn), `b` (branch from here), 
 
 ### `tutti-ai deploy`
 
-Bundle your score and ship it to a hosting platform. Bundles include a Dockerfile, `docker-compose.yml`, and platform-specific config (`fly.toml`, `railway.json`) generated from a `DeployConfig` block on the agent.
+Bundle your score and ship it to a hosting platform. The CLI ships bundlers for five targets — `docker`, `railway`, `fly`, `modal`, `daytona` — generated from a `DeployConfig` block on the agent.
 
 ```bash
 tutti-ai deploy --target docker                # generate Docker bundle in ./tutti-deploy/
 tutti-ai deploy --target railway               # bundle + railway up
 tutti-ai deploy --target fly                   # bundle + fly deploy
+tutti-ai deploy --target modal                 # bundle + modal deploy (scale-to-zero)
+tutti-ai deploy --target daytona               # bundle + daytona create + ssh
 tutti-ai deploy --target railway --dry-run     # print the plan without executing
 ```
 
@@ -469,7 +471,7 @@ tutti-ai deploy --target railway --dry-run     # print the plan without executin
 
 | Flag | Default | Description |
 | ---- | ------- | ----------- |
-| `--target <platform>` | (required) | One of `docker`, `railway`, `fly`. |
+| `--target <platform>` | (required) | One of `docker`, `railway`, `fly`, `modal`, `daytona`. `cloudflare` is accepted on the score's `DeployTarget` union but the CLI errors loudly — its bundler is a follow-up. |
 | `--dry-run` | false | Print the plan + generated files without invoking the platform CLI. |
 | `-s, --score <path>` | `./tutti.score.ts` | Score file to load. |
 | `-o, --out <dir>` | `./tutti-deploy` | Output directory for generated bundle. |
@@ -522,11 +524,28 @@ tutti-ai deploy logs --tail     # follow
 
 ### `tutti-ai deploy rollback`
 
-Roll back to the previous deploy. Dispatches to the platform's equivalent (`railway rollback`, `fly releases rollback <prev>`, `docker compose pull && up -d` for the prior tag).
+Roll back to the previous deploy. Dispatches to the platform's equivalent (`railway rollback`, `fly releases rollback <prev>`, `docker compose pull && up -d` for the prior tag). Modal redeploys are functions, not slot-based releases, so rollback is reported as not applicable on Modal.
 
 ```bash
 tutti-ai deploy rollback
 ```
+
+### `tutti-ai deploy verify-hibernate`
+
+Check a score against the serverless-hibernation contract before a `--target modal` (or any scale-to-zero) deploy. Flags long-lived in-memory stores and background timers outside the scheduler — anything that wouldn't survive the next cold start.
+
+```bash
+tutti-ai deploy verify-hibernate
+tutti-ai deploy verify-hibernate -s ./path/to/score.ts
+```
+
+**Options:**
+
+| Flag | Default | Description |
+| ---- | ------- | ----------- |
+| `-s, --score <path>` | `./tutti.score.ts` | Score file to load. |
+
+Exits non-zero on a finding, so it composes into CI as a deploy gate.
 
 ---
 
@@ -676,6 +695,21 @@ const score = defineScore({
 | `TUTTI_PG_URL` | Recommended | PostgreSQL URL for durable schedule persistence. Falls back to in-memory (lost on restart). |
 
 Emits `schedule:triggered`, `schedule:completed`, and `schedule:error` events to stdout with timestamps.
+
+#### Scheduled delivery
+
+v0.26 adds optional `deliver` + `deliver_format` to a schedule block — when set, the scheduler dispatches the agent's final text reply to a platform after every successful run. Per-platform paths: Slack `chat.postMessage`, Discord `channels.fetch(...).send(...)`, Telegram `sendMessage` (with `parse_mode: "MarkdownV2"` when `deliver_format === "markdown"`), email `EmailClientWrapper.send`, WhatsApp `sendText` (markdown stripped before send — `logger.warn` makes the loss visible).
+
+```ts
+schedule: {
+  cron: "0 9 * * 1-5",
+  input: "Generate today's standup from the engineering channels.",
+  deliver: { platform: "slack", channel: "#standup" },
+  deliver_format: "markdown",
+}
+```
+
+`ScheduleDeliveryTarget` is a discriminated union over `platform` and carries addressing only — no tokens. Credentials are read from `SecretsManager` per the existing per-voice convention (`SLACK_BOT_TOKEN`, `DISCORD_BOT_TOKEN`, `TELEGRAM_BOT_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `TUTTI_EMAIL_SMTP_*` / `TUTTI_EMAIL_FROM`). Each voice's `forToken` / `forKey` cache means a delivery reuses whichever wrapper the agent's matching voice already initialised. Delivery failures are absorbed in the engine — they never crash the schedule timer — and surface as `schedule:delivery_failed`; success fires `schedule:delivered` with the dispatched payload length.
 
 ### `tutti-ai schedules`
 
