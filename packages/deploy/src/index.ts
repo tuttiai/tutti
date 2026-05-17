@@ -29,6 +29,19 @@ export {
   buildFlyConfig,
 } from "./targets/fly.js";
 export {
+  generateModalBundle,
+  buildModalApp,
+  buildModalEnvExample,
+  buildModalDeployScript,
+} from "./targets/modal.js";
+export {
+  generateDaytonaBundle,
+  buildDevcontainer,
+  buildSnapshotsYaml,
+  buildDaytonaGitignore,
+  buildDaytonaScript,
+} from "./targets/daytona.js";
+export {
   scanForSecrets,
   validateSecrets,
   buildEnvExample,

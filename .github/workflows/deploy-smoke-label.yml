@@ -1,0 +1,31 @@
+name: Deploy-smoke label
+
+# Auto-applies the `deploy-smoke` label to PRs that touch
+# `packages/deploy/src/targets/modal.ts`. The label then retriggers
+# `modal-smoke.yml` so any change to the Modal bundle generator is exercised
+# against Modal's free tier before merge.
+#
+# Uses `pull_request_target` so the label step gets a write-scoped token —
+# which means this workflow runs in the base-repo context with no checkout
+# of the PR's code. Do NOT add `actions/checkout` here, and do NOT execute
+# any code from the PR head — that would defeat the security model.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - packages/deploy/src/targets/modal.ts
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply deploy-smoke label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh pr edit "$PR_NUMBER" --repo "$REPO" --add-label deploy-smoke

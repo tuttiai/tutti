@@ -8,8 +8,20 @@ import { z } from "zod";
  * - `cloudflare` — emit a Cloudflare Worker bundle (wrangler-compatible).
  * - `railway`    — emit a Railway service config (`railway.json`).
  * - `fly`        — emit a Fly Machine config (`fly.toml`).
+ * - `modal`      — emit a Modal app (`modal_app.py`) that runs the Tutti
+ *                  Node server inside a Modal-managed container.
+ * - `daytona`    — emit a Daytona devcontainer bundle (`.devcontainer/`,
+ *                  `.daytona/snapshots.yaml`, `daytona.sh`) for a persistent
+ *                  always-warm agent dev environment.
  */
-export const DEPLOY_TARGETS = ["docker", "cloudflare", "railway", "fly"] as const;
+export const DEPLOY_TARGETS = [
+  "docker",
+  "cloudflare",
+  "railway",
+  "fly",
+  "modal",
+  "daytona",
+] as const;
 
 const DeployTargetSchema = z.enum(DEPLOY_TARGETS);
 

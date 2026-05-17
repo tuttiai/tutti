@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generateDaytonaBundle > matches the snapshot for a representative manifest 1`] = `
+{
+  "devcontainer": "{
+  "name": "marketing-agent",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+  "postCreateCommand": "npm install -g tutti-ai@latest",
+  "forwardPorts": [
+    3000
+  ],
+  "containerEnv": {
+    "LOG_LEVEL": "info"
+  }
+}
+",
+  "gitignore": "# Daytona local workspace state — keep config files (snapshots.yaml,
+# .devcontainer/) tracked, ignore everything generated at runtime.
+.daytona/state/
+.daytona/logs/
+.daytona/cache/
+",
+  "script": "#!/usr/bin/env bash
+set -euo pipefail
+
+# Create a Daytona workspace from this directory (no IDE auto-open),
+# then SSH in and start the Tutti server.
+# Edit WORKSPACE_DIR if you cloned into a folder name different from the
+# deployment name — devcontainers mount at /workspaces/<host-folder>.
+WORKSPACE_DIR="/workspaces/marketing-agent"
+
+daytona create --no-ide
+daytona ssh -- tutti-ai serve --score "$WORKSPACE_DIR/tutti.score.ts"
+",
+  "snapshots": "# UNVERIFIED SCHEMA — these field names have not been validated against
+# the current Daytona OSS or Daytona Sandbox config format. Hibernation
+# is normally configured via the SDK or \`daytona sandbox create\` flags,
+# not a checked-in YAML. This file is emitted because the deploy spec
+# requests it; treat it as a placeholder until the schema is confirmed.
+# TODO(deploy/daytona): move hibernation config into daytona.sh CLI flags.
+idle_minutes_until_hibernate: 5
+auto_resume: true
+",
+}
+`;

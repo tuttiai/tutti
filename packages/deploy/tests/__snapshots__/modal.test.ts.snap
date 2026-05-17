@@ -1,0 +1,36 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildModalApp > matches the snapshot for a representative manifest 1`] = `
+"import subprocess
+
+import modal
+
+APP_NAME = 'marketing-agent'
+CLI_VERSION = 'latest'  # pin to a specific @tuttiai/cli version for reproducible builds
+
+image = (
+    modal.Image.from_registry("node:20-bookworm-slim", add_python="3.11")
+    .run_commands(
+        f"npm install -g tutti-ai@{CLI_VERSION}",
+        f"npm install -g @tuttiai/cli@{CLI_VERSION}",
+    )
+    .add_local_file("tutti.score.ts", "/app/tutti.score.ts")
+)
+
+app = modal.App(APP_NAME)
+
+ANTHROPIC_API_KEY = modal.Secret.from_name('tutti-anthropic-api-key')
+OPENAI_API_KEY = modal.Secret.from_name('tutti-openai-api-key')
+
+@app.function(
+    image=image,
+    secrets=[ANTHROPIC_API_KEY, OPENAI_API_KEY],
+    env={'LOG_LEVEL': 'info'},
+    timeout=3600,
+    memory=2048,
+)
+@modal.web_server(port=3000, startup_timeout=120)
+def serve():
+    subprocess.Popen(["tutti-ai", "serve", "--score", "/app/tutti.score.ts"])
+"
+`;
