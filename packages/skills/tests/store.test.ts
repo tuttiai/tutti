@@ -1,14 +1,29 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { z } from "zod";
 
-import { EventBus } from "@tuttiai/core";
-
-import { InMemorySkillStore } from "../src/in-memory-store.js";
+import { InMemorySkillStore, type SkillEventBus } from "../src/in-memory-store.js";
 import type {
   Skill,
   SkillCandidate,
   Trajectory,
 } from "../src/types.js";
+
+// Local minimal bus — satisfies SkillEventBus and provides the same
+// `on(type, handler)` subscribe surface the test relies on, without
+// importing @tuttiai/core (which would re-create the build cycle).
+class TestEventBus implements SkillEventBus {
+  private readonly handlers = new Map<string, Array<(e: Record<string, unknown>) => void>>();
+
+  on(type: string, handler: (e: Record<string, unknown>) => void): void {
+    const arr = this.handlers.get(type) ?? [];
+    arr.push(handler);
+    this.handlers.set(type, arr);
+  }
+
+  emit(event: { type: string; [k: string]: unknown }): void {
+    for (const h of this.handlers.get(event.type) ?? []) h(event);
+  }
+}
 
 const makeTrajectory = (overrides: Partial<Trajectory> = {}): Trajectory => ({
   id: "01HQ-traj-1",
@@ -115,7 +130,7 @@ describe("InMemorySkillStore", () => {
     });
 
     it("emits skill:candidate_proposed when an EventBus is wired in", async () => {
-      const bus = new EventBus();
+      const bus = new TestEventBus();
       const handler = vi.fn();
       bus.on("skill:candidate_proposed", handler);
       const eventfulStore = new InMemorySkillStore({ events: bus });
@@ -173,7 +188,7 @@ describe("InMemorySkillStore", () => {
     });
 
     it("emits skill:approved with reviewed_by forwarded", async () => {
-      const bus = new EventBus();
+      const bus = new TestEventBus();
       const handler = vi.fn();
       bus.on("skill:approved", handler);
       const eventfulStore = new InMemorySkillStore({ events: bus });
@@ -212,7 +227,7 @@ describe("InMemorySkillStore", () => {
     });
 
     it("emits skill:rejected with reason forwarded", async () => {
-      const bus = new EventBus();
+      const bus = new TestEventBus();
       const handler = vi.fn();
       bus.on("skill:rejected", handler);
       const eventfulStore = new InMemorySkillStore({ events: bus });
@@ -232,7 +247,7 @@ describe("InMemorySkillStore", () => {
     });
 
     it("emits skill:rejected with no extras when none provided", async () => {
-      const bus = new EventBus();
+      const bus = new TestEventBus();
       const handler = vi.fn();
       bus.on("skill:rejected", handler);
       const eventfulStore = new InMemorySkillStore({ events: bus });
