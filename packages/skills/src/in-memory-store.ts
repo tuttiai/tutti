@@ -50,11 +50,12 @@ export class InMemorySkillStore implements SkillStore {
     this.events = options.events;
   }
 
-  async recordTrajectory(trajectory: Trajectory): Promise<void> {
+  recordTrajectory(trajectory: Trajectory): Promise<void> {
     this.trajectories.set(trajectory.id, trajectory);
+    return Promise.resolve();
   }
 
-  async listTrajectories(agentName: string, since?: Date): Promise<Trajectory[]> {
+  listTrajectories(agentName: string, since?: Date): Promise<Trajectory[]> {
     const cutoff = since?.getTime();
     const out: Trajectory[] = [];
     for (const t of this.trajectories.values()) {
@@ -63,10 +64,10 @@ export class InMemorySkillStore implements SkillStore {
       out.push(t);
     }
     out.sort((a, b) => b.ended_at.getTime() - a.ended_at.getTime());
-    return out;
+    return Promise.resolve(out);
   }
 
-  async proposeCandidate(candidate: SkillCandidate): Promise<void> {
+  proposeCandidate(candidate: SkillCandidate): Promise<void> {
     this.candidates.set(candidate.id, candidate);
     this.events?.emit({
       type: "skill:candidate_proposed",
@@ -74,18 +75,19 @@ export class InMemorySkillStore implements SkillStore {
       name_suggestion: candidate.name_suggestion,
       evidence_count: candidate.evidence_trajectory_ids.length,
     });
+    return Promise.resolve();
   }
 
-  async listCandidates(): Promise<SkillCandidate[]> {
+  listCandidates(): Promise<SkillCandidate[]> {
     const out = Array.from(this.candidates.values());
     out.sort((a, b) => b.proposed_at.getTime() - a.proposed_at.getTime());
-    return out;
+    return Promise.resolve(out);
   }
 
-  async approveCandidate(id: string, opts: ApproveCandidateOptions = {}): Promise<Skill> {
+  approveCandidate(id: string, opts: ApproveCandidateOptions = {}): Promise<Skill> {
     const candidate = this.candidates.get(id);
     if (!candidate) {
-      throw new Error(`No pending candidate with id "${id}"`);
+      return Promise.reject(new Error(`No pending candidate with id "${id}"`));
     }
     const skill: Skill = {
       ...candidate,
@@ -104,13 +106,13 @@ export class InMemorySkillStore implements SkillStore {
       name: skill.name_suggestion,
       ...(opts.reviewed_by !== undefined ? { reviewed_by: opts.reviewed_by } : {}),
     });
-    return skill;
+    return Promise.resolve(skill);
   }
 
-  async rejectCandidate(id: string, opts: RejectCandidateOptions = {}): Promise<void> {
+  rejectCandidate(id: string, opts: RejectCandidateOptions = {}): Promise<void> {
     const candidate = this.candidates.get(id);
     if (!candidate) {
-      throw new Error(`No pending candidate with id "${id}"`);
+      return Promise.reject(new Error(`No pending candidate with id "${id}"`));
     }
     const skill: Skill = {
       ...candidate,
@@ -128,13 +130,14 @@ export class InMemorySkillStore implements SkillStore {
       ...(opts.reviewed_by !== undefined ? { reviewed_by: opts.reviewed_by } : {}),
       ...(opts.reason !== undefined ? { reason: opts.reason } : {}),
     });
+    return Promise.resolve();
   }
 
-  async listSkills(agentName?: string): Promise<Skill[]> {
+  listSkills(agentName?: string): Promise<Skill[]> {
     const all = Array.from(this.skills.values());
     const filtered = agentName === undefined ? all : all.filter((s) => this.skillCoversAgent(s, agentName));
     filtered.sort((a, b) => b.reviewed_at.getTime() - a.reviewed_at.getTime());
-    return filtered;
+    return Promise.resolve(filtered);
   }
 
   /**

@@ -139,15 +139,15 @@ export function resolveConstituents(
  * available evidence trajectory. Returns `undefined` if no evidence
  * trajectory is retained — the renderer then prints `(unknown)`.
  */
-async function resolveAgentName(
+function resolveAgentName(
   evidenceIds: readonly string[],
   agentTrajectoryIndex: ReadonlyMap<string, string>,
 ): Promise<string | undefined> {
   for (const id of evidenceIds) {
     const agent = agentTrajectoryIndex.get(id);
-    if (agent !== undefined) return agent;
+    if (agent !== undefined) return Promise.resolve(agent);
   }
-  return undefined;
+  return Promise.resolve(undefined);
 }
 
 /**
