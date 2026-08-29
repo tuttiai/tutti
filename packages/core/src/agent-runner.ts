@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type {
@@ -28,12 +27,7 @@ import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
-import {
-  MemoryEnforcer,
-  createMemoryHelpers,
-  createMemoryTools,
-  DEFAULT_MAX_ENTRIES_PER_AGENT,
-} from "./memory/curated.js";
+import { createMemoryHelpers } from "./memory/curated.js";
 import { createUserMemoryStore } from "./memory/user/index.js";
 import { MemoryUserMemoryStore } from "./memory/user/memory-store.js";
 import type {
@@ -74,7 +68,6 @@ import {
   importanceLabel,
   parseInferredMemories,
   renderProfileForPrompt,
-  toolToDefinition,
 } from "./run/helpers.js";
 import { assertAutoModelSupported, resolveRunSession } from "./run/preflight.js";
 import {
@@ -82,6 +75,7 @@ import {
   costBudgetChecks,
   prepareRunBudget,
 } from "./run/budget.js";
+import { assembleRunTools } from "./run/tool-assembly.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -596,68 +590,14 @@ export class AgentRunner {
         session_id: session.id,
       });
 
-      // Initialize voices that have setup hooks (e.g., MCP voice discovers tools)
-      const voiceCtx = { session_id: session.id, agent_name: agent.name };
-      for (const voice of agent.voices) {
-        if (voice.setup) {
-          await voice.setup(voiceCtx);
-        }
-      }
-
-      // Per-run identifier shared between the SkillExecutor's
-      // `skill:invoked` emissions and the TrajectoryObserver at run
-      // end — same value at both call sites so subscribers can correlate.
-      const runId = randomUUID();
-
-      // Collect all tools from all voices
-      const allTools: Tool[] = [...agent.voices.flatMap((v) => v.tools)];
-
-      // Inject HITL tool if enabled
-      if (agent.allow_human_input) {
-        allTools.push(this.createHitlTool(agent.name, session.id));
-      }
-
-      // Project the agent's approved skills onto callable tools. The
-      // executor closes over `runId` for `skill:invoked` correlation and
-      // over the voice-tool pool so each skill's constituents resolve
-      // against the tools this agent actually has. Permission breaches
-      // throw at this call site (run start), not at skill invocation.
-      if (this.skillExecutor) {
-        const skillTools = await this.skillExecutor.toolsForAgent(agent.name, {
-          tools: allTools,
-          grantedPermissions: agent.permissions ?? [],
-          runId,
+      const { allTools, toolDefs, runId, semanticStore, memoryEnforcer } =
+        await assembleRunTools(agent, session.id, {
+          semanticMemory: this.semanticMemory,
+          skillExecutor: this.skillExecutor,
+          events: this.events,
+          createHitlTool: (a, s) => this.createHitlTool(a, s),
         });
-        allTools.push(...skillTools);
-      }
-
-      // Resolve the semantic memory config + store once per run. Both
-      // the system-prompt injection (later in this method) and the
-      // ToolContext.memory helpers / curated agent tools route through
-      // the same `MemoryEnforcer`, so per-agent cap, LRU eviction, and
-      // memory:* events fire exactly once per logical operation.
-      //
-      // The curated tools are NOT a Voice — voices declare permissions
-      // and have setup/teardown hooks that don't apply to in-process
-      // memory. They are appended directly to `allTools` here.
       const semanticCfg = agent.memory?.semantic;
-      const semanticStore: SemanticMemoryStore | undefined = semanticCfg?.enabled
-        ? (semanticCfg.store ?? this.semanticMemory)
-        : undefined;
-      const memoryEnforcer =
-        semanticCfg?.enabled && semanticStore
-          ? new MemoryEnforcer(
-              semanticStore,
-              agent.name,
-              semanticCfg.max_entries_per_agent ?? DEFAULT_MAX_ENTRIES_PER_AGENT,
-              this.events,
-            )
-          : undefined;
-      if (memoryEnforcer && semanticCfg?.curated_tools !== false) {
-        allTools.push(...createMemoryTools({ enforcer: memoryEnforcer }));
-      }
-
-      const toolDefs = allTools.map(toolToDefinition);
       // Counted once per run — neither voices nor HITL toggle mid-loop.
       // Threaded into the router ALS scope so emitted decisions can
       // attribute the agent's blast radius alongside the routing choice.
