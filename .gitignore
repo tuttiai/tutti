@@ -15,3 +15,6 @@ coverage
 # or un-ignore it by uncommenting the negation line below:
 # !.tutti/golden/
 .tutti/
+
+# Local agent working state — synced from tuttiai/knowledge
+CLAUDE.local.md
