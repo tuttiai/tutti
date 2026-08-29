@@ -77,6 +77,7 @@ import {
   renderProfileForPrompt,
   toolToDefinition,
 } from "./run/helpers.js";
+import { assertAutoModelSupported, resolveRunSession } from "./run/preflight.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -614,33 +615,9 @@ export class AgentRunner {
     session_id?: string,
     options?: AgentRunOptions,
   ): Promise<AgentResult> {
-    // `model: 'auto'` opts an agent into per-call routing via the score's
-    // SmartProvider. Validate up front so the failure surfaces at run
-    // start rather than partway through a turn.
-    if (agent.model === "auto" && !this.asSmartProvider()) {
-      throw new Error(
-        `Agent "${agent.name}" sets model: 'auto' but the score's provider is not a SmartProvider.\n` +
-          `Configure a SmartProvider from @tuttiai/router on your score, or set an explicit model on the agent.`,
-      );
-    }
+    assertAutoModelSupported(agent, this.asSmartProvider() !== null);
 
-    // session_id can come either from the positional arg (legacy) or the
-    // options bag (new). Positional wins on conflict for back-compat.
-    const resolvedSessionId = session_id ?? options?.session_id;
-    const userId = options?.user_id;
-
-    // Resolve or create session
-    const session = resolvedSessionId
-      ? this.sessions.get(resolvedSessionId)
-      : this.sessions.create(agent.name);
-
-    if (!session) {
-      throw new Error(
-        `Session not found: ${resolvedSessionId}\n` +
-        `The session may have expired or the ID is incorrect.\n` +
-        `Omit session_id to start a new conversation.`,
-      );
-    }
+    const { session, userId } = resolveRunSession(agent, session_id, options, this.sessions);
 
     return Tracing.agentRun(agent.name, session.id, agent.model, async () => {
       const agentHooks = agent.hooks;
