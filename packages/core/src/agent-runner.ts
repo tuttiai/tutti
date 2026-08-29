@@ -48,9 +48,9 @@ import type { SkillExecutor } from "./skills/executor.js";
 import type { TrajectoryToolCall } from "@tuttiai/skills";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
-import { estimateCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
+import { estimateCost, type RunCostStore } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
-import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
+import { Tracing, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { needsApproval } from "./interrupt/index.js";
 import {
@@ -70,6 +70,7 @@ import {
 import { assembleRunTools } from "./run/tool-assembly.js";
 import { composeSystemPrompt } from "./run/system-prompt.js";
 import { extractFinalOutput, resolveRunOutput } from "./run/output.js";
+import { finaliseRunCost } from "./run/cost.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -1148,38 +1149,13 @@ export class AgentRunner {
         session_id: session.id,
       });
 
-      const trace_id = getCurrentTraceId();
-      // Aggregate per-call cost recorded on llm.completion spans into a
-      // single per-run figure. Null when no span had a known model price
-      // (e.g. fully custom model with no registerModelPrice call).
-      const runCost = trace_id !== undefined ? getRunCost(trace_id).cost_usd : null;
-      const usage: TokenUsage = {
-        ...totalUsage,
-        ...(runCost !== null ? { cost_usd: runCost } : {}),
-      };
-
-      // Persist this run's cost so future runs can enforce daily and
-      // monthly caps. Best-effort: store failures must not invalidate
-      // the run that just completed successfully.
-      if (this.runCostStore) {
-        const storedCost =
-          runCost ??
-          (budget ? budget.estimated_cost_usd : 0);
-        try {
-          await this.runCostStore.record({
-            run_id: trace_id ?? `${session.id}:${runStartedAt.toISOString()}`,
-            agent_name: agent.name,
-            started_at: runStartedAt,
-            cost_usd: storedCost,
-            total_tokens: totalUsage.input_tokens + totalUsage.output_tokens,
-          });
-        } catch (err) {
-          logger.warn(
-            { error: err instanceof Error ? err.message : String(err), agent: agent.name },
-            "RunCostStore.record failed — daily/monthly aggregation may be incomplete",
-          );
-        }
-      }
+      const { trace_id, usage } = await finaliseRunCost(agent, {
+        sessionId: session.id,
+        totalUsage,
+        budget,
+        runStartedAt,
+        runCostStore: this.runCostStore,
+      });
 
       const agentResult: AgentResult = {
         session_id: session.id,
