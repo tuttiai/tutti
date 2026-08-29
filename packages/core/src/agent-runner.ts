@@ -56,7 +56,7 @@ import type { SkillExecutor } from "./skills/executor.js";
 import type { TrajectoryToolCall } from "@tuttiai/skills";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
-import { estimateCost, getDailyCost, getMonthlyCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
+import { estimateCost, getRunCost, type RunCostStore } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
@@ -68,7 +68,6 @@ import {
   ProviderError,
   RateLimitError,
   StructuredOutputError,
-  type BudgetScope,
 } from "./errors.js";
 import {
   extractText,
@@ -78,6 +77,11 @@ import {
   toolToDefinition,
 } from "./run/helpers.js";
 import { assertAutoModelSupported, resolveRunSession } from "./run/preflight.js";
+import {
+  checkCostBudgetBreach,
+  costBudgetChecks,
+  prepareRunBudget,
+} from "./run/budget.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -137,8 +141,6 @@ interface SmartProviderSurface {
   getLastDecision?: () => { model: string } | undefined;
 }
 
-const DEFAULT_MAX_TURNS = 10;
-const DEFAULT_MAX_TOOL_CALLS = 20;
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 const DEFAULT_HITL_TIMEOUT_S = 300;
 const MAX_PROVIDER_RETRIES = 3;
@@ -149,52 +151,6 @@ const hitlRequestSchema = z.object({
   options: z.array(z.string()).optional().describe("If provided, the human picks one of these"),
   timeout_seconds: z.number().optional().describe("How long to wait before timing out (default 300)"),
 });
-
-/**
- * Build the per-scope cost-check rows the runner uses to emit warnings
- * and detect breaches. Each row is included only when its underlying
- * limit is configured. `daily.current` and `monthly.current` add the
- * caller-provided snapshots to this run's accumulated cost.
- */
-function costBudgetChecks(
-  cfg: { max_cost_usd?: number; max_cost_usd_per_day?: number; max_cost_usd_per_month?: number },
-  runCostUsd: number,
-  dailySnapshotUsd: number,
-  monthlySnapshotUsd: number,
-): Array<{ scope: BudgetScope; current: number; limit: number }> {
-  const checks: Array<{ scope: BudgetScope; current: number; limit: number }> = [];
-  if (cfg.max_cost_usd !== undefined && cfg.max_cost_usd > 0) {
-    checks.push({ scope: "run", current: runCostUsd, limit: cfg.max_cost_usd });
-  }
-  if (cfg.max_cost_usd_per_day !== undefined && cfg.max_cost_usd_per_day > 0) {
-    checks.push({
-      scope: "day",
-      current: dailySnapshotUsd + runCostUsd,
-      limit: cfg.max_cost_usd_per_day,
-    });
-  }
-  if (cfg.max_cost_usd_per_month !== undefined && cfg.max_cost_usd_per_month > 0) {
-    checks.push({
-      scope: "month",
-      current: monthlySnapshotUsd + runCostUsd,
-      limit: cfg.max_cost_usd_per_month,
-    });
-  }
-  return checks;
-}
-
-/** Return the first scope already over its limit, or `null` when none. */
-function checkCostBudgetBreach(
-  cfg: { max_cost_usd?: number; max_cost_usd_per_day?: number; max_cost_usd_per_month?: number },
-  runCostUsd: number,
-  dailySnapshotUsd: number,
-  monthlySnapshotUsd: number,
-): { scope: BudgetScope; current: number; limit: number } | null {
-  for (const c of costBudgetChecks(cfg, runCostUsd, dailySnapshotUsd, monthlySnapshotUsd)) {
-    if (c.current >= c.limit) return c;
-  }
-  return null;
-}
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt++) {
@@ -747,64 +703,16 @@ export class AgentRunner {
         ? [...checkpoint.messages]
         : [...session.messages, { role: "user", content: guardedInput }];
 
-      const maxTurns = agent.max_turns ?? DEFAULT_MAX_TURNS;
-      const maxToolCalls = agent.max_tool_calls ?? DEFAULT_MAX_TOOL_CALLS;
-      const budget = agent.budget
-        ? new TokenBudget(agent.budget, agent.model ?? "")
-        : undefined;
+      const {
+        maxTurns,
+        maxToolCalls,
+        budget,
+        cfg,
+        runStartedAt,
+        dailySnapshotUsd,
+        monthlySnapshotUsd,
+      } = await prepareRunBudget(agent, this.runCostStore);
 
-      // Snapshot daily / monthly cost from the run-cost store at run
-      // start. We add this run's accumulating cost to the snapshot for
-      // every check; concurrent runs in other processes can over-spend
-      // by at most one run's worth — accepted to avoid hammering the
-      // store on every turn.
-      //
-      // Daily/monthly enforcement only activates when a store is
-      // attached. Without persistence the values are incoherent (a
-      // "daily total" of just this run's cost is meaningless), so we
-      // skip them rather than silently mis-enforce.
-      const rawCfg = agent.budget;
-      const wantsDaily =
-        rawCfg?.max_cost_usd_per_day !== undefined && rawCfg.max_cost_usd_per_day > 0;
-      const wantsMonthly =
-        rawCfg?.max_cost_usd_per_month !== undefined && rawCfg.max_cost_usd_per_month > 0;
-      const runStartedAt = new Date();
-      let dailySnapshotUsd = 0;
-      let monthlySnapshotUsd = 0;
-      if (!this.runCostStore && (wantsDaily || wantsMonthly)) {
-        logger.warn(
-          { agent: agent.name },
-          "Agent has max_cost_usd_per_day/_per_month set but the runtime has no RunCostStore — skipping daily/monthly enforcement",
-        );
-      }
-      if (this.runCostStore && (wantsDaily || wantsMonthly)) {
-        try {
-          if (wantsDaily) {
-            dailySnapshotUsd = await getDailyCost(this.runCostStore, runStartedAt);
-          }
-          if (wantsMonthly) {
-            monthlySnapshotUsd = await getMonthlyCost(this.runCostStore, runStartedAt);
-          }
-        } catch (err) {
-          // A flaky cost store should not block runs. Log and assume
-          // zero spend so far — the per-run cap still applies.
-          logger.warn(
-            { error: err instanceof Error ? err.message : String(err), agent: agent.name },
-            "RunCostStore snapshot failed — proceeding with zero daily/monthly history",
-          );
-        }
-      }
-      // Strip daily/monthly limits from the cfg the loop sees when no
-      // store is configured, so post-call checks ignore them too.
-      const cfg = rawCfg
-        ? this.runCostStore
-          ? rawCfg
-          : {
-              ...(rawCfg.max_tokens !== undefined ? { max_tokens: rawCfg.max_tokens } : {}),
-              ...(rawCfg.max_cost_usd !== undefined ? { max_cost_usd: rawCfg.max_cost_usd } : {}),
-              ...(rawCfg.warn_at_percent !== undefined ? { warn_at_percent: rawCfg.warn_at_percent } : {}),
-            }
-        : undefined;
       const totalUsage: TokenUsage =
         resuming && checkpoint
           ? {
