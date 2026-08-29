@@ -59,7 +59,6 @@ import {
   ToolTimeoutError,
   ProviderError,
   RateLimitError,
-  StructuredOutputError,
 } from "./errors.js";
 import { extractText, parseInferredMemories } from "./run/helpers.js";
 import { assertAutoModelSupported, resolveRunSession } from "./run/preflight.js";
@@ -70,6 +69,7 @@ import {
 } from "./run/budget.js";
 import { assembleRunTools } from "./run/tool-assembly.js";
 import { composeSystemPrompt } from "./run/system-prompt.js";
+import { extractFinalOutput, resolveRunOutput } from "./run/output.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -132,7 +132,6 @@ interface SmartProviderSurface {
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 const DEFAULT_HITL_TIMEOUT_S = 300;
 const MAX_PROVIDER_RETRIES = 3;
-const DEFAULT_STRUCTURED_OUTPUT_MAX_RETRIES = 3;
 
 const hitlRequestSchema = z.object({
   question: z.string().describe("The question to ask the human"),
@@ -1098,60 +1097,29 @@ export class AgentRunner {
         throw err;
       }
 
-      // Extract final text output
-      let output = extractText(
-        messages.filter((m) => m.role === "assistant").at(-1)?.content,
-      );
-
-      // Structured output validation + retry loop
-      let structuredResult: unknown = undefined;
-      if (agent.outputSchema) {
-        const maxRetries = agent.maxRetries ?? DEFAULT_STRUCTURED_OUTPUT_MAX_RETRIES;
-
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-          try {
-            const parsed: unknown = JSON.parse(output);
-            structuredResult = agent.outputSchema.parse(parsed);
-            break;
-          } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : String(err);
-
-            if (attempt >= maxRetries) {
-              throw new StructuredOutputError(output, errorMsg);
-            }
-
-            logger.warn(
-              { agent: agent.name, attempt: attempt + 1, error: errorMsg },
-              "Structured output validation failed, retrying",
-            );
-
-            messages.push({
-              role: "user",
-              content: `Your response was invalid JSON. Error: ${errorMsg}. Try again.`,
-            });
-
-            turns++;
-
-            const retryRequest: ChatRequest = {
-              model: agent.model,
-              system: baseSystemPrompt,
-              messages,
-            };
-
-            const retryResponse = await withRetry(() =>
+      // Repair turns mutate the counter in place, so `turns` stays accurate
+      // for the result and the run:end event.
+      const outputCounter = { turns };
+      const resolved = await resolveRunOutput(
+        agent,
+        extractFinalOutput(messages),
+        {
+          messages,
+          baseSystemPrompt,
+          totalUsage,
+          callModel: (request) =>
+            withRetry(() =>
               agent.streaming
-                ? this.streamToResponse(routerScope, retryRequest)
-                : this.callProviderChat(routerScope, retryRequest, budget),
-            );
-
-            totalUsage.input_tokens += retryResponse.usage.input_tokens;
-            totalUsage.output_tokens += retryResponse.usage.output_tokens;
-            messages.push({ role: "assistant", content: retryResponse.content });
-
-            output = extractText(retryResponse.content);
-          }
-        }
-      }
+                ? this.streamToResponse(routerScope, request)
+                : this.callProviderChat(routerScope, request, budget),
+            ),
+        },
+        outputCounter,
+      );
+      turns = outputCounter.turns;
+      const structuredResult = resolved.structuredResult;
+      // Reassigned below when the afterRun guardrail rewrites the output.
+      let output = resolved.output;
 
       // Output guardrail — may modify or block the output after the last turn.
       if (agent.afterRun) {
