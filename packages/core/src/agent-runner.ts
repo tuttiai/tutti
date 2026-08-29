@@ -20,13 +20,12 @@ import type {
   TokenUsage,
   TuttiHooks,
 } from "@tuttiai/types";
-import type { Checkpoint, CheckpointStore } from "./checkpoint/index.js";
+import type { CheckpointStore } from "./checkpoint/index.js";
 import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
-import { createMemoryHelpers } from "./memory/curated.js";
 import { createUserMemoryStore } from "./memory/user/index.js";
 import { MemoryUserMemoryStore } from "./memory/user/memory-store.js";
 import type {
@@ -48,28 +47,25 @@ import type { SkillExecutor } from "./skills/executor.js";
 import type { TrajectoryToolCall } from "@tuttiai/skills";
 import type { ToolCache } from "./cache/tool-cache.js";
 import { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
-import { estimateCost, type RunCostStore } from "@tuttiai/telemetry";
+import type { RunCostStore } from "@tuttiai/telemetry";
 import { logger } from "./logger.js";
 import { Tracing, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { needsApproval } from "./interrupt/index.js";
 import {
-  BudgetExceededError,
   InterruptDeniedError,
   ToolTimeoutError,
 } from "./errors.js";
 import { extractText, parseInferredMemories } from "./run/helpers.js";
 import { assertAutoModelSupported, resolveRunSession } from "./run/preflight.js";
-import {
-  checkCostBudgetBreach,
-  costBudgetChecks,
-  prepareRunBudget,
-} from "./run/budget.js";
+import { prepareRunBudget } from "./run/budget.js";
 import { assembleRunTools } from "./run/tool-assembly.js";
 import { composeSystemPrompt } from "./run/system-prompt.js";
 import { extractFinalOutput, resolveRunOutput } from "./run/output.js";
 import { finaliseRunCost } from "./run/cost.js";
 import { withRetry } from "./run/retry.js";
+import { runAgentLoop } from "./run/loop.js";
+import type { RouterScope, RunLoopState, SmartProviderSurface } from "./run/state.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -92,44 +88,8 @@ interface RouterFallbackPayload {
   error: string;
 }
 
-/**
- * Per-call ALS scope that carries the routing context the
- * `SmartProvider`'s `on_decision` / `on_fallback` callbacks need to
- * tag emitted events. Stored as one object so adding new fields stays
- * cheap as the integration grows.
- */
-interface RouterScope {
-  agent_name: string;
-  destructive_tool_count: number;
-}
 
-/**
- * Subset of `@tuttiai/router`'s `SmartProvider` surface that
- * `AgentRunner` calls into. Inlined so `@tuttiai/core` doesn't depend
- * on `@tuttiai/router` (cycle).
- */
-interface SmartProviderSurface {
-  previewDecision: (
-    request: ChatRequest,
-    ctx?: { destructive_tool_count?: number },
-  ) => Promise<{ estimated_cost_usd: number }>;
-  chat: (
-    request: ChatRequest,
-    override?: { force_tier?: "small" | "medium" | "large" | "fallback"; force_reason?: string },
-  ) => Promise<ChatResponse>;
-  /**
-   * Last routing decision the provider made on this process. Used by the
-   * runner after a call to discover the actual model the SmartProvider
-   * picked — needed to price `model: 'auto'` runs correctly via
-   * {@link TokenBudget.add}'s `model_override` and to mark the
-   * `llm.completion` span with `auto_routed: true` plus the resolved
-   * model name. Optional in the surface: older fakes may omit it; the
-   * runner degrades gracefully when it returns `undefined`.
-   */
-  getLastDecision?: () => { model: string } | undefined;
-}
 
-const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 const DEFAULT_HITL_TIMEOUT_S = 300;
 
 const hitlRequestSchema = z.object({
@@ -633,7 +593,6 @@ export class AgentRunner {
             }
           : { input_tokens: 0, output_tokens: 0 };
       let turns = resuming && checkpoint ? checkpoint.turn : 0;
-      let totalToolCalls = 0;
       // Trajectory audit: every successful or failed tool execution
       // appends one entry. Drained at run end into the
       // `TrajectoryObserver` (when wired). Skipped entirely when no
@@ -671,393 +630,53 @@ export class AgentRunner {
       // propagates so callers see the real failure.
       try {
       // Agentic loop
-      while (turns < maxTurns) {
-        turns++;
-
-        // Pre-call hard enforcement on cost budgets. Catches "previous
-        // turn just pushed us over" and "we started the run already
-        // past today's cap" without making another paid call. Token-
-        // based limits keep their soft-break semantics below.
-        if (budget && cfg) {
-          const breach = checkCostBudgetBreach(
-            cfg,
-            budget.estimated_cost_usd,
-            dailySnapshotUsd,
-            monthlySnapshotUsd,
-          );
-          if (breach) {
-            this.events.emit({
-              type: "budget:exceeded",
-              agent_name: agent.name,
-              tokens: budget.total_tokens,
-              cost_usd: budget.estimated_cost_usd,
-              scope: breach.scope,
-              limit: breach.limit,
-            });
-            throw new BudgetExceededError({
-              scope: breach.scope,
-              limit: breach.limit,
-              current: breach.current,
-              tokens: budget.total_tokens,
-            });
-          }
-        }
-
-        logger.info({ agent: agent.name, session: session.id, turn: turns }, "Turn started");
-
-        this.events.emit({
-          type: "turn:start",
-          agent_name: agent.name,
-          session_id: session.id,
-          turn: turns,
-        });
-
-        // Inject semantic memories into system prompt if enabled.
-        // Uses the per-agent-resolved store so a custom
-        // `agent.memory.semantic.store` is honoured here too.
-        let systemPrompt = baseSystemPrompt;
-        const memCfg = semanticCfg;
-        if (memCfg?.enabled && semanticStore) {
-          const maxMemories = memCfg.max_memories ?? 5;
-          const injectSystem = memCfg.inject_system !== false;
-          if (injectSystem) {
-            const memories = await semanticStore.search(
-              input,
-              agent.name,
-              maxMemories,
-            );
-            if (memories.length > 0) {
-              const memoryBlock = memories
-                .map((m) => `- ${m.content}`)
-                .join("\n");
-              systemPrompt +=
-                "\n\nRelevant context from previous sessions:\n" +
-                memoryBlock;
-              // When the curated tools are also active, hint that the
-              // model may call them to extend or correct this context.
-              if (memCfg.curated_tools !== false) {
-                systemPrompt +=
-                  "\n\nUse the `remember` tool when the user shares something worth keeping. " +
-                  "Use `recall` to look things up. " +
-                  "Use `forget` to remove an entry the user retracts.";
-              }
-            }
-          }
-        }
-
-        let request: ChatRequest = {
-          model: agent.model,
-          system: systemPrompt,
-          messages,
-          tools: toolDefs.length > 0 ? toolDefs : undefined,
-        };
-
-        // beforeLLMCall hooks — may modify the request
-        hookCtx.turn = turns;
-        const globalReq = await this.safeHook(() => this.globalHooks?.beforeLLMCall?.(hookCtx, request));
-        if (globalReq) request = globalReq;
-        const agentReq = await this.safeHook(() => agentHooks?.beforeLLMCall?.(hookCtx, request));
-        if (agentReq) request = agentReq;
-
-        logger.debug({ agent: agent.name, model: agent.model }, "LLM request");
-
-        this.events.emit({
-          type: "llm:request",
-          agent_name: agent.name,
-          request,
-        });
-
-        const response = await Tracing.llmCall(
-          agent.model ?? "unknown",
-          async () => {
-            const r = await withRetry(() =>
-              agent.streaming
-                ? this.streamToResponse(routerScope, request)
-                : this.callProviderChat(routerScope, request, budget),
-            );
-            // For `model: 'auto'`, mirror the SmartProvider's chosen
-            // model onto the still-open span and recompute cost at the
-            // resolved tier's rate. Without this, the span carries
-            // `model: 'auto'` (no PRICING entry → cost_usd missing),
-            // which would silently break run-cost-store accounting.
-            if (agent.model === "auto") {
-              const sp = this.asSmartProvider();
-              const resolved = sp?.getLastDecision?.()?.model;
-              if (resolved) {
-                const cost = estimateCost(
-                  resolved,
-                  r.usage.input_tokens,
-                  r.usage.output_tokens,
-                );
-                setActiveLlmAttributes({
-                  auto_routed: true,
-                  model: resolved,
-                  ...(cost !== null ? { cost_usd: cost } : {}),
-                });
-              } else {
-                setActiveLlmAttributes({ auto_routed: true });
-              }
-            }
-            return r;
-          },
-        );
-
-        logger.debug(
-          { agent: agent.name, stopReason: response.stop_reason, usage: response.usage },
-          "LLM response",
-        );
-
-        this.events.emit({
-          type: "llm:response",
-          agent_name: agent.name,
-          response,
-        });
-
-        // afterLLMCall hooks
-        await this.safeHook(() => this.globalHooks?.afterLLMCall?.(hookCtx, response));
-        await this.safeHook(() => agentHooks?.afterLLMCall?.(hookCtx, response));
-
-        totalUsage.input_tokens += response.usage.input_tokens;
-        totalUsage.output_tokens += response.usage.output_tokens;
-
-        // For `model: 'auto'` runs, price this call at the SmartProvider's
-        // chosen tier rather than the 'auto' sentinel (which has no
-        // PRICING entry). Span attribution already happened inside the
-        // llmCall callback above.
-        const resolvedModel =
-          agent.model === "auto"
-            ? this.asSmartProvider()?.getLastDecision?.()?.model
-            : undefined;
-
-        // Check budget. Token limits keep their soft-break semantics
-        // (event + return partial result). Cost limits — per-run,
-        // daily, monthly — emit warning at the configured threshold and
-        // hard-throw on breach so callers cannot keep paying for an
-        // over-cap run.
-        if (budget) {
-          budget.add(
-            response.usage.input_tokens,
-            response.usage.output_tokens,
-            resolvedModel,
-          );
-
-          // Token-based path: preserves the historical event-and-break
-          // behaviour the integration tests assert.
-          if (cfg?.max_tokens && budget.total_tokens >= cfg.max_tokens) {
-            logger.warn(
-              { agent: agent.name, tokens: budget.total_tokens, cost_usd: budget.estimated_cost_usd },
-              "Token budget exceeded",
-            );
-            this.events.emit({
-              type: "budget:exceeded",
-              agent_name: agent.name,
-              tokens: budget.total_tokens,
-              cost_usd: budget.estimated_cost_usd,
-            });
-            messages.push({ role: "assistant", content: response.content });
-            break;
-          }
-          if (cfg?.max_tokens) {
-            const warnAt = (cfg.warn_at_percent ?? 80) / 100;
-            if (budget.total_tokens >= cfg.max_tokens * warnAt) {
-              this.events.emit({
-                type: "budget:warning",
-                agent_name: agent.name,
-                tokens: budget.total_tokens,
-                cost_usd: budget.estimated_cost_usd,
-              });
-            }
-          }
-
-          // Cost-based path: per-scope warnings + hard throw on breach.
-          if (cfg) {
-            const checks = costBudgetChecks(
-              cfg,
-              budget.estimated_cost_usd,
-              dailySnapshotUsd,
-              monthlySnapshotUsd,
-            );
-            const warnAt = (cfg.warn_at_percent ?? 80) / 100;
-            for (const c of checks) {
-              if (c.current >= c.limit) {
-                logger.warn(
-                  {
-                    agent: agent.name,
-                    scope: c.scope,
-                    current: c.current,
-                    limit: c.limit,
-                  },
-                  "Cost budget exceeded",
-                );
-                this.events.emit({
-                  type: "budget:exceeded",
-                  agent_name: agent.name,
-                  tokens: budget.total_tokens,
-                  cost_usd: budget.estimated_cost_usd,
-                  scope: c.scope,
-                  limit: c.limit,
-                });
-                messages.push({ role: "assistant", content: response.content });
-                throw new BudgetExceededError({
-                  scope: c.scope,
-                  limit: c.limit,
-                  current: c.current,
-                  tokens: budget.total_tokens,
-                });
-              }
-              if (c.current >= c.limit * warnAt) {
-                this.events.emit({
-                  type: "budget:warning",
-                  agent_name: agent.name,
-                  tokens: budget.total_tokens,
-                  cost_usd: budget.estimated_cost_usd,
-                  scope: c.scope,
-                  limit: c.limit,
-                });
-              }
-            }
-          }
-        }
-
-        // Add assistant message
-        messages.push({ role: "assistant", content: response.content });
-
-        this.events.emit({
-          type: "turn:end",
-          agent_name: agent.name,
-          session_id: session.id,
-          turn: turns,
-        });
-
-        // If the model is done talking, exit the loop
-        if (response.stop_reason !== "tool_use") {
-          break;
-        }
-
-        // Execute tool calls
-        const toolUseBlocks = response.content.filter(
-          (b): b is ToolUseBlock => b.type === "tool_use",
-        );
-
-        totalToolCalls += toolUseBlocks.length;
-        if (totalToolCalls > maxToolCalls) {
-          messages.push({
-            role: "user",
-            content: toolUseBlocks.map((block) => ({
-              type: "tool_result" as const,
-              tool_use_id: block.id,
-              content: `Tool call rate limit exceeded: ${totalToolCalls} calls (max: ${maxToolCalls})`,
-              is_error: true,
-            })),
-          });
-          break;
-        }
-
-        const toolTimeoutMs = agent.tool_timeout_ms ?? DEFAULT_TOOL_TIMEOUT_MS;
-        const toolContext: ToolContext = {
-          session_id: session.id,
-          agent_name: agent.name,
-          ...(userId !== undefined ? { user_id: userId } : {}),
-        };
-
-        // Attach user-memory helpers when both the agent has user_memory
-        // configured and the run was started with a user_id. The bound
-        // userId is implicit — tool code does not pass it on every call.
-        // Defaults to importance: 3 (high) since explicit `remember()`
-        // calls from tool code reflect deliberate intent.
-        if (userId && userMemory) {
-          const store = userMemory.store;
-          toolContext.user_memory = {
-            remember: async (content, options) => {
-              const stored = await store.store(userId, content, {
-                source: "explicit",
-                importance: options?.importance ?? 3,
-                ...(options?.tags !== undefined ? { tags: options.tags } : {}),
-                ...(options?.expires_at !== undefined ? { expires_at: options.expires_at } : {}),
-              });
-              return { id: stored.id };
-            },
-          };
-        }
-
-        // Attach memory helpers if semantic memory is enabled. Both
-        // `ctx.memory` (for user-defined tool code) and the curated
-        // `remember` / `recall` / `forget` agent tools route through
-        // the same `MemoryEnforcer`, so cap, LRU eviction, and
-        // `memory:*` events fire exactly once per logical operation.
-        if (memoryEnforcer) {
-          toolContext.memory = createMemoryHelpers(memoryEnforcer);
-        }
-
-        // Pass the audit array only when an observer is wired —
-        // executeTool short-circuits the hash + push when undefined.
-        const auditSink = this.trajectoryObserver ? trajectoryAudit : undefined;
-        const toolResults: ToolResultBlock[] = await Promise.all(
-          toolUseBlocks.map((block) =>
-            this.executeTool(
-              allTools,
-              block,
-              toolContext,
-              toolTimeoutMs,
-              hookCtx,
-              agentHooks,
-              agent.cache,
-              agent.requireApproval,
-              auditSink,
-            ),
-          ),
-        );
-
-        // Add tool results as a user message (Anthropic API format)
-        messages.push({ role: "user", content: toolResults });
-
-        // Durable checkpoint at the bottom of the tool-use branch: the
-        // turn is fully processed (assistant message + tool_results both
-        // persisted to `messages`) and we're about to ask the LLM to act
-        // on those results. This is the natural "safe to resume from"
-        // boundary — state.awaiting_tool_results=true flags exactly that.
-        if (durableEnabled && this.checkpointStore) {
-          const cp: Checkpoint = {
-            session_id: session.id,
-            turn: turns,
-            messages: [...messages],
-            tool_results: toolResults.map((r) => ({
-              content: r.content,
-              ...(r.is_error ? { is_error: r.is_error } : {}),
-            })),
-            state: {
-              next_turn: turns + 1,
-              prompt_tokens_used: totalUsage.input_tokens,
-              completion_tokens_used: totalUsage.output_tokens,
-              awaiting_tool_results: true,
-            },
-            saved_at: new Date(),
-          };
-          try {
-            const store = this.checkpointStore;
-            await Tracing.checkpoint(session.id, turns, () => store.save(cp));
-            lastCheckpointedTurn = turns;
-            this.events.emit({
-              type: "checkpoint:saved",
-              session_id: session.id,
-              turn: turns,
-            });
-          } catch (err) {
-            // Durability is best-effort — a transient Redis / Postgres
-            // outage shouldn't abort the agent run. Log loudly so the
-            // operator sees it; the next turn will retry.
-            logger.error(
-              {
-                agent: agent.name,
-                session: session.id,
-                turn: turns,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "Checkpoint save failed — continuing without durability for this turn",
-            );
-          }
-        }
-      }
+      const loopState: RunLoopState = {
+        turns,
+        totalToolCalls: 0,
+        lastCheckpointedTurn,
+        totalUsage,
+        messages,
+        trajectoryAudit,
+      };
+      await runAgentLoop(
+        loopState,
+        {
+          agent,
+          session,
+          input,
+          maxTurns,
+          maxToolCalls,
+          budget,
+          cfg,
+          dailySnapshotUsd,
+          monthlySnapshotUsd,
+          allTools,
+          toolDefs,
+          baseSystemPrompt,
+          routerScope,
+          hookCtx,
+          agentHooks,
+          durableEnabled,
+          memoryEnforcer,
+          semanticCfg,
+          semanticStore,
+          userId,
+          userMemory,
+        },
+        {
+          events: this.events,
+          globalHooks: this.globalHooks,
+          checkpointStore: this.checkpointStore,
+          trajectoryObserver: this.trajectoryObserver,
+          safeHook: (fn) => this.safeHook(fn),
+          asSmartProvider: () => this.asSmartProvider(),
+          streamToResponse: (scope, request) => this.streamToResponse(scope, request),
+          callProviderChat: (scope, request, b) => this.callProviderChat(scope, request, b),
+          executeTool: (...args) => this.executeTool(...args),
+        },
+      );
+      turns = loopState.turns;
+      lastCheckpointedTurn = loopState.lastCheckpointedTurn;
 
       } catch (err) {
         if (durableEnabled) {
