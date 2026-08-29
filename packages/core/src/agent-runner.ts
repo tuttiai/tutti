@@ -57,8 +57,6 @@ import {
   BudgetExceededError,
   InterruptDeniedError,
   ToolTimeoutError,
-  ProviderError,
-  RateLimitError,
 } from "./errors.js";
 import { extractText, parseInferredMemories } from "./run/helpers.js";
 import { assertAutoModelSupported, resolveRunSession } from "./run/preflight.js";
@@ -71,6 +69,7 @@ import { assembleRunTools } from "./run/tool-assembly.js";
 import { composeSystemPrompt } from "./run/system-prompt.js";
 import { extractFinalOutput, resolveRunOutput } from "./run/output.js";
 import { finaliseRunCost } from "./run/cost.js";
+import { withRetry } from "./run/retry.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -132,7 +131,6 @@ interface SmartProviderSurface {
 
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 const DEFAULT_HITL_TIMEOUT_S = 300;
-const MAX_PROVIDER_RETRIES = 3;
 
 const hitlRequestSchema = z.object({
   question: z.string().describe("The question to ask the human"),
@@ -140,26 +138,6 @@ const hitlRequestSchema = z.object({
   timeout_seconds: z.number().optional().describe("How long to wait before timing out (default 300)"),
 });
 
-async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (attempt >= MAX_PROVIDER_RETRIES || !(err instanceof ProviderError)) {
-        throw err;
-      }
-      if (err instanceof RateLimitError && err.retryAfter) {
-        const retryAfter = err.retryAfter;
-        logger.warn({ attempt, retryAfter }, "Rate limited, waiting before retry");
-        await new Promise((r) => setTimeout(r, retryAfter * 1000));
-      } else {
-        const delayMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
-        logger.warn({ attempt, delayMs }, "Provider error, retrying with backoff");
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
-    }
-  }
-}
 
 export class AgentRunner {
   private pendingHitl = new Map<string, (answer: string) => void>();
