@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import type {
   AgentConfig,
   AgentResult,
@@ -33,7 +32,6 @@ import { MemoryUserMemoryStore } from "./memory/user/memory-store.js";
 import type {
   AgentRunOptions,
   StoreOptions,
-  UserMemory,
   UserMemoryStore,
 } from "./memory/user/types.js";
 import {
@@ -63,12 +61,7 @@ import {
   RateLimitError,
   StructuredOutputError,
 } from "./errors.js";
-import {
-  extractText,
-  importanceLabel,
-  parseInferredMemories,
-  renderProfileForPrompt,
-} from "./run/helpers.js";
+import { extractText, parseInferredMemories } from "./run/helpers.js";
 import { assertAutoModelSupported, resolveRunSession } from "./run/preflight.js";
 import {
   checkCostBudgetBreach,
@@ -76,6 +69,7 @@ import {
   prepareRunBudget,
 } from "./run/budget.js";
 import { assembleRunTools } from "./run/tool-assembly.js";
+import { composeSystemPrompt } from "./run/system-prompt.js";
 
 /**
  * Shape of the decision payload `@tuttiai/router`'s `SmartProvider`
@@ -685,60 +679,14 @@ export class AgentRunner {
 
       // Build base system prompt — append structured output instruction when
       // an outputSchema is configured so the LLM knows the expected format.
-      let baseSystemPrompt = agent.system_prompt;
-      if (agent.outputSchema) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Zod generic variance
-        const outputJsonSchema = zodToJsonSchema(agent.outputSchema, { target: "openApi3" });
-        baseSystemPrompt +=
-          "\n\nYou must respond with a valid JSON object matching this schema: " +
-          JSON.stringify(outputJsonSchema) +
-          ". No other text.";
-      }
-
-      // Inject the user's dialectic profile (if any) BEFORE per-fact
-      // user memories so the agent sees the holistic picture first, then
-      // the specific facts. Both injectors are independently no-op when
-      // their respective configs are absent.
       const userMemory = this.getUserMemoryStore(agent);
       const userModel = this.getUserModelConsolidator(agent);
-      if (userId && userModel) {
-        try {
-          const profile = await userModel.store.get(userId);
-          if (profile) {
-            baseSystemPrompt += renderProfileForPrompt(profile);
-          }
-        } catch (err) {
-          logger.warn(
-            { error: err instanceof Error ? err.message : String(err), agent: agent.name, user_id: userId },
-            "User-model load failed — continuing without injected profile",
-          );
-        }
-      }
-
-      // Inject user memories ONCE before the first turn, into the base
-      // prompt so they persist for every subsequent turn. Search uses the
-      // raw input so the most contextually relevant memories surface.
-      // No-op when either user_id or per-agent user_memory config is absent.
-      let injectedUserMemories: UserMemory[] = [];
-      if (userId && userMemory) {
-        const limit = userMemory.cfg.inject_limit ?? 10;
-        try {
-          injectedUserMemories = await userMemory.store.search(userId, guardedInput, limit);
-        } catch (err) {
-          // User-memory failures are non-fatal — log and continue with
-          // an empty memory set rather than aborting the whole run.
-          logger.warn(
-            { error: err instanceof Error ? err.message : String(err), agent: agent.name, user_id: userId },
-            "User-memory search failed — continuing without injected memories",
-          );
-        }
-        if (injectedUserMemories.length > 0) {
-          baseSystemPrompt += "\n\nWhat I remember about you:\n" +
-            injectedUserMemories
-              .map((m) => "- " + m.content + " [importance: " + importanceLabel(m.importance) + "]")
-              .join("\n");
-        }
-      }
+      const { baseSystemPrompt } = await composeSystemPrompt(agent, {
+        userId,
+        guardedInput,
+        userMemory,
+        userModel,
+      });
 
       // Agentic loop. The try/catch around it only exists to surface the
       // last durable checkpoint on crash — the error itself still
