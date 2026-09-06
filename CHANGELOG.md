@@ -14,6 +14,18 @@ Marked `destructive: true`, in line with every other tool in the catalogue that 
 
 The voice now exposes 11 tools. No public-API change: `GitHubVoice` and its options are unchanged, and the new tool factory is internal.
 
+### Fixed
+
+**`allow_private` is now settable on the local embeddings provider.** `LocalEmbeddingProvider` has always accepted `allow_private` in its constructor, and `voices/rag/README.md` has always documented it, but the flag was not a field on `LocalEmbeddingConfig` and `createEmbeddingProvider` forwards the config as typed. No caller going through `RagConfig` could set it.
+
+Since `assertSafeUrl` refuses `localhost`, `127.0.0.1`, `::1` and every private IPv4 range, that made `provider: "local"` unusable for its only purpose: an Ollama-compatible server on the machine. Documented behaviour that the type system made unreachable.
+
+`allow_private?: boolean` is now declared on `LocalEmbeddingConfig`, so it flows through `RagConfig` to the provider, and the constructor's `LocalEmbeddingConfig & { allow_private?: boolean }` intersection is gone.
+
+**The opt-out is also narrower than it was.** Previously setting it skipped `assertSafeUrl` entirely, so a `file:` URL would have been accepted. `assertSafeUrl` now takes `{ allow_private }` and always validates the scheme, relaxing only the loopback / private-range / link-local host checks. The flag now means what its name says. [ADR-0019](https://github.com/tuttiai/knowledge) records why the opt-out relaxes the whole host policy rather than loopback alone.
+
+The default is unchanged and still refuses loopback, proven by tests at both the class and the `createEmbeddingProvider` level.
+
 ## v0.26.2 — Fix CI build cycle in scheduled-delivery dispatcher. (2026-05-18)
 
 ### Fixed

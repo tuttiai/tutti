@@ -26,7 +26,24 @@ const BLOCKED_HOSTS = new Set([
 const PRIVATE_IPV4_RE =
   /^(?:10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/;
 
-export function assertSafeUrl(input: string): URL {
+/** Options accepted by {@link assertSafeUrl}. */
+export interface SafeUrlOptions {
+  /**
+   * Skip the loopback / private-range / link-local host checks.
+   *
+   * Scheme and parse validation still run: `file:`, `gopher:` and a
+   * malformed URL are refused either way. Only the host policy is relaxed,
+   * which is the whole of what this flag is named for.
+   *
+   * @default false
+   */
+  allow_private?: boolean;
+}
+
+export function assertSafeUrl(
+  input: string,
+  options: SafeUrlOptions = {},
+): URL {
   let parsed: URL;
   try {
     parsed = new URL(input);
@@ -36,6 +53,12 @@ export function assertSafeUrl(input: string): URL {
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new UrlValidationError(input, "only http(s) URLs are allowed");
+  }
+
+  // Scheme is checked above and always enforced; only the host policy below
+  // is what an opt-out relaxes.
+  if (options.allow_private === true) {
+    return parsed;
   }
 
   const host = parsed.hostname.toLowerCase();
