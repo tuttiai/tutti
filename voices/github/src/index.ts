@@ -6,6 +6,7 @@ import { createCreateIssueTool } from "./tools/create-issue.js";
 import { createCommentOnIssueTool } from "./tools/comment-on-issue.js";
 import { createListPullRequestsTool } from "./tools/list-pull-requests.js";
 import { createGetPullRequestTool } from "./tools/get-pull-request.js";
+import { createCreatePullRequestTool } from "./tools/create-pull-request.js";
 import { createGetFileContentsTool } from "./tools/get-file-contents.js";
 import { createSearchCodeTool } from "./tools/search-code.js";
 import { createListRepositoriesTool } from "./tools/list-repositories.js";
@@ -31,6 +32,7 @@ export class GitHubVoice implements Voice {
       createCommentOnIssueTool(octokit),
       createListPullRequestsTool(octokit),
       createGetPullRequestTool(octokit),
+      createCreatePullRequestTool(octokit),
       createGetFileContentsTool(octokit),
       createSearchCodeTool(octokit),
       createListRepositoriesTool(octokit),

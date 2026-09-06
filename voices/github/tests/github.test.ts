@@ -7,6 +7,7 @@ import { createCreateIssueTool } from "../src/tools/create-issue.js";
 import { createCommentOnIssueTool } from "../src/tools/comment-on-issue.js";
 import { createListPullRequestsTool } from "../src/tools/list-pull-requests.js";
 import { createGetPullRequestTool } from "../src/tools/get-pull-request.js";
+import { createCreatePullRequestTool } from "../src/tools/create-pull-request.js";
 import { createGetFileContentsTool } from "../src/tools/get-file-contents.js";
 import { createSearchCodeTool } from "../src/tools/search-code.js";
 import { createListRepositoriesTool } from "../src/tools/list-repositories.js";
@@ -27,6 +28,7 @@ function createMockOctokit() {
     pulls: {
       list: vi.fn(),
       get: vi.fn(),
+      create: vi.fn(),
     },
     repos: {
       getContent: vi.fn(),
@@ -51,10 +53,10 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("GitHubVoice", () => {
-  it("implements Voice with 10 tools", () => {
+  it("implements Voice with 11 tools", () => {
     const voice = new GitHubVoice({ token: "fake" });
     expect(voice.name).toBe("github");
-    expect(voice.tools).toHaveLength(10);
+    expect(voice.tools).toHaveLength(11);
     const names = voice.tools.map((t) => t.name);
     expect(names).toContain("list_issues");
     expect(names).toContain("get_issue");
@@ -62,6 +64,7 @@ describe("GitHubVoice", () => {
     expect(names).toContain("comment_on_issue");
     expect(names).toContain("list_pull_requests");
     expect(names).toContain("get_pull_request");
+    expect(names).toContain("create_pull_request");
     expect(names).toContain("get_file_contents");
     expect(names).toContain("search_code");
     expect(names).toContain("list_repositories");
@@ -343,6 +346,118 @@ describe("get_pull_request", () => {
     expect(result.content).toContain("+100");
     expect(result.content).toContain("-20");
     expect(result.content).toContain("PR description");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// create_pull_request
+// ---------------------------------------------------------------------------
+
+describe("create_pull_request", () => {
+  it("opens a pull request and returns number, branches and url", async () => {
+    octokit.pulls.create.mockResolvedValue({
+      data: {
+        number: 42,
+        title: "Add the thing",
+        draft: false,
+        head: { ref: "feat/thing" },
+        base: { ref: "main" },
+        html_url: "https://github.com/o/r/pull/42",
+      },
+    });
+
+    const tool = createCreatePullRequestTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({
+        owner: "o",
+        repo: "r",
+        title: "Add the thing",
+        head: "feat/thing",
+        base: "main",
+      }),
+      ctx,
+    );
+
+    expect(result.is_error).toBeUndefined();
+    expect(result.content).toContain("Opened pull request #42: Add the thing");
+    expect(result.content).toContain("Branch: feat/thing → main");
+    expect(result.content).toContain("Draft: no");
+    expect(result.content).toContain("https://github.com/o/r/pull/42");
+  });
+
+  it("passes body, draft and maintainer_can_modify through to the API", async () => {
+    octokit.pulls.create.mockResolvedValue({
+      data: {
+        number: 7,
+        title: "WIP",
+        draft: true,
+        head: { ref: "wip" },
+        base: { ref: "develop" },
+        html_url: "https://github.com/o/r/pull/7",
+      },
+    });
+
+    const tool = createCreatePullRequestTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({
+        owner: "o",
+        repo: "r",
+        title: "WIP",
+        head: "wip",
+        base: "develop",
+        body: "Not ready yet",
+        draft: true,
+        maintainer_can_modify: false,
+      }),
+      ctx,
+    );
+
+    expect(octokit.pulls.create).toHaveBeenCalledWith({
+      owner: "o",
+      repo: "r",
+      title: "WIP",
+      head: "wip",
+      base: "develop",
+      body: "Not ready yet",
+      draft: true,
+      maintainer_can_modify: false,
+    });
+    expect(result.content).toContain("Draft: yes");
+  });
+
+  it("is marked destructive so it gates on approval by default", () => {
+    const tool = createCreatePullRequestTool(octokit);
+    expect(tool.destructive).toBe(true);
+  });
+
+  it("returns is_error with a fix hint when the head branch has no commits", async () => {
+    const err = Object.assign(new Error("No commits between main and feat/thing"), {
+      status: 422,
+    });
+    octokit.pulls.create.mockRejectedValue(err);
+
+    const tool = createCreatePullRequestTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({
+        owner: "o",
+        repo: "r",
+        title: "Add the thing",
+        head: "feat/thing",
+        base: "main",
+      }),
+      ctx,
+    );
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("[422]");
+    expect(result.content).toContain("o/r");
+  });
+
+  it("rejects input that is missing the head branch", () => {
+    const tool = createCreatePullRequestTool(octokit);
+    expect(() =>
+      tool.parameters.parse({ owner: "o", repo: "r", title: "t", base: "main" }),
+    ).toThrow();
   });
 });
 
