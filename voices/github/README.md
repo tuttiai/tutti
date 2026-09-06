@@ -2,6 +2,8 @@
 
 GitHub voice for [Tutti](https://tutti-ai.com) — gives agents the ability to interact with GitHub repositories, issues, and pull requests.
 
+`create_pull_request` is marked `destructive: true`, so HITL-enabled runtimes gate it behind human approval before a PR is opened. There is deliberately no tool that merges a pull request.
+
 ## Install
 
 ```bash
@@ -51,6 +53,7 @@ Without a token, tools still work for public repos but are limited to 60 request
 | `comment_on_issue` | Comment on an issue or PR |
 | `list_pull_requests` | List PRs with state filtering |
 | `get_pull_request` | Get full PR details with diff stats |
+| `create_pull_request` | Open a PR from an existing branch. Destructive — gated behind HITL. Does not merge. |
 | `get_file_contents` | Read a file from a repo |
 | `search_code` | Search code across repos |
 | `list_repositories` | List repos for a user or org |

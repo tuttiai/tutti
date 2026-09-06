@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+**`create_pull_request` on the GitHub voice.** `@tuttiai/github` shipped ten tools, all of them reads plus `create_issue` and `comment_on_issue`. An agent could describe work it had done but could not submit it, so any workflow that ends in a pull request had to drop out of the voice and shell out to `gh`.
+
+`create_pull_request` opens a PR from an existing branch: `owner`, `repo`, `title`, `head`, `base`, and optional `body`, `draft` and `maintainer_can_modify`. It does not create the branch and does not push commits — `head` must already exist with at least one commit not on `base`, or GitHub answers 422 and the tool returns the message with a fix hint rather than throwing.
+
+Marked `destructive: true`, in line with every other tool in the catalogue that creates outward-facing state (`post_message`, `send_email`, `create_product`), so [ADR-0010](https://github.com/tuttiai/knowledge) gates it behind human approval by default. Operators who want unattended PR creation opt out with `requireApproval: false` on the agent.
+
+**There is no merge tool, and this is deliberate.** Merging is the one step in the review loop that should stay with a person.
+
+The voice now exposes 11 tools. No public-API change: `GitHubVoice` and its options are unchanged, and the new tool factory is internal.
+
 ## v0.26.2 — Fix CI build cycle in scheduled-delivery dispatcher. (2026-05-18)
 
 ### Fixed
