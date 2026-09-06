@@ -162,6 +162,32 @@ describe("createEmbeddingProvider", () => {
     expect(provider).toBeInstanceOf(LocalEmbeddingProvider);
   });
 
+  it("refuses a loopback base_url through the factory by default", () => {
+    expect(() =>
+      createEmbeddingProvider({
+        collection: "c",
+        embeddings: {
+          provider: "local",
+          base_url: "http://127.0.0.1:11434",
+          model: "nomic-embed-text",
+        },
+      }),
+    ).toThrow(/loopback|private/i);
+  });
+
+  it("forwards allow_private through the factory", () => {
+    const provider = createEmbeddingProvider({
+      collection: "c",
+      embeddings: {
+        provider: "local",
+        base_url: "http://127.0.0.1:11434",
+        model: "nomic-embed-text",
+        allow_private: true,
+      },
+    });
+    expect(provider).toBeInstanceOf(LocalEmbeddingProvider);
+  });
+
   it("throws when embeddings config is missing", () => {
     expect(() => createEmbeddingProvider({ collection: "c" })).toThrow(
       /embeddings is required/,
@@ -490,6 +516,52 @@ describe("LocalEmbeddingProvider", () => {
     });
     const vectors = await provider.embed(["x"]);
     expect(vectors).toHaveLength(1);
+  });
+
+  it.each([
+    ["loopback host", "http://localhost:11434"],
+    ["loopback v4", "http://127.0.0.1:11434"],
+    ["private 10/8", "http://10.0.0.5:11434"],
+    ["private 172.16/12", "http://172.20.0.5:11434"],
+    ["private 192.168/16", "http://192.168.1.20:11434"],
+    ["link-local metadata", "http://169.254.169.254/"],
+  ])("refuses %s by default", (_label, base_url) => {
+    expect(
+      () =>
+        new LocalEmbeddingProvider({
+          provider: "local",
+          base_url,
+          model: "nomic-embed-text",
+        }),
+    ).toThrow(/loopback|private/i);
+  });
+
+  it.each([
+    ["private 10/8", "http://10.0.0.5:11434"],
+    ["private 192.168/16", "http://192.168.1.20:11434"],
+    ["link-local metadata", "http://169.254.169.254"],
+  ])("permits %s once allow_private is set", (_label, base_url) => {
+    expect(
+      () =>
+        new LocalEmbeddingProvider({
+          provider: "local",
+          base_url,
+          model: "nomic-embed-text",
+          allow_private: true,
+        }),
+    ).not.toThrow();
+  });
+
+  it("still refuses a non-http scheme even with allow_private", () => {
+    expect(
+      () =>
+        new LocalEmbeddingProvider({
+          provider: "local",
+          base_url: "file:///etc/passwd",
+          model: "nomic-embed-text",
+          allow_private: true,
+        }),
+    ).toThrow();
   });
 
   it("throws when response is missing an embedding array", async () => {

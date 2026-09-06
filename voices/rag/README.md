@@ -91,6 +91,12 @@ embeddings: {
 }
 ```
 
+`allow_private` relaxes only the host policy: loopback (`localhost`, `127.0.0.1`, `::1`), the
+private IPv4 ranges and link-local. Scheme validation still runs, so `file:` and other non-http(s)
+URLs are refused either way. It does mean `169.254.169.254`, the cloud instance metadata endpoint,
+becomes reachable — set it only when `base_url` is a constant you control, never when it derives
+from agent or user input.
+
 Every provider retries on rate-limit errors with exponential backoff (3 attempts, 500/1000/2000 ms) and returns L2-normalised vectors so cosine reduces to a dot product at query time.
 
 ### Vector stores

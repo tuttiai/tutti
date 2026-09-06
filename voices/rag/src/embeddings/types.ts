@@ -57,6 +57,24 @@ export interface LocalEmbeddingConfig extends EmbeddingConfigBase {
   base_url: string;
   /** Model name recognised by the server, e.g. "nomic-embed-text". */
   model: string;
+  /**
+   * Permit a `base_url` that the SSRF guard would otherwise refuse: loopback
+   * hosts (`localhost`, `127.0.0.1`, `::1`), the private IPv4 ranges
+   * (10/8, 172.16/12, 192.168/16) and link-local (169.254/16).
+   *
+   * Defaults to `false`, so a local embeddings server on `localhost` is
+   * rejected until this is set. That default is deliberate: it is the same
+   * guard every other remote fetch in this voice runs, and it exists because
+   * ingested content can influence what an agent asks for.
+   *
+   * **What you give up.** This disables the check entirely for this provider,
+   * not just for loopback. `169.254.169.254` — the cloud instance metadata
+   * endpoint — becomes reachable too. Only set it when `base_url` is a
+   * constant you control, never when it derives from agent or user input.
+   *
+   * @default false
+   */
+  allow_private?: boolean;
 }
 
 /** Discriminated union of every supported embedding provider configuration. */

@@ -25,7 +25,8 @@ interface OllamaEmbeddingResponse {
  *
  * NOTE: `base_url` is validated with the voice's SSRF guard, which means
  * localhost / private IPs are rejected. When actually running Ollama on
- * localhost, the caller must opt in explicitly — see `allow_private`.
+ * localhost, the caller must opt in explicitly — see
+ * {@link LocalEmbeddingConfig.allow_private}.
  */
 export class LocalEmbeddingProvider implements EmbeddingProvider {
   public readonly name = "local";
@@ -36,14 +37,13 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
   private readonly maxBatch: number;
   private readonly maxRetries: number | undefined;
 
-  constructor(config: LocalEmbeddingConfig & { allow_private?: boolean }) {
+  constructor(config: LocalEmbeddingConfig) {
     if (!config.base_url) {
       throw new Error("LocalEmbeddingProvider: base_url is required");
     }
-    if (!config.allow_private) {
-      // Enforce the voice-wide URL policy unless the caller opts out.
-      assertSafeUrl(config.base_url);
-    }
+    // The voice-wide URL policy always runs. `allow_private` relaxes only the
+    // host checks inside it — a non-http(s) scheme is refused either way.
+    assertSafeUrl(config.base_url, { allow_private: config.allow_private });
     this.baseUrl = config.base_url.replace(/\/$/, "");
     this.model = config.model;
     this.maxBatch = config.max_batch_size ?? DEFAULT_MAX_BATCH;
