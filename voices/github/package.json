@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/github",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Tutti voice — interact with GitHub repositories, issues, and pull requests",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,7 +26,11 @@
     "@tuttiai/core": ">=0.11.0",
     "@tuttiai/types": ">=0.7.0"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -34,5 +38,13 @@
     "directory": "voices/github"
   },
   "homepage": "https://tutti-ai.com",
-  "keywords": ["tutti", "ai", "agents", "github", "voice", "issues", "pull-requests"]
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "github",
+    "voice",
+    "issues",
+    "pull-requests"
+  ]
 }
