@@ -1,6 +1,6 @@
 {
   "name": "@tuttiai/discord",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Tutti voice — read, post and moderate Discord messages from agents",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,14 +19,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "discord.js": "14.26.3",
+    "discord.js": "14.27.0",
     "zod": "3.25.76"
   },
   "peerDependencies": {
     "@tuttiai/core": ">=0.11.0",
     "@tuttiai/types": ">=0.9.0"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -34,5 +38,12 @@
     "directory": "voices/discord"
   },
   "homepage": "https://tutti-ai.com",
-  "keywords": ["tutti", "ai", "agents", "discord", "chatbot", "voice"]
+  "keywords": [
+    "tutti",
+    "ai",
+    "agents",
+    "discord",
+    "chatbot",
+    "voice"
+  ]
 }
