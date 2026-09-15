@@ -67,3 +67,5 @@ export type {
   PostgresPoolLike,
   PoolFactory,
 } from "./client.js";
+
+export { PostgresVoiceConfigSchema, type PostgresVoiceConfig } from "./config-schema.js";

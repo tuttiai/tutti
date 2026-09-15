@@ -53,3 +53,5 @@ export class PlaywrightVoice implements Voice {
 }
 
 export { BrowserManager, type BrowserOptions } from "./browser.js";
+
+export { PlaywrightVoiceConfigSchema, type PlaywrightVoiceConfig } from "./config-schema.js";

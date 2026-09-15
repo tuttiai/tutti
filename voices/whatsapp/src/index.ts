@@ -87,3 +87,5 @@ export type {
   InboundEntry,
   InboundWebhookPayload,
 } from "./types.js";
+
+export { WhatsAppVoiceConfigSchema, type WhatsAppVoiceConfig } from "./config-schema.js";

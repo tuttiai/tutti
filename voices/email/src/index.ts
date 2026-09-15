@@ -181,3 +181,5 @@ export type {
   ParsedMailLike,
   ParseFn,
 } from "./parser.js";
+
+export { EmailVoiceConfigSchema, type EmailVoiceConfig } from "./config-schema.js";

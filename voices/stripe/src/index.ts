@@ -116,3 +116,5 @@ export type {
   StripeBalanceLike,
   StripeBalanceTransactionLike,
 } from "./client.js";
+
+export { StripeVoiceConfigSchema, type StripeVoiceConfig } from "./config-schema.js";

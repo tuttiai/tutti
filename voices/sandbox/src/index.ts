@@ -123,3 +123,5 @@ export class SandboxVoice implements Voice {
     }
   }
 }
+
+export { SandboxVoiceConfigSchema, type SandboxVoiceConfig } from "./config-schema.js";

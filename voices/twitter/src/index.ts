@@ -45,3 +45,5 @@ export class TwitterVoice implements Voice {
 
 export { createTwitterClient } from "./client.js";
 export type { TwitterClient, TwitterClientOptions } from "./client.js";
+
+export { TwitterVoiceConfigSchema, type TwitterVoiceConfig } from "./config-schema.js";

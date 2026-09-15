@@ -202,3 +202,5 @@ function convertType(prop: Record<string, unknown>): z.ZodTypeAny {
       return z.unknown();
   }
 }
+
+export { McpVoiceConfigSchema, type McpVoiceConfig } from "./config-schema.js";

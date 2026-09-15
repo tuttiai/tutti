@@ -152,3 +152,5 @@ export class WebVoice implements Voice {
     this.tools = tools;
   }
 }
+
+export { WebVoiceConfigSchema, type WebVoiceConfigSerialisable } from "./config-schema.js";

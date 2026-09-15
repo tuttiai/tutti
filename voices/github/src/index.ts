@@ -42,3 +42,5 @@ export class GitHubVoice implements Voice {
 }
 
 export { createOctokit } from "./client.js";
+
+export { GitHubVoiceConfigSchema, type GitHubVoiceConfig } from "./config-schema.js";
