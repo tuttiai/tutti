@@ -115,3 +115,5 @@ export function RagVoice(config: RagConfig, options: RagVoiceOptions = {}): Voic
     tools,
   };
 }
+
+export { RagVoiceConfigSchema, type RagVoiceConfig } from "./config-schema.js";

@@ -58,3 +58,5 @@ export type {
   TelegramTextContextLike,
   BotFactory,
 } from "./client.js";
+
+export { TelegramVoiceConfigSchema, type TelegramVoiceConfig } from "./config-schema.js";

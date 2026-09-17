@@ -31,3 +31,5 @@ export {
   moveFileTool,
   searchFilesTool,
 };
+
+export { FilesystemVoiceConfigSchema, type FilesystemVoiceConfig } from "./config-schema.js";

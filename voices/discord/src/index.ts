@@ -75,3 +75,5 @@ export type {
   ClientFactory,
   DiscordMessageHandler,
 } from "./client.js";
+
+export { DiscordVoiceConfigSchema, type DiscordVoiceConfig } from "./config-schema.js";

@@ -14,7 +14,9 @@
     "lint": "eslint packages/*/src voices/*/src",
     "lint:fix": "eslint packages/*/src voices/*/src --fix",
     "typecheck": "turbo run typecheck",
-    "test:coverage": "turbo run test -- --coverage"
+    "test:coverage": "turbo run test -- --coverage",
+    "voice-manifest": "tsx scripts/build-voice-manifest.ts",
+    "voice-manifest:check": "tsx scripts/build-voice-manifest.ts --check"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",

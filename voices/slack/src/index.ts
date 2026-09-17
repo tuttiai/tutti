@@ -81,3 +81,5 @@ export type {
   SocketModeClientLike,
   SocketModeFactory,
 } from "./socket-mode.js";
+
+export { SlackVoiceConfigSchema, type SlackVoiceConfig } from "./config-schema.js";

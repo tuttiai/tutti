@@ -14,6 +14,18 @@ Marked `destructive: true`, in line with every other tool in the catalogue that 
 
 The voice now exposes 11 tools. No public-API change: `GitHubVoice` and its options are unchanged, and the new tool factory is internal.
 
+**A config schema on every voice, and a generated manifest describing all fifteen.** Until now no voice declared its configuration at runtime. `GitHubVoiceOptions` was a bare TypeScript interface, so a caller passing `{ tokenn: "..." }` got a voice with no credentials and no error, and anything outside this repo wanting to know what a voice accepts had to read its source.
+
+Each voice now exports a `*VoiceConfigSchema` from its index: `GitHubVoiceConfigSchema`, `RagVoiceConfigSchema`, and so on for all fifteen. Every schema is `.strict()`, so an unknown key is refused rather than ignored, and every field carries `.describe()`.
+
+**The schemas cover the serialisable configuration only.** Test seams and callbacks — `clientFactory`, `poolFactory`, `fetchFn`, `_imapFactory`, and the `llm` argument to `RagVoice` — are deliberately absent. They are functions, and a stored configuration document that could name a function would need that function to be evaluated. Passing one to a schema is now an error that names the field.
+
+`npm run voice-manifest` writes `voice-manifest.json` at the repo root: for each voice its package, version, description, `required_permissions` and its configuration as JSON Schema. `npm run voice-manifest:check` exits non-zero when the file is stale. The manifest exists so a consumer that is not this runtime can enumerate the voices and validate an `options` object without importing fifteen packages or hand-copying their fields.
+
+**The manifest states where it is lossy rather than hiding it.** JSON Schema cannot express a zod `.refine()`. A schema carrying one is emitted with `lossy: true` and the rule written out in `unexpressed_rules`. Today that is `twitter`, whose four OAuth 1.0a fields must be supplied together or not at all. The generator refuses to run if a schema gains a refinement whose rule is not stated, and equally if a stated rule no longer has a refinement behind it. A consumer validating only against this file will accept documents the runtime rejects, so it is a fast first pass and never the last one.
+
+No behaviour changes. No voice reads its schema yet, no constructor validates, and nothing is removed: the existing options interfaces are untouched and every voice accepts exactly what it accepted before.
+
 ### Fixed
 
 **`allow_private` is now settable on the local embeddings provider.** `LocalEmbeddingProvider` has always accepted `allow_private` in its constructor, and `voices/rag/README.md` has always documented it, but the flag was not a field on `LocalEmbeddingConfig` and `createEmbeddingProvider` forwards the config as typed. No caller going through `RagConfig` could set it.
