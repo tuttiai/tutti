@@ -118,5 +118,37 @@ describe("Streaming", () => {
       expect(captured[0]).toHaveProperty("agent_name", "test-agent");
       expect(captured[0]).toHaveProperty("text");
     });
+
+    it("carries the run's session_id", async () => {
+      const { runner, events } = createRunner([textResponse("Hi")]);
+      const agent = { ...simpleAgent, streaming: true };
+
+      const sessionIds: string[] = [];
+      events.on("token:stream", (e) => sessionIds.push(e.session_id));
+
+      const result = await runner.run(agent, "hello");
+
+      expect(sessionIds.length).toBeGreaterThan(0);
+      expect(new Set(sessionIds)).toEqual(new Set([result.session_id]));
+    });
+
+    it("stamps each concurrent run's tokens with its own session_id", async () => {
+      const { runner, events } = createRunner([textResponse("one"), textResponse("two")]);
+      const agent = { ...simpleAgent, streaming: true };
+
+      const bySession = new Map<string, string>();
+      events.on("token:stream", (e) => {
+        bySession.set(e.session_id, (bySession.get(e.session_id) ?? "") + e.text);
+      });
+
+      const [a, b] = await Promise.all([
+        runner.run(agent, "first"),
+        runner.run(agent, "second"),
+      ]);
+
+      expect(a.session_id).not.toBe(b.session_id);
+      expect(bySession.get(a.session_id)).toBe(a.output);
+      expect(bySession.get(b.session_id)).toBe(b.output);
+    });
   });
 });

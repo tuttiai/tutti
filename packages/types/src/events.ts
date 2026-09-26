@@ -40,7 +40,12 @@ export type TuttiEvent =
       scope?: "run" | "day" | "month";
       limit?: number;
     }
-  | { type: "token:stream"; agent_name: string; text: string }
+  /**
+   * One text chunk from a streaming LLM call. `session_id` is the run's
+   * session, so a subscriber serving several concurrent runs can tell
+   * whose tokens these are.
+   */
+  | { type: "token:stream"; agent_name: string; session_id: string; text: string }
   | { type: "hitl:requested"; agent_name: string; session_id: string; question: string; options?: string[] }
   | { type: "hitl:answered"; agent_name: string; session_id: string; answer: string }
   | { type: "hitl:timeout"; agent_name: string; session_id: string }

@@ -97,6 +97,12 @@ export interface BuildTestServerOptions {
    * instance to seed records before the test runs.
    */
   runCostStore?: RunCostStore | "memory";
+  /**
+   * Replace the canned-response mock provider entirely. Used by tests
+   * that need a provider whose output depends on the request, such as
+   * two concurrent runs that must stay distinguishable.
+   */
+  provider?: LLMProvider;
 }
 
 /**
@@ -115,7 +121,7 @@ export async function buildTestServer(
     ? optionsOrLegacy
     : { config: optionsOrLegacy };
 
-  const provider = createMockProvider(responses);
+  const provider = options.provider ?? createMockProvider(responses);
 
   const baseAgent: AgentConfig = {
     name: AGENT_NAME,
@@ -164,7 +170,8 @@ function isBuildOptions(v: unknown): v is BuildTestServerOptions {
     "config" in v ||
     "interruptStore" in v ||
     "agent" in v ||
-    "runCostStore" in v
+    "runCostStore" in v ||
+    "provider" in v
   );
 }
 

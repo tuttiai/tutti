@@ -1,21 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 
 import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
-
-/** Parse raw SSE text into an array of event objects. */
-function parseSSE(raw: string): Record<string, unknown>[] {
-  return raw
-    .split("\n\n")
-    .filter(Boolean)
-    .map((frame) => {
-      const dataLine = frame
-        .split("\n")
-        .find((l) => l.startsWith("data: "));
-      if (!dataLine) return undefined;
-      return JSON.parse(dataLine.slice(6)) as Record<string, unknown>;
-    })
-    .filter((e): e is Record<string, unknown> => e !== undefined);
-}
+import { parseSSE } from "./sse.js";
 
 describe("POST /run/stream", () => {
   let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
