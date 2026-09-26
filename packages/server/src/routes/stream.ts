@@ -78,9 +78,13 @@ export function registerStreamRoute(
       if (mapped) sseWrite(sse, mapped.name, mapped.payload);
     });
 
-    // Clean up if the client disconnects mid-stream.
+    // Clean up if the client disconnects mid-stream. This listens on the
+    // response, not the request: Node emits the request's `close` as soon as
+    // its body has been read, which ended every stream before its first frame.
+    // A response that closes after finishing is a normal end, not a departure.
     let clientClosed = false;
-    request.raw.on("close", () => {
+    reply.raw.on("close", () => {
+      if (reply.raw.writableFinished) return;
       clientClosed = true;
       scope.unsubscribe();
       if (!sse.destroyed) sse.end();

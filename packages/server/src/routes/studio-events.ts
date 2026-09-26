@@ -106,7 +106,7 @@ export function registerStudioEventsRoute(
 ): void {
   app.get(
     "/studio/events",
-    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    async (_request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       if (!graph) {
         await reply.code(404).send({
           error: "studio_events_unavailable",
@@ -145,7 +145,6 @@ export function registerStudioEventsRoute(
         stream.end();
       };
 
-      request.raw.once("close", close);
       reply.raw.once("close", close);
 
       stream.pipe(reply.raw);
