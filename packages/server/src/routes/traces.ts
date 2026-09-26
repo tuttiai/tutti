@@ -62,7 +62,7 @@ export function registerTracesRoutes(app: FastifyInstance): void {
     });
   });
 
-  app.get("/traces/stream", (request, reply) => {
+  app.get("/traces/stream", (_request, reply) => {
     const tracer = getTuttiTracer();
     const sse = new PassThrough();
     reply.type("text/event-stream").header("Cache-Control", "no-cache");
@@ -76,7 +76,9 @@ export function registerTracesRoutes(app: FastifyInstance): void {
       sse.write(`data: ${JSON.stringify(spanToJson(span))}\n\n`);
     });
 
-    request.raw.on("close", () => {
+    // The response's close, not the request's: Node emits the request's as
+    // soon as its body has been read, long before the client leaves.
+    reply.raw.on("close", () => {
       unsubscribe();
       if (!sse.destroyed) sse.end();
     });

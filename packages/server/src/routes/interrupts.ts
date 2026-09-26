@@ -199,7 +199,7 @@ export function registerInterruptsRoutes(
   // We fetch the full record from the store on each event rather than
   // relying on the slim event payload so the wire shape is always
   // authoritative and matches the REST endpoints.
-  app.get("/interrupts/stream", (request, reply) => {
+  app.get("/interrupts/stream", (_request, reply) => {
     const store = runtime.interruptStore;
     if (!store) {
       return reply.code(503).send({
@@ -232,7 +232,9 @@ export function registerInterruptsRoutes(
         });
     });
 
-    request.raw.on("close", () => {
+    // The response's close, not the request's: Node emits the request's as
+    // soon as its body has been read, long before the client leaves.
+    reply.raw.on("close", () => {
       unsub();
       if (!sse.destroyed) sse.end();
     });

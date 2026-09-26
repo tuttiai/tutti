@@ -28,6 +28,12 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Fixed
 
+**`POST /run/stream` delivers its frames over a real socket.** Every streamed run answered `200` with an empty body, success and failure alike. The route took the request's `close` event as the client leaving, and Node emits that as soon as the request body has been read, so the stream was ended before its first frame. Every stream test used `app.inject`, which never emits it, so all of them passed.
+
+- `/run/stream`, `/traces/stream` and `/interrupts/stream` now listen for the response's `close`, and `/run/stream` treats a response that closed after finishing as a normal end rather than a departure.
+- `/studio/events` listened on both; the request half is gone.
+- `tests/stream-socket.test.ts` drives `/run/stream` through a loopback listener with `fetch`. It fails on the old route and passes on this one.
+
 **The root `Dockerfile` builds again.** `docker build .` failed at the turbo step with `src/index.ts(97,8): error TS2307: Cannot find module '@tuttiai/telemetry'`. `@tuttiai/core` gained a dependency on the workspace package `@tuttiai/telemetry`, and the Dockerfile lists the workspace packages it copies by hand, so nothing told it.
 
 Three packages were missing, each for a different reason:
