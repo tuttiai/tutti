@@ -28,6 +28,18 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Fixed
 
+**The root `Dockerfile` builds again.** `docker build .` failed at the turbo step with `src/index.ts(97,8): error TS2307: Cannot find module '@tuttiai/telemetry'`. `@tuttiai/core` gained a dependency on the workspace package `@tuttiai/telemetry`, and the Dockerfile lists the workspace packages it copies by hand, so nothing told it.
+
+Three packages were missing, each for a different reason:
+
+- `@tuttiai/telemetry` is a runtime dependency of core. It is now copied, built and shipped in the image.
+- `@tuttiai/realtime` is a peer of server, and `packages/server/src/routes/realtime.ts` imports it statically, so `dist/start.js` cannot load without it even when `realtime` is off. It is now copied, built and shipped too.
+- `@tuttiai/skills` is imported by core with `import type` only, but core's declaration build still has to resolve those types. It is built in the builder stage and deliberately left out of the runtime image.
+
+**The healthcheck also never passed.** It probed `http://localhost:3847`, which Alpine resolves to `::1`, while the server binds `0.0.0.0`. Every check was refused and the container went `unhealthy` after its retries. It now probes `127.0.0.1`.
+
+A `docker` job in CI now builds the image on every pull request, so the next workspace dependency the Dockerfile does not know about fails there rather than on someone's machine.
+
 **`allow_private` is now settable on the local embeddings provider.** `LocalEmbeddingProvider` has always accepted `allow_private` in its constructor, and `voices/rag/README.md` has always documented it, but the flag was not a field on `LocalEmbeddingConfig` and `createEmbeddingProvider` forwards the config as typed. No caller going through `RagConfig` could set it.
 
 Since `assertSafeUrl` refuses `localhost`, `127.0.0.1`, `::1` and every private IPv4 range, that made `provider: "local"` unusable for its only purpose: an Ollama-compatible server on the machine. Documented behaviour that the type system made unreachable.

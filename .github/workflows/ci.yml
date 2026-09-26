@@ -52,3 +52,11 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+
+  docker:
+    # The root Dockerfile lists workspace packages by hand, so a new
+    # workspace dependency of core or server breaks it silently. Build it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t tutti-server:ci .
