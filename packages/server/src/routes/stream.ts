@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import type { TuttiRuntime } from "@tuttiai/core";
 import type { TuttiEvent } from "@tuttiai/types";
 import { estimateCostUsd } from "../cost.js";
+import { scopeRunEvents } from "../run-scope.js";
 import type { RunBody } from "./schemas.js";
 import { runBodySchema } from "./schemas.js";
 
@@ -50,6 +51,9 @@ function mapEvent(
  * `content_delta` events are only emitted when the agent is configured
  * with `streaming: true` in its score definition.
  *
+ * Only events from the run this request starts are streamed. Concurrent
+ * requests on the same runtime never see each other's frames.
+ *
  * @param app       - Fastify instance.
  * @param runtime   - Pre-built Tutti runtime.
  * @param agentName - Agent key in the score.
@@ -66,29 +70,27 @@ export function registerStreamRoute(
     reply.type("text/event-stream").header("Cache-Control", "no-cache");
     reply.send(sse);
 
-    const unsubs: (() => void)[] = [];
-
-    const unsubAll = runtime.events.onAny((e: TuttiEvent) => {
+    // Scoped to this request's run: the event bus is shared by every
+    // concurrent request, so an unscoped subscription streams other
+    // clients' tokens and tool calls into this response.
+    const scope = scopeRunEvents(runtime.events, (e: TuttiEvent) => {
       const mapped = mapEvent(e);
       if (mapped) sseWrite(sse, mapped.name, mapped.payload);
     });
-    unsubs.push(unsubAll);
 
     // Clean up if the client disconnects mid-stream.
     let clientClosed = false;
     request.raw.on("close", () => {
       clientClosed = true;
-      for (const u of unsubs) u();
+      scope.unsubscribe();
       if (!sse.destroyed) sse.end();
     });
 
     const start = Date.now();
 
     try {
-      const result = await runtime.run(
-        agentName,
-        request.body.input,
-        request.body.session_id,
+      const result = await scope.run(() =>
+        runtime.run(agentName, request.body.input, request.body.session_id),
       );
 
       if (!clientClosed) {
@@ -107,7 +109,7 @@ export function registerStreamRoute(
         sseWrite(sse, "error", { message });
       }
     } finally {
-      for (const u of unsubs) u();
+      scope.unsubscribe();
       if (!sse.destroyed) sse.end();
     }
   });

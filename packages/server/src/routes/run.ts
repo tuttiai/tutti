@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import type { TuttiGraph, TuttiRuntime } from "@tuttiai/core";
 import { estimateCostUsd } from "../cost.js";
 import { DEFAULT_TIMEOUT_MS } from "../config.js";
+import { scopeRunEvents } from "../run-scope.js";
 import type { RunBody } from "./schemas.js";
 import { runBodySchema } from "./schemas.js";
 
@@ -35,9 +36,11 @@ export function registerRunRoute(
   app.post<{ Body: RunBody }>("/run", {
     schema: { body: runBodySchema },
   }, async (request, reply) => {
+    // Scoped to this request's run so a 504's partial_output never
+    // carries tokens streamed by a concurrent request.
     let partialOutput = "";
-    const unsubStream = runtime.events.on("token:stream", (e) => {
-      partialOutput += e.text;
+    const scope = scopeRunEvents(runtime.events, (e) => {
+      if (e.type === "token:stream") partialOutput += e.text;
     });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -45,14 +48,16 @@ export function registerRunRoute(
 
     try {
       const result = await Promise.race([
-        runEntry(runtime, graph, agentName, request.body.input, request.body.session_id),
+        scope.run(() =>
+          runEntry(runtime, graph, agentName, request.body.input, request.body.session_id),
+        ),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs);
         }),
       ]);
 
       if (timer) clearTimeout(timer);
-      unsubStream();
+      scope.unsubscribe();
 
       return reply.code(200).send({
         output: result.output,
@@ -64,7 +69,7 @@ export function registerRunRoute(
       });
     } catch (err: unknown) {
       if (timer) clearTimeout(timer);
-      unsubStream();
+      scope.unsubscribe();
 
       // Route-local timeout handling — not a TuttiError, so we handle it
       // here rather than letting the global error handler map it.

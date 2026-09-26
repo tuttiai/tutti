@@ -321,6 +321,8 @@ tutti.events.on("token:stream", (e) => {
 });
 ```
 
+Each event carries the `session_id` of the run that produced it, so a subscriber serving several concurrent runs can keep their tokens apart.
+
 The `tutti-ai run` command enables streaming automatically — tokens print to the terminal as they arrive.
 
 All four providers support streaming: Anthropic (message stream events), OpenAI (delta chunks), Gemini (content stream), and OpenRouter (delta chunks via the OpenAI-compatible SSE protocol).

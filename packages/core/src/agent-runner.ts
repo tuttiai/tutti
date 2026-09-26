@@ -1016,7 +1016,7 @@ export class AgentRunner {
           async () => {
             const r = await withRetry(() =>
               agent.streaming
-                ? this.streamToResponse(routerScope, request)
+                ? this.streamToResponse(routerScope, request, session.id)
                 : this.callProviderChat(routerScope, request, budget),
             );
             // For `model: 'auto'`, mirror the SmartProvider's chosen
@@ -1362,7 +1362,7 @@ export class AgentRunner {
 
             const retryResponse = await withRetry(() =>
               agent.streaming
-                ? this.streamToResponse(routerScope, retryRequest)
+                ? this.streamToResponse(routerScope, retryRequest, session.id)
                 : this.callProviderChat(routerScope, retryRequest, budget),
             );
 
@@ -1578,14 +1578,21 @@ export class AgentRunner {
   private async streamToResponse(
     scope: RouterScope,
     request: ChatRequest,
+    sessionId: string,
   ): Promise<ChatResponse> {
     return this.routerContext.run(scope, async () => {
-      return this.streamToResponseInner(scope.agent_name, request);
+      return this.streamToResponseInner(scope.agent_name, sessionId, request);
     });
   }
 
+  /**
+   * Drain a provider stream into one response, emitting `token:stream`
+   * per text chunk. The session id is stamped on every token because a
+   * shared event bus carries tokens from every concurrent run at once.
+   */
   private async streamToResponseInner(
     agentName: string,
+    sessionId: string,
     request: ChatRequest,
   ): Promise<ChatResponse> {
     const content: ContentBlock[] = [];
@@ -1599,6 +1606,7 @@ export class AgentRunner {
         this.events.emit({
           type: "token:stream",
           agent_name: agentName,
+          session_id: sessionId,
           text: chunk.text,
         });
       }

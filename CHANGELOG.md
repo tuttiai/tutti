@@ -40,6 +40,14 @@ Three packages were missing, each for a different reason:
 
 A `docker` job in CI now builds the image on every pull request, so the next workspace dependency the Dockerfile does not know about fails there rather than on someone's machine.
 
+**Streamed runs no longer leak into each other.** `POST /run/stream` subscribed to the runtime's event bus with `onAny` and forwarded every event it saw. The bus is shared by every request on the server, so two concurrent streamed runs each received the other's `content_delta`, `tool_call`, `tool_result`, `turn_start` and `turn_end` frames: one user's tokens and tool output in another user's response. `POST /run` had the same flaw in the `partial_output` it returns with a 504.
+
+Filtering by session was not enough on its own. `token:stream`, `tool:start` and `tool:end` carry no `session_id`, and a request that does not supply one only learns its session from the result, after the run has ended. Creating the session in the route first is not an option either, because `PostgresSessionStore.get()` always returns `undefined`, so a pre-created id would fail the run with "Session not found".
+
+Both routes now run the agent inside an `AsyncLocalStorage` scope, and their subscriber drops any event not emitted from within it. `EventBus.emit` calls handlers synchronously, so the handler always sees the async context of the run that emitted. This also scopes graph runs on `POST /run`, whose nodes each open a session of their own. `runtime.run`'s signature and the SSE frame shapes are unchanged. Proven by tests that run two interleaved requests on one server and assert that neither sees a single frame of the other's, plus one for a run started outside any request.
+
+**`token:stream` carries `session_id`.** It was the only per-run event on the hot path with no session, so any subscriber serving concurrent runs, not only the server, could not attribute tokens. Additive for consumers of the event.
+
 **`allow_private` is now settable on the local embeddings provider.** `LocalEmbeddingProvider` has always accepted `allow_private` in its constructor, and `voices/rag/README.md` has always documented it, but the flag was not a field on `LocalEmbeddingConfig` and `createEmbeddingProvider` forwards the config as typed. No caller going through `RagConfig` could set it.
 
 Since `assertSafeUrl` refuses `localhost`, `127.0.0.1`, `::1` and every private IPv4 range, that made `provider: "local"` unusable for its only purpose: an Ollama-compatible server on the machine. Documented behaviour that the type system made unreachable.
