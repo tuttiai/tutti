@@ -4,6 +4,15 @@
 
 ### Added
 
+**The stock server image pauses gated tool calls for a person, and `/run/stream` says so.** Three things stopped a product using the framework's approval gate through the Docker image. `start.ts` built its runtime with no `InterruptStore`, so any tool marked `destructive: true` (GitHub's `create_pull_request`, for one) threw "no InterruptStore is configured" when called, and the approve and deny routes answered 503. There was no variable for `requireApproval`. And `POST /run/stream` dropped `interrupt:requested`, so the caller never learned the run was waiting, while the silence of a paused run let undici's `fetch` abort the body after 300 seconds.
+
+- **The image's runtime always carries a `MemoryInterruptStore`.** A gated call now pauses until `POST /interrupts/:id/approve` or `/deny`. Pending approvals live in memory and do not survive a restart.
+- **`TUTTI_REQUIRE_APPROVAL` sets the agent's `requireApproval`.** Unset, empty or `destructive` keeps the framework default (destructive tools only); `none` gates nothing; `all` gates everything; anything else is a comma-separated list of tool names or globs, which gates those as well as the destructive ones. An item outside `[A-Za-z0-9_*?.-]+` stops the start, quoting only that item. The started log line reports the policy.
+- **`/run/stream` sends `approval_requested`** with `interrupt_id`, `session_id`, `tool_name` and `tool_args`, and keeps the stream open. Approval resumes the run on the same stream; denial ends it with an `error` frame carrying the reason.
+- **`/run/stream` writes a `: heartbeat` SSE comment every 15 seconds** while it is open, so a wait for a person is not cut by a client or proxy idle timeout. `ServerConfig.stream_heartbeat_ms` changes the interval, `0` turns it off, and `DEFAULT_STREAM_HEARTBEAT_MS` is exported.
+
+The agent and runtime construction moved out of `start.ts` into `src/start-runtime.ts` so it can be tested without starting a process.
+
 **The stock server image can give its agent voices.** `packages/server/src/start.ts` built a one-agent runtime from environment variables and hard-coded `voices: []`, so the Docker image could hold a conversation and do nothing else. Anything wanting tools had to mount a score file, which is code.
 
 It now reads five more variables. `TUTTI_VOICES` is a JSON array of `{ voice, options, only? }`; `TUTTI_PERMISSIONS` grants the agent's permissions; `TUTTI_MAX_TURNS`, `TUTTI_MAX_TOOL_CALLS` and `TUTTI_MAX_COST_USD` set its limits. The image carries four voices, `github`, `slack`, `email` and `web`, chosen because each answers a call and returns rather than holding a listener open.

@@ -8,6 +8,21 @@
  * | `TUTTI_MAX_TURNS` | positive integer | the runtime default |
  * | `TUTTI_MAX_TOOL_CALLS` | positive integer | the runtime default |
  * | `TUTTI_MAX_COST_USD` | positive decimal | no ceiling |
+ * | `TUTTI_REQUIRE_APPROVAL` | see below | gate tools marked `destructive` |
+ *
+ * `TUTTI_REQUIRE_APPROVAL` sets the agent's `requireApproval`:
+ *
+ * | Value | `requireApproval` | Gated |
+ * |---|---|---|
+ * | absent, empty or `destructive` | `undefined` | tools marked `destructive: true` |
+ * | `none` | `false` | nothing, destructive tools included |
+ * | `all` | `"all"` | every tool call |
+ * | `send_*, create_pull_request` | `string[]` | matching names, plus destructive tools |
+ *
+ * A list is comma-separated, trimmed, with empty items dropped. Each item is
+ * a tool name or glob of `[A-Za-z0-9_*?.-]+`, and anything else is refused.
+ * The framework's matcher treats only `*` as a wildcard; `?` and `.` match
+ * themselves.
  *
  * `TUTTI_VOICES` carries credentials inside `options`, so nothing here ever
  * echoes its content: a JSON syntax error is reported without the snippet
@@ -15,7 +30,7 @@
  */
 
 import { z } from "zod";
-import type { Permission } from "@tuttiai/types";
+import type { AgentConfig, Permission } from "@tuttiai/types";
 
 import { VoiceConfigError, VoiceSpecsSchema, type VoiceSpec } from "./voice-loader.js";
 
@@ -29,6 +44,8 @@ export interface StartAgentEnv {
   readonly max_turns: number | undefined;
   readonly max_tool_calls: number | undefined;
   readonly max_cost_usd: number | undefined;
+  /** The agent's `requireApproval`. `undefined` gates destructive tools only. */
+  readonly require_approval: AgentConfig["requireApproval"];
 }
 
 const PermissionSchema = z.enum(["network", "filesystem", "shell", "browser"]);
@@ -67,6 +84,27 @@ function readPermissions(raw: string | undefined): Permission[] {
   });
 }
 
+const APPROVAL_PATTERN = /^[A-Za-z0-9_*?.-]+$/;
+
+/** Parse `TUTTI_REQUIRE_APPROVAL`, refusing an item that is not a tool name or glob. */
+function readRequireApproval(raw: string | undefined): AgentConfig["requireApproval"] {
+  const value = raw?.trim() ?? "";
+  if (value === "" || value === "destructive") return undefined;
+  if (value === "none") return false;
+  if (value === "all") return "all";
+  const patterns = value.split(",").map((item) => item.trim()).filter((item) => item !== "");
+  for (const pattern of patterns) {
+    if (!APPROVAL_PATTERN.test(pattern)) {
+      throw new VoiceConfigError(
+        `TUTTI_REQUIRE_APPROVAL names "${pattern}", which is not a tool name or glob ` +
+          "(letters, digits and _ * ? . - only). Use destructive, none, all or a comma-separated list.",
+      );
+    }
+  }
+  // Only commas, so nothing survived: the same as leaving it unset.
+  return patterns.length === 0 ? undefined : patterns;
+}
+
 /** Parse one optional numeric variable. */
 function readNumber(read: ReadVariable, key: string, schema: z.ZodNumber): number | undefined {
   const raw = read(key);
@@ -93,5 +131,6 @@ export function readStartAgentEnv(read: ReadVariable): StartAgentEnv {
     max_turns: readNumber(read, "TUTTI_MAX_TURNS", PositiveInt),
     max_tool_calls: readNumber(read, "TUTTI_MAX_TOOL_CALLS", PositiveInt),
     max_cost_usd: readNumber(read, "TUTTI_MAX_COST_USD", PositiveAmount),
+    require_approval: readRequireApproval(read("TUTTI_REQUIRE_APPROVAL")),
   };
 }

@@ -17,6 +17,7 @@ describe("readStartAgentEnv", () => {
       max_turns: undefined,
       max_tool_calls: undefined,
       max_cost_usd: undefined,
+      require_approval: undefined,
     });
   });
 
@@ -85,5 +86,61 @@ describe("readStartAgentEnv", () => {
     ["TUTTI_MAX_COST_USD", "-1"],
   ])("refuses %s=%s", (key, value) => {
     expect(() => readStartAgentEnv(reader({ [key]: value }))).toThrow(`${key} must be a positive number.`);
+  });
+
+  describe("TUTTI_REQUIRE_APPROVAL", () => {
+    const approval = (value: string): unknown =>
+      readStartAgentEnv(reader({ TUTTI_REQUIRE_APPROVAL: value })).require_approval;
+
+    it("leaves the framework default when absent", () => {
+      expect(readStartAgentEnv(reader({})).require_approval).toBeUndefined();
+    });
+
+    it.each(["", "  ", "destructive", " destructive "])(
+      "reads %j as the framework default",
+      (value) => {
+        expect(approval(value)).toBeUndefined();
+      },
+    );
+
+    it("reads none as gating nothing", () => {
+      expect(approval("none")).toBe(false);
+    });
+
+    it("reads all as gating every tool", () => {
+      expect(approval(" all ")).toBe("all");
+    });
+
+    it("reads a list, trimmed, with empty items dropped", () => {
+      expect(approval(" send_*, ,create_pull_request,, web.fetch-?")).toEqual([
+        "send_*",
+        "create_pull_request",
+        "web.fetch-?",
+      ]);
+    });
+
+    it("reads a single tool name as a list of one", () => {
+      expect(approval("create_issue")).toEqual(["create_issue"]);
+    });
+
+    it("reads a list of nothing but commas as the framework default", () => {
+      expect(approval(" , ,")).toBeUndefined();
+    });
+
+    it("refuses an item that is not a tool name or glob, quoting only that item", () => {
+      let message = "";
+      try {
+        approval(`send_*, bogus!, ${TOKEN}`);
+      } catch (error) {
+        message = String(error);
+      }
+      expect(message).toContain('TUTTI_REQUIRE_APPROVAL names "bogus!"');
+      expect(message).not.toContain("send_*");
+      expect(message).not.toContain(TOKEN);
+    });
+
+    it.each(["rm -rf", "a/b", "tool;drop", "all,[x]"])("refuses %j", (value) => {
+      expect(() => approval(value)).toThrow(/TUTTI_REQUIRE_APPROVAL names/);
+    });
   });
 });

@@ -220,20 +220,19 @@ You can also write your own by implementing the `GuardrailHook` contract — any
 
 ## Approval gates (HITL)
 
-Gate destructive tool calls behind human approval with `requireApproval`:
+Tools marked `destructive: true` wait for a person's approval by default. `requireApproval` widens or narrows that:
 
 ```ts
 {
   assistant: {
-    requireApproval: [
-      { tool: "delete_file" },
-      { tool: "push_branch", when: "branch === 'main'" },
-    ],
+    // Glob patterns on tool names; destructive tools stay gated too.
+    requireApproval: ["send_*", "delete_*"],
+    // Or "all" to gate every call, or false to gate nothing.
   },
 }
 ```
 
-When the agent attempts a matching tool call, the runtime emits `hitl:requested`, writes an interrupt to the configured `InterruptStore`, and pauses the run. Review and resolve via the [`tutti-ai interrupts`](/cli/reference#tutti-ai-interrupts) TUI, the `/interrupts/*` HTTP endpoints, or the Studio UI.
+When the agent attempts a gated tool call, the runtime writes an interrupt to the configured `InterruptStore`, emits `interrupt:requested`, and pauses the run. Review and resolve via the [`tutti-ai interrupts`](/cli/reference#tutti-ai-interrupts) TUI, the `/interrupts/*` HTTP endpoints, or the Studio UI. A client reading `POST /run/stream` receives an `approval_requested` frame carrying the `interrupt_id`, and the same stream continues once the call is approved.
 
 :::tip[Routing impact]
 When the [smart router](./smart-routing) is enabled, agents with destructive tools loaded automatically bias toward larger, safer models. The cost of an LLM mistake on a destructive call (a posted tweet, a voided invoice, a deleted message) is far higher than the cost of using a smarter model for that turn — `SmartProvider` factors this into every routing decision.

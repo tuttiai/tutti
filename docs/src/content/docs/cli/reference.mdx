@@ -331,6 +331,8 @@ curl -N -X POST http://localhost:3847/run/stream \
   -d '{"input": "Write a short poem about TypeScript"}'
 ```
 
+`/run/stream` frames are `turn_start`, `tool_call`, `tool_result`, `content_delta`, `turn_end` and a final `run_complete` or `error`. When the runtime has an `InterruptStore`, a tool call waiting for approval sends `approval_requested` with its `interrupt_id`, and the stream stays open until `POST /interrupts/:id/approve` resumes the run or `/deny` ends it with an `error`. `tutti-ai serve` does not attach a store yet, so there a gated call (any tool marked `destructive`, by default) fails the run instead; the stock Docker image in `@tuttiai/server` does attach one. While the stream is open the server writes a `: heartbeat` SSE comment every 15 seconds, so an idle wait is not cut by a client or proxy timeout.
+
 SIGINT/SIGTERM drain in-flight requests before exit. See the [server docs](/guides/serve) for the full API schema.
 
 ### `tutti-ai studio [score]`

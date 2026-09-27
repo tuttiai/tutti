@@ -18,6 +18,18 @@ export const DEFAULT_HOST = "127.0.0.1";
 /** Default request timeout in milliseconds for non-streaming runs. */
 export const DEFAULT_TIMEOUT_MS = 120_000;
 
+/**
+ * Default interval in milliseconds between SSE heartbeat comments on
+ * `POST /run/stream`.
+ *
+ * @remarks
+ * Undici's `fetch` aborts a response body after 300 s without a chunk, and
+ * proxies idle out sooner. A run paused for a person's approval writes
+ * nothing for as long as the person takes, so the heartbeat keeps the
+ * connection alive meanwhile.
+ */
+export const DEFAULT_STREAM_HEARTBEAT_MS = 15_000;
+
 /** Package version, surfaced via the `/health` endpoint. */
 export const SERVER_VERSION = "0.1.1";
 
@@ -71,6 +83,11 @@ export interface ServerConfig {
   agent_name: string;
   /** Non-streaming request timeout in ms. Defaults to {@link DEFAULT_TIMEOUT_MS}. */
   timeout_ms?: number;
+  /**
+   * Interval in ms between `: heartbeat` comments on `POST /run/stream`.
+   * Defaults to {@link DEFAULT_STREAM_HEARTBEAT_MS}. `0` turns it off.
+   */
+  stream_heartbeat_ms?: number;
   /** Optional graph config — when provided, `GET /graph` returns its JSON representation. */
   graph?: GraphConfig;
   /**
