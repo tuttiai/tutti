@@ -146,7 +146,8 @@ for a person instead of failing the run. `TUTTI_REQUIRE_APPROVAL` says which cal
 | `send_*, create_issue` | The named tools, plus destructive ones |
 
 A list is comma-separated, and each item is a tool name or glob of letters, digits and
-`_ * ? . -`; anything else stops the start. Only `*` is a wildcard: `?` and `.` match themselves.
+`_ * . -`; anything else stops the start. Only `*` is a wildcard, and `?` is refused because the
+matcher would read it as a literal.
 Approve or deny with `POST /interrupts/:id/approve` or `/deny`, taking the id from the
 `approval_requested` frame on `/run/stream` or from `GET /sessions/:id/interrupts`. Pending
 approvals live in memory, so a restart forgets them along with the runs waiting on them.

@@ -20,9 +20,10 @@
  * | `send_*, create_pull_request` | `string[]` | matching names, plus destructive tools |
  *
  * A list is comma-separated, trimmed, with empty items dropped. Each item is
- * a tool name or glob of `[A-Za-z0-9_*?.-]+`, and anything else is refused.
- * The framework's matcher treats only `*` as a wildcard; `?` and `.` match
- * themselves.
+ * a tool name or glob of `[A-Za-z0-9_*.-]+`, and anything else is refused.
+ * `*` is the framework matcher's only wildcard. `?` is refused rather than
+ * accepted as a literal, because no tool name holds one and a person writing
+ * it expects a wildcard the matcher does not have.
  *
  * `TUTTI_VOICES` carries credentials inside `options`, so nothing here ever
  * echoes its content: a JSON syntax error is reported without the snippet
@@ -84,7 +85,7 @@ function readPermissions(raw: string | undefined): Permission[] {
   });
 }
 
-const APPROVAL_PATTERN = /^[A-Za-z0-9_*?.-]+$/;
+const APPROVAL_PATTERN = /^[A-Za-z0-9_*.-]+$/;
 
 /** Parse `TUTTI_REQUIRE_APPROVAL`, refusing an item that is not a tool name or glob. */
 function readRequireApproval(raw: string | undefined): AgentConfig["requireApproval"] {
@@ -97,7 +98,7 @@ function readRequireApproval(raw: string | undefined): AgentConfig["requireAppro
     if (!APPROVAL_PATTERN.test(pattern)) {
       throw new VoiceConfigError(
         `TUTTI_REQUIRE_APPROVAL names "${pattern}", which is not a tool name or glob ` +
-          "(letters, digits and _ * ? . - only). Use destructive, none, all or a comma-separated list.",
+          "(letters, digits and _ * . - only). Use destructive, none, all or a comma-separated list.",
       );
     }
   }

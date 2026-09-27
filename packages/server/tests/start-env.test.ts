@@ -112,11 +112,15 @@ describe("readStartAgentEnv", () => {
     });
 
     it("reads a list, trimmed, with empty items dropped", () => {
-      expect(approval(" send_*, ,create_pull_request,, web.fetch-?")).toEqual([
+      expect(approval(" send_*, ,create_pull_request,, web.fetch-url")).toEqual([
         "send_*",
         "create_pull_request",
-        "web.fetch-?",
+        "web.fetch-url",
       ]);
+    });
+
+    it("refuses ?, which the matcher would read as a literal rather than the wildcard it looks like", () => {
+      expect(() => approval("send_?")).toThrow('TUTTI_REQUIRE_APPROVAL names "send_?"');
     });
 
     it("reads a single tool name as a list of one", () => {
