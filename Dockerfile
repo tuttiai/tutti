@@ -21,6 +21,9 @@ COPY voices/github/package.json       voices/github/
 COPY voices/playwright/package.json   voices/playwright/
 COPY voices/mcp/package.json          voices/mcp/
 COPY voices/rag/package.json          voices/rag/
+COPY voices/email/package.json        voices/email/
+COPY voices/slack/package.json        voices/slack/
+COPY voices/web/package.json          voices/web/
 
 RUN npm ci --ignore-scripts
 
@@ -52,7 +55,26 @@ COPY packages/server/src/            packages/server/src/
 COPY packages/server/tsconfig.json   packages/server/
 COPY packages/server/tsup.config.ts  packages/server/
 
-# Build in dependency order (turbo resolves the graph)
+# The voices start.ts can load from TUTTI_VOICES (src/voice-registry.ts).
+# A voice missing here is refused at start as "not installed in this image".
+COPY voices/github/src/            voices/github/src/
+COPY voices/github/tsconfig.json   voices/github/
+COPY voices/github/tsup.config.ts  voices/github/
+
+COPY voices/slack/src/             voices/slack/src/
+COPY voices/slack/tsconfig.json    voices/slack/
+COPY voices/slack/tsup.config.ts   voices/slack/
+
+COPY voices/email/src/             voices/email/src/
+COPY voices/email/tsconfig.json    voices/email/
+COPY voices/email/tsup.config.ts   voices/email/
+
+COPY voices/web/src/               voices/web/src/
+COPY voices/web/tsconfig.json      voices/web/
+COPY voices/web/tsup.config.ts     voices/web/
+
+# Build in dependency order (turbo resolves the graph). The server's voice
+# devDependencies are part of that graph, so the four voices build too.
 RUN npx turbo run build --filter=@tuttiai/server...
 
 # ── Stage 2: production dependencies ────────────────────────
@@ -76,6 +98,9 @@ COPY voices/github/package.json       voices/github/
 COPY voices/playwright/package.json   voices/playwright/
 COPY voices/mcp/package.json          voices/mcp/
 COPY voices/rag/package.json          voices/rag/
+COPY voices/email/package.json        voices/email/
+COPY voices/slack/package.json        voices/slack/
+COPY voices/web/package.json          voices/web/
 
 RUN npm ci --omit=dev --ignore-scripts
 
@@ -106,6 +131,15 @@ COPY --from=builder --chown=tutti:tutti /app/packages/telemetry/dist packages/te
 COPY --from=builder --chown=tutti:tutti /app/packages/core/dist      packages/core/dist
 COPY --from=builder --chown=tutti:tutti /app/packages/realtime/dist  packages/realtime/dist
 COPY --from=builder --chown=tutti:tutti /app/packages/server/dist    packages/server/dist
+
+COPY --from=deps    --chown=tutti:tutti /app/voices/github/package.json voices/github/
+COPY --from=deps    --chown=tutti:tutti /app/voices/slack/package.json  voices/slack/
+COPY --from=deps    --chown=tutti:tutti /app/voices/email/package.json  voices/email/
+COPY --from=deps    --chown=tutti:tutti /app/voices/web/package.json    voices/web/
+COPY --from=builder --chown=tutti:tutti /app/voices/github/dist         voices/github/dist
+COPY --from=builder --chown=tutti:tutti /app/voices/slack/dist          voices/slack/dist
+COPY --from=builder --chown=tutti:tutti /app/voices/email/dist          voices/email/dist
+COPY --from=builder --chown=tutti:tutti /app/voices/web/dist            voices/web/dist
 
 ENV NODE_ENV=production
 

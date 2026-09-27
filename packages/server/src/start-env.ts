@@ -1,0 +1,97 @@
+/**
+ * The agent-shaping variables `start.ts` reads beyond a prompt and a model.
+ *
+ * | Variable | Shape | Absent means |
+ * |---|---|---|
+ * | `TUTTI_VOICES` | JSON array of `{ voice, options, only? }` | no voices |
+ * | `TUTTI_PERMISSIONS` | comma-separated `network,filesystem,shell,browser` | none granted |
+ * | `TUTTI_MAX_TURNS` | positive integer | the runtime default |
+ * | `TUTTI_MAX_TOOL_CALLS` | positive integer | the runtime default |
+ * | `TUTTI_MAX_COST_USD` | positive decimal | no ceiling |
+ *
+ * `TUTTI_VOICES` carries credentials inside `options`, so nothing here ever
+ * echoes its content: a JSON syntax error is reported without the snippet
+ * Node would quote, and a shape error by path and code only.
+ */
+
+import { z } from "zod";
+import type { Permission } from "@tuttiai/types";
+
+import { VoiceConfigError, VoiceSpecsSchema, type VoiceSpec } from "./voice-loader.js";
+
+/** Reads one variable. `SecretsManager.optional` in production, a map in tests. */
+export type ReadVariable = (key: string) => string | undefined;
+
+/** What the variables add to the one agent the image runs. */
+export interface StartAgentEnv {
+  readonly voices: readonly VoiceSpec[];
+  readonly permissions: readonly Permission[];
+  readonly max_turns: number | undefined;
+  readonly max_tool_calls: number | undefined;
+  readonly max_cost_usd: number | undefined;
+}
+
+const PermissionSchema = z.enum(["network", "filesystem", "shell", "browser"]);
+const PositiveInt = z.coerce.number().int().positive();
+const PositiveAmount = z.coerce.number().positive().finite();
+
+/** Parse `TUTTI_VOICES` without ever quoting what it holds. */
+function readVoices(raw: string | undefined): VoiceSpec[] {
+  if (raw === undefined || raw.trim() === "") return [];
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new VoiceConfigError("TUTTI_VOICES is not valid JSON.");
+  }
+  const parsed = VoiceSpecsSchema.safeParse(json);
+  if (!parsed.success) {
+    const where = parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"} (${i.code})`);
+    throw new VoiceConfigError(`TUTTI_VOICES has the wrong shape: ${where.join(", ")}.`);
+  }
+  return parsed.data;
+}
+
+/** Parse `TUTTI_PERMISSIONS`, refusing a permission the framework does not have. */
+function readPermissions(raw: string | undefined): Permission[] {
+  if (raw === undefined || raw.trim() === "") return [];
+  const names = raw.split(",").map((name) => name.trim()).filter((name) => name !== "");
+  return names.map((name) => {
+    const parsed = PermissionSchema.safeParse(name);
+    if (!parsed.success) {
+      throw new VoiceConfigError(
+        `TUTTI_PERMISSIONS names "${name}", which is not one of: ${PermissionSchema.options.join(", ")}.`,
+      );
+    }
+    return parsed.data;
+  });
+}
+
+/** Parse one optional numeric variable. */
+function readNumber(read: ReadVariable, key: string, schema: z.ZodNumber): number | undefined {
+  const raw = read(key);
+  if (raw === undefined || raw.trim() === "") return undefined;
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new VoiceConfigError(`${key} must be a positive number.`);
+  return parsed.data;
+}
+
+/**
+ * Read the agent-shaping variables.
+ *
+ * @param read - Reads one variable.
+ * @returns What they add to the agent.
+ * @throws {VoiceConfigError} When any of them is malformed.
+ *
+ * @example
+ * const env = readStartAgentEnv((key) => SecretsManager.optional(key));
+ */
+export function readStartAgentEnv(read: ReadVariable): StartAgentEnv {
+  return {
+    voices: readVoices(read("TUTTI_VOICES")),
+    permissions: readPermissions(read("TUTTI_PERMISSIONS")),
+    max_turns: readNumber(read, "TUTTI_MAX_TURNS", PositiveInt),
+    max_tool_calls: readNumber(read, "TUTTI_MAX_TOOL_CALLS", PositiveInt),
+    max_cost_usd: readNumber(read, "TUTTI_MAX_COST_USD", PositiveAmount),
+  };
+}
