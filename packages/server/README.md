@@ -51,7 +51,7 @@ tutti-ai serve --port 3847 --watch
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/run` | Run agent to completion. Returns `{ output, session_id, turns, usage, cost_usd, duration_ms }`. |
-| `POST` | `/run/stream` | SSE stream: `turn_start`, `tool_call`, `tool_result`, `content_delta`, `turn_end`, `run_complete`. |
+| `POST` | `/run/stream` | SSE stream: `turn_start`, `tool_call`, `approval_requested`, `tool_result`, `content_delta`, `turn_end`, `run_complete`, or `error`. |
 | `GET` | `/sessions/:id` | Retrieve session conversation history. |
 | `GET` | `/health` | `{ status: "ok", version, uptime_s }`. |
 
@@ -67,8 +67,28 @@ interface ServerConfig {
   rate_limit?: { max: number; timeWindow: string } | false;
   cors_origins?: string | string[];      // Falls back to TUTTI_ALLOWED_ORIGINS env
   timeout_ms?: number;                   // Default: 120_000
+  stream_heartbeat_ms?: number;          // Default: 15_000; 0 turns it off
 }
 ```
+
+### Approvals on `/run/stream`
+
+When a tool call needs a person's approval (see `requireApproval` on the agent; tools marked
+`destructive: true` are gated by default) and the runtime has an `InterruptStore`, the run pauses
+and the stream says so:
+
+```
+data: {"event":"approval_requested","interrupt_id":"...","session_id":"...","tool_name":"create_pull_request","tool_args":{...}}
+```
+
+The stream stays open. `POST /interrupts/:id/approve` resumes the run on the same stream, so
+`tool_result` and `run_complete` follow. `POST /interrupts/:id/deny` ends the run, and the stream
+closes with an `error` frame whose `message` carries the denial reason.
+
+A paused run writes nothing, and undici's `fetch` aborts a response body after 300 seconds without
+a chunk. So `/run/stream` writes an SSE comment, `: heartbeat`, every `stream_heartbeat_ms` for as
+long as the stream is open. SSE clients discard comments; a hand-written parser should skip any
+line starting with `:`.
 
 ## Middleware
 
@@ -100,6 +120,7 @@ The image runs one agent configured entirely by environment:
 | `TUTTI_PERMISSIONS` | none | Comma-separated: `network`, `filesystem`, `shell`, `browser` |
 | `TUTTI_MAX_TURNS`, `TUTTI_MAX_TOOL_CALLS` | runtime defaults | Loop limits |
 | `TUTTI_MAX_COST_USD` | none | Hard cost ceiling per run |
+| `TUTTI_REQUIRE_APPROVAL` | `destructive` | Which tool calls wait for a person, below |
 
 The image carries four voices: `github`, `slack`, `email` and `web`. Each entry's `options` is
 validated by that voice's own `.strict()` config schema, credentials included, and `only` keeps
@@ -111,6 +132,30 @@ permission) stops the process before it listens, and no refusal ever quotes an o
 docker run -p 3847:3847 -e TUTTI_API_KEY=key -e ANTHROPIC_API_KEY=sk-... \
   -e TUTTI_PERMISSIONS=network \
   -e TUTTI_VOICES='[{"voice":"github","options":{"token":"ghp_..."},"only":["list_issues","get_issue"]}]' \
+  tutti-server
+```
+
+The image's runtime always carries an in-memory interrupt store, so a gated tool call pauses
+for a person instead of failing the run. `TUTTI_REQUIRE_APPROVAL` says which calls are gated:
+
+| Value | Gated |
+|---|---|
+| unset, empty or `destructive` | Tools marked `destructive: true`, such as GitHub's `create_pull_request` |
+| `none` | Nothing, destructive tools included |
+| `all` | Every tool call |
+| `send_*, create_issue` | The named tools, plus destructive ones |
+
+A list is comma-separated, and each item is a tool name or glob of letters, digits and
+`_ * . -`; anything else stops the start. Only `*` is a wildcard, and `?` is refused because the
+matcher would read it as a literal.
+Approve or deny with `POST /interrupts/:id/approve` or `/deny`, taking the id from the
+`approval_requested` frame on `/run/stream` or from `GET /sessions/:id/interrupts`. Pending
+approvals live in memory, so a restart forgets them along with the runs waiting on them.
+
+```bash
+docker run -p 3847:3847 -e TUTTI_API_KEY=key -e ANTHROPIC_API_KEY=sk-... \
+  -e TUTTI_PERMISSIONS=network -e TUTTI_REQUIRE_APPROVAL='create_issue' \
+  -e TUTTI_VOICES='[{"voice":"github","options":{"token":"ghp_..."}}]' \
   tutti-server
 ```
 

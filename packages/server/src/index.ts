@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import websocketPlugin from "@fastify/websocket";
 
-import { DEFAULT_TIMEOUT_MS } from "./config.js";
+import { DEFAULT_STREAM_HEARTBEAT_MS, DEFAULT_TIMEOUT_MS } from "./config.js";
 import { registerRequestId } from "./middleware/request-id.js";
 import { registerCors } from "./middleware/cors.js";
 import { registerRateLimit } from "./middleware/rate-limit.js";
@@ -26,6 +26,7 @@ import { SessionsRegistry } from "./sessions-registry.js";
 export {
   DEFAULT_HOST,
   DEFAULT_PORT,
+  DEFAULT_STREAM_HEARTBEAT_MS,
   DEFAULT_TIMEOUT_MS,
   SERVER_VERSION,
   type RateLimitConfig,
@@ -104,7 +105,10 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
   // 6. Routes
   registerHealthRoute(app);
   registerRunRoute(app, config.runtime, config.agent_name, timeoutMs, config.graph_runner);
-  registerStreamRoute(app, config.runtime, config.agent_name);
+  registerStreamRoute(app, config.runtime, {
+    agent_name: config.agent_name,
+    heartbeat_ms: config.stream_heartbeat_ms ?? DEFAULT_STREAM_HEARTBEAT_MS,
+  });
   registerSessionsRoute(
     app,
     config.runtime,

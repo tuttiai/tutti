@@ -39,9 +39,41 @@ function mapEvent(
       return { name: "content_delta", payload: { text: e.text } };
     case "turn:end":
       return { name: "turn_end", payload: { session_id: e.session_id, turn: e.turn } };
+    case "interrupt:requested":
+      return {
+        name: "approval_requested",
+        payload: {
+          interrupt_id: e.interrupt_id,
+          session_id: e.session_id,
+          tool_name: e.tool_name,
+          tool_args: e.tool_args,
+        },
+      };
     default:
       return undefined;
   }
+}
+
+/**
+ * Write an SSE comment every `intervalMs` so an idle stream is not cut.
+ * Clients ignore comment lines. A non-positive interval writes nothing.
+ *
+ * @returns Stops the heartbeat. Safe to call more than once.
+ */
+function startHeartbeat(stream: PassThrough, intervalMs: number): () => void {
+  if (intervalMs <= 0) return () => undefined;
+  const timer = setInterval(() => {
+    if (!stream.destroyed && !stream.writableEnded) stream.write(": heartbeat\n\n");
+  }, intervalMs);
+  return () => clearInterval(timer);
+}
+
+/** Options for {@link registerStreamRoute}. */
+export interface StreamRouteOptions {
+  /** Agent key in the score. */
+  readonly agent_name: string;
+  /** Interval between `: heartbeat` comments. `0` turns them off. */
+  readonly heartbeat_ms: number;
 }
 
 /**
@@ -54,14 +86,26 @@ function mapEvent(
  * Only events from the run this request starts are streamed. Concurrent
  * requests on the same runtime never see each other's frames.
  *
- * @param app       - Fastify instance.
- * @param runtime   - Pre-built Tutti runtime.
- * @param agentName - Agent key in the score.
+ * When a tool call needs a person's approval, the stream sends
+ * `approval_requested` with `interrupt_id`, `session_id`, `tool_name` and
+ * `tool_args`, then stays open while the run waits. Approving through
+ * `POST /interrupts/:id/approve` resumes it on the same stream, so
+ * `tool_result` and `run_complete` follow. Denying ends the run, and the
+ * stream closes with an `error` frame carrying the denial.
+ *
+ * A paused run writes nothing, and undici's `fetch` aborts a body after 300 s
+ * without a chunk, so the route writes a `: heartbeat` SSE comment every
+ * `heartbeat_ms` (15 s by default) for as long as the stream is open. SSE
+ * clients discard comments.
+ *
+ * @param app     - Fastify instance.
+ * @param runtime - Pre-built Tutti runtime.
+ * @param options - The agent to run and the heartbeat interval.
  */
 export function registerStreamRoute(
   app: FastifyInstance,
   runtime: TuttiRuntime,
-  agentName: string,
+  options: StreamRouteOptions,
 ): void {
   app.post<{ Body: RunBody }>("/run/stream", {
     schema: { body: runBodySchema },
@@ -69,6 +113,7 @@ export function registerStreamRoute(
     const sse = new PassThrough();
     reply.type("text/event-stream").header("Cache-Control", "no-cache");
     reply.send(sse);
+    const stopHeartbeat = startHeartbeat(sse, options.heartbeat_ms);
 
     // Scoped to this request's run: the event bus is shared by every
     // concurrent request, so an unscoped subscription streams other
@@ -86,6 +131,7 @@ export function registerStreamRoute(
     reply.raw.on("close", () => {
       if (reply.raw.writableFinished) return;
       clientClosed = true;
+      stopHeartbeat();
       scope.unsubscribe();
       if (!sse.destroyed) sse.end();
     });
@@ -94,7 +140,7 @@ export function registerStreamRoute(
 
     try {
       const result = await scope.run(() =>
-        runtime.run(agentName, request.body.input, request.body.session_id),
+        runtime.run(options.agent_name, request.body.input, request.body.session_id),
       );
 
       if (!clientClosed) {
@@ -113,6 +159,7 @@ export function registerStreamRoute(
         sseWrite(sse, "error", { message });
       }
     } finally {
+      stopHeartbeat();
       scope.unsubscribe();
       if (!sse.destroyed) sse.end();
     }

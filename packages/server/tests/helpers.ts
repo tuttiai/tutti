@@ -71,7 +71,7 @@ const AGENT_NAME = "test-agent";
 const API_KEY = "test-api-key";
 
 export interface TestHarness {
-  app: ReturnType<typeof createServer>;
+  app: Awaited<ReturnType<typeof createServer>>;
   runtime: TuttiRuntime;
   interruptStore: InterruptStore | undefined;
 }

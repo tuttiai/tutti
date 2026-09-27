@@ -5,10 +5,13 @@
  * One agent, optionally holding voices from `TUTTI_VOICES` (see
  * `start-env.ts`). For multi-agent setups, mount a score file and use the
  * library API (`createServer`) instead.
+ *
+ * The runtime always carries an in-memory interrupt store, so a gated tool
+ * call pauses for a person (`POST /interrupts/:id/approve` or `/deny`)
+ * instead of failing the run. Pending approvals do not survive a restart.
  */
 
 import {
-  TuttiRuntime,
   AnthropicProvider,
   OpenAIProvider,
   GeminiProvider,
@@ -16,10 +19,11 @@ import {
   SecretsManager,
   createLogger,
 } from "@tuttiai/core";
-import type { AgentConfig, LLMProvider, ScoreConfig } from "@tuttiai/types";
+import type { LLMProvider, ScoreConfig } from "@tuttiai/types";
 
 import { createServer, DEFAULT_PORT } from "./index.js";
 import { readStartAgentEnv } from "./start-env.js";
+import { buildStartAgent, buildStartRuntime } from "./start-runtime.js";
 import { loadVoices } from "./voice-loader.js";
 
 const logger = createLogger("tutti-server");
@@ -54,21 +58,13 @@ function buildProvider(): LLMProvider {
 // deployment reports a failed start rather than an agent missing its tools.
 const agentEnv = readStartAgentEnv((key) => SecretsManager.optional(key));
 const voices = await loadVoices(agentEnv.voices);
-const permissions = [...agentEnv.permissions];
-for (const voice of voices) PermissionGuard.check(voice, permissions);
+for (const voice of voices) PermissionGuard.check(voice, [...agentEnv.permissions]);
 
-const agent: AgentConfig = {
-  name: AGENT_NAME,
-  model: MODEL,
-  system_prompt: SYSTEM_PROMPT,
+const agent = buildStartAgent(
+  { name: AGENT_NAME, model: MODEL, system_prompt: SYSTEM_PROMPT },
+  agentEnv,
   voices,
-  permissions,
-  streaming: true,
-};
-if (agentEnv.max_turns !== undefined) agent.max_turns = agentEnv.max_turns;
-if (agentEnv.max_tool_calls !== undefined) agent.max_tool_calls = agentEnv.max_tool_calls;
-if (agentEnv.max_cost_usd !== undefined) agent.budget = { max_cost_usd: agentEnv.max_cost_usd };
-
+);
 const score: ScoreConfig = {
   name: "tutti-server",
   provider: buildProvider(),
@@ -76,7 +72,8 @@ const score: ScoreConfig = {
   agents: { [AGENT_NAME]: agent },
 };
 
-const runtime = new TuttiRuntime(score);
+// Carries an interrupt store, so a gated tool call waits for a person.
+const runtime = buildStartRuntime(score);
 
 const app = await createServer({
   port: PORT,
@@ -96,7 +93,9 @@ logger.info(
     agent: AGENT_NAME,
     // Names only: the options carry credentials.
     voices: voices.map((voice) => ({ name: voice.name, tools: voice.tools.length })),
-    permissions,
+    permissions: agentEnv.permissions,
+    // Undefined reads as the framework default: destructive tools only.
+    require_approval: agentEnv.require_approval ?? "destructive",
   },
   "Tutti server started",
 );
