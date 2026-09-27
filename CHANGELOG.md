@@ -4,6 +4,18 @@
 
 ### Added
 
+**The stock server image can give its agent voices.** `packages/server/src/start.ts` built a one-agent runtime from environment variables and hard-coded `voices: []`, so the Docker image could hold a conversation and do nothing else. Anything wanting tools had to mount a score file, which is code.
+
+It now reads five more variables. `TUTTI_VOICES` is a JSON array of `{ voice, options, only? }`; `TUTTI_PERMISSIONS` grants the agent's permissions; `TUTTI_MAX_TURNS`, `TUTTI_MAX_TOOL_CALLS` and `TUTTI_MAX_COST_USD` set its limits. The image carries four voices, `github`, `slack`, `email` and `web`, chosen because each answers a call and returns rather than holding a listener open.
+
+- **A voice key is looked up in a fixed table** (`src/voice-registry.ts`) and never used to build an import specifier. An unknown key is refused, listing what the image carries.
+- **Options are validated by the voice's own config schema** from the manifest work below, so an unknown or misspelt option stops the start rather than producing a voice with no credential.
+- **`only` narrows a voice to the named tools**, and a name the voice does not have is refused. A typo in an allowlist is a grant nobody meant.
+- **`PermissionGuard.check()` runs at start** as well as on every run, so a voice needing `network` on an agent without it fails the container before it listens instead of failing the first message.
+- **No refusal quotes a value.** `TUTTI_VOICES` carries credentials, so a JSON syntax error is reported without Node's snippet and every schema problem by path and code only.
+
+The four voices are optional peer dependencies of `@tuttiai/server`, loaded with a dynamic `import()`, so a library user installs none of them. `zod` becomes a direct dependency of the server, at the version the rest of the repo pins. The root `Dockerfile` now builds and ships the four. `docker inspect` shows `TUTTI_VOICES` in full, credentials included, which the server README states rather than leaves to be found.
+
 **`create_pull_request` on the GitHub voice.** `@tuttiai/github` shipped ten tools, all of them reads plus `create_issue` and `comment_on_issue`. An agent could describe work it had done but could not submit it, so any workflow that ends in a pull request had to drop out of the voice and shell out to `gh`.
 
 `create_pull_request` opens a PR from an existing branch: `owner`, `repo`, `title`, `head`, `base`, and optional `body`, `draft` and `maintainer_can_modify`. It does not create the branch and does not push commits — `head` must already exist with at least one commit not on `base`, or GitHub answers 422 and the tool returns the message with a fix hint rather than throwing.

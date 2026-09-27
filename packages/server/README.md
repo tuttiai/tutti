@@ -89,6 +89,34 @@ docker run -p 3847:3847 -e TUTTI_API_KEY=key -e ANTHROPIC_API_KEY=sk-... tutti-s
 
 See the repo root `docker-compose.yml` for a full stack with Postgres and Redis.
 
+The image runs one agent configured entirely by environment:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TUTTI_AGENT_NAME` | `assistant` | The agent's key |
+| `TUTTI_SYSTEM_PROMPT` | `You are a helpful assistant.` | Its system prompt |
+| `TUTTI_PROVIDER`, `TUTTI_MODEL` | `anthropic`, a Sonnet model | Provider and model |
+| `TUTTI_VOICES` | none | JSON array of `{ "voice", "options", "only"? }` |
+| `TUTTI_PERMISSIONS` | none | Comma-separated: `network`, `filesystem`, `shell`, `browser` |
+| `TUTTI_MAX_TURNS`, `TUTTI_MAX_TOOL_CALLS` | runtime defaults | Loop limits |
+| `TUTTI_MAX_COST_USD` | none | Hard cost ceiling per run |
+
+The image carries four voices: `github`, `slack`, `email` and `web`. Each entry's `options` is
+validated by that voice's own `.strict()` config schema, credentials included, and `only` keeps
+just the named tools. Every voice needs the permissions it declares, so all four need
+`TUTTI_PERMISSIONS=network`. Any refusal (an unknown voice, an unknown option or tool, a missing
+permission) stops the process before it listens, and no refusal ever quotes an option's value.
+
+```bash
+docker run -p 3847:3847 -e TUTTI_API_KEY=key -e ANTHROPIC_API_KEY=sk-... \
+  -e TUTTI_PERMISSIONS=network \
+  -e TUTTI_VOICES='[{"voice":"github","options":{"token":"ghp_..."},"only":["list_issues","get_issue"]}]' \
+  tutti-server
+```
+
+`docker inspect` shows every variable, credentials in `TUTTI_VOICES` included. Anyone who can
+inspect containers on the host can read them.
+
 ## License
 
 Apache 2.0
