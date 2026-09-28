@@ -4,6 +4,16 @@
 
 ### Added
 
+**`ClaudeCodeProvider`: run your own agents on your Claude subscription.** Every provider billed per token through an API key, so trying agents out locally cost money on every turn even for someone already paying for Claude Pro or Max. The new provider answers through the locally installed Claude Code CLI, `claude -p`, using whatever login that CLI holds.
+
+- **Tutti never touches the credential.** The CLI signs itself in, interactively or from `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`). If `ANTHROPIC_API_KEY` is set, Claude Code bills the API instead, and the provider warns at construction.
+- **The CLI runs as a plain model.** Its built-in tools, MCP servers, hooks, plugins and `CLAUDE.md` are all off (`--tools "" --safe-mode --strict-mcp-config --no-session-persistence`), and it runs from the temp directory. Tutti's own tools travel through `--json-schema` structured output: the model either answers or lists tool calls, the tool names constrained to an enum of the ones offered, and Tutti's runner executes them as for any other provider. Tool call ids are minted by the provider, never taken from the model.
+- **Each turn is one stateless process** carrying the whole conversation as JSON on stdin (not argv, which a long conversation outgrows). `max_tokens`, `temperature` and `stop_sequences` are ignored, and `stream()` yields the reply once complete.
+- **Errors are typed:** 401 or 403 is `AuthenticationError`, 429 or a reached usage limit is `RateLimitError`, and a missing CLI, a timeout or anything else is `ProviderError`, with any output redacted before it reaches the message.
+- **The server image selects it with `TUTTI_PROVIDER=claude-code`.** The choice moved out of `start.ts` into `src/start-provider.ts` so it can be tested. The stock image is unchanged; `--build-arg CLAUDE_CODE_VERSION=<version>` adds the pinned CLI, with the system ripgrep Alpine needs.
+
+It is meant for your own agents on your own machine. Anthropic's terms do not permit serving other people through a personal subscription, which the providers guide says plainly.
+
 **The stock server image pauses gated tool calls for a person, and `/run/stream` says so.** Three things stopped a product using the framework's approval gate through the Docker image. `start.ts` built its runtime with no `InterruptStore`, so any tool marked `destructive: true` (GitHub's `create_pull_request`, for one) threw "no InterruptStore is configured" when called, and the approve and deny routes answered 503. There was no variable for `requireApproval`. And `POST /run/stream` dropped `interrupt:requested`, so the caller never learned the run was waiting, while the silence of a paused run let undici's `fetch` abort the body after 300 seconds.
 
 - **The image's runtime always carries a `MemoryInterruptStore`.** A gated call now pauses until `POST /interrupts/:id/approve` or `/deny`. Pending approvals live in memory and do not survive a restart.

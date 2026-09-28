@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-Tutti ships with four built-in LLM providers. They all implement the same `LLMProvider` interface, so you can swap them with a single line change.
+Tutti ships with five built-in LLM providers. They all implement the same `LLMProvider` interface, so you can swap them with a single line change.
 
 ## Anthropic (Claude)
 
@@ -95,6 +95,56 @@ const provider = new OpenRouterProvider({
 **Cost reporting:** OpenRouter returns per-call USD cost inline via its `usage: { include: true }` extension. The cost is surfaced on `ChatResponse.usage.cost_usd` and `StreamChunk.usage.cost_usd` — no second `/generation` round trip required. Your `RunCostStore`-backed daily/monthly budgets work identically to the native providers.
 
 **Errors:** 401 → `AuthenticationError`, 429 → `RateLimitError` (with `Retry-After` parsing), other HTTP errors → `ProviderError` with `status` preserved. Same shape as the other providers, so retry/backoff policy is unchanged.
+
+## Claude Code (your own Claude subscription)
+
+`ClaudeCodeProvider` answers through a locally installed [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI, running `claude -p` once per turn. It uses whatever login that CLI already holds, so on your own machine your agents run against your Claude Pro or Max plan instead of per-token API billing.
+
+```ts
+import { ClaudeCodeProvider } from "@tuttiai/core";
+
+const provider = new ClaudeCodeProvider();
+// or with explicit options:
+const provider = new ClaudeCodeProvider({
+  command: "/usr/local/bin/claude", // default: `claude` on PATH
+  timeout_ms: 300_000,              // default: 10 minutes per turn
+});
+```
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `command` | `claude` | The CLI to run |
+| `timeout_ms` | `600000` | Kill a turn that runs longer than this |
+| `cwd` | the OS temp directory | Working directory for the CLI |
+| `runner` | spawns the CLI | Replace the process runner, for tests |
+
+**Signing in:** Tutti never reads or stores a credential for this provider. Sign the CLI in yourself, either interactively (`claude`, then `/login`) or, in a container, with a long-lived token: run `claude setup-token` once and pass the result as `CLAUDE_CODE_OAUTH_TOKEN`. **If `ANTHROPIC_API_KEY` is set, Claude Code uses it and bills the API**, and the provider logs a warning saying so.
+
+**How tools work:** every Claude Code built-in tool, MCP server, hook, plugin and `CLAUDE.md` is switched off (`--tools "" --safe-mode --strict-mcp-config`), so the CLI behaves as a plain model. The model answers through structured output, either with its final text or with calls to your agent's tools, which Tutti's runner then executes exactly as it does for any other provider. Tool names are constrained to the ones offered.
+
+**Limits:**
+- Each turn is a fresh process carrying the whole conversation, which adds a second or two of start-up per turn.
+- `max_tokens`, `temperature` and `stop_sequences` are not supported by the CLI and are ignored.
+- `stream()` yields the reply once it is complete, not token by token.
+- Usage counts against your plan's rolling limits, shared with your own Claude Code sessions. A reached limit surfaces as `RateLimitError`.
+- `usage.cost_usd` is left unset. Token counts are reported, so cost estimates and `max_cost_usd` still work, but they price list rates your plan does not charge.
+
+:::caution
+This provider is for running **your own** agents on **your own** machine. Anthropic's terms do not permit serving other people through a personal Claude subscription. For anything that answers other users, use `AnthropicProvider` with an API key.
+:::
+
+**In the Docker image**, build with the CLI and select the provider:
+
+```bash
+docker build --build-arg CLAUDE_CODE_VERSION=2.1.284 -t tutti-server:claude-code .
+docker run -p 3847:3847 \
+  -e TUTTI_API_KEY=key \
+  -e TUTTI_PROVIDER=claude-code -e TUTTI_MODEL=claude-sonnet-5 \
+  -e CLAUDE_CODE_OAUTH_TOKEN=... \
+  tutti-server:claude-code
+```
+
+**Errors:** a 401 or 403 becomes `AuthenticationError`; a 429 or a reached usage limit becomes `RateLimitError`; a missing CLI, a timeout or any other failure becomes `ProviderError`, with `status` kept when the API gave one.
 
 ## Switching providers
 
