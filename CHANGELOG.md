@@ -51,6 +51,8 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 **Tool schemas Anthropic accepts.** `z.number().positive()` was sent as draft-04's `{ minimum: 0, exclusiveMinimum: true }`, and Anthropic, which validates against JSON Schema draft 2020-12, refused every request from an agent holding such a tool: the `web` voice's `fetch_url` made every agent with that voice unusable. Exclusive bounds are now written as numbers (`{ exclusiveMinimum: 0 }`); the `openApi3` target the Gemini provider relies on stays. One converter, `src/tool-schema.ts`, serves the agent runner and the skills executor.
 
+**An agent stopped at a limit gives its answer.** Reaching `max_tool_calls` or `max_turns` ended the run right after a tool call, so its output was empty however much it had done. The runner now makes one more call asking it to answer from what it has and to say what it could not check (`src/final-answer.ts`), counted in the run's usage. A run that answered within its limits is unchanged.
+
 **`POST /run/stream` delivers its frames over a real socket.** Every streamed run answered `200` with an empty body, success and failure alike. The route took the request's `close` event as the client leaving, and Node emits that as soon as the request body has been read, so the stream was ended before its first frame. Every stream test used `app.inject`, which never emits it, so all of them passed.
 
 - `/run/stream`, `/traces/stream` and `/interrupts/stream` now listen for the response's `close`, and `/run/stream` treats a response that closed after finishing as a normal end rather than a departure.

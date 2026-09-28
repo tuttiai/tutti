@@ -205,7 +205,8 @@ describe("AgentRunner", () => {
     );
 
     expect(result.turns).toBe(3);
-    expect(provider.chat).toHaveBeenCalledTimes(3);
+    // Three turns, then the one call asking the agent to answer from what it has (final-answer.ts).
+    expect(provider.chat).toHaveBeenCalledTimes(4);
   });
 
   it("accumulates token usage across turns", async () => {
