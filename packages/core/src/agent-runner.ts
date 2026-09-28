@@ -26,6 +26,7 @@ import type {
 import type { Checkpoint, CheckpointStore } from "./checkpoint/index.js";
 import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
+import { toolInputSchema } from "./tool-schema.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
@@ -1897,12 +1898,10 @@ export class AgentRunner {
 }
 
 function toolToDefinition(tool: Tool): ToolDefinition {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Zod generic variance: Tool<unknown> vs zodToJsonSchema's expected ZodType<any>
-  const jsonSchema = zodToJsonSchema(tool.parameters, { target: "openApi3" });
   return {
     name: tool.name,
     description: tool.description,
-    input_schema: jsonSchema,
+    input_schema: toolInputSchema(tool.parameters),
   };
 }
 
