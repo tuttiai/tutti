@@ -66,6 +66,10 @@ Each voice now exports a `*VoiceConfigSchema` from its index: `GitHubVoiceConfig
 
 No behaviour changes. No voice reads its schema yet, no constructor validates, and nothing is removed: the existing options interfaces are untouched and every voice accepts exactly what it accepted before.
 
+### Security
+
+**The RAG voice no longer ingests the process's own state.** `ingest_document` read any local path it was given, so an agent could ingest `/proc/self/environ`, which holds every credential the process started with. The text was then sent to the embeddings provider and returned by `search_knowledge`. The voice declares only `network`, so nothing in the permission model stopped it. `loadFromFile()` now refuses a path in `/proc`, `/sys` or `/dev`, and checks again after following symlinks, so a link into one is refused too. Every other readable file still ingests as before.
+
 ### Fixed
 
 **Tool schemas Anthropic accepts.** `z.number().positive()` was sent as draft-04's `{ minimum: 0, exclusiveMinimum: true }`, and Anthropic, which validates against JSON Schema draft 2020-12, refused every request from an agent holding such a tool: the `web` voice's `fetch_url` made every agent with that voice unusable. Exclusive bounds are now written as numbers (`{ exclusiveMinimum: 0 }`); the `openApi3` target the Gemini provider relies on stays. One converter, `src/tool-schema.ts`, serves the agent runner and the skills executor.

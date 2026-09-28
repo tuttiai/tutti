@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -164,6 +164,18 @@ describe("ingestDocument", () => {
       title: "Notes",
     });
     expect(chunks[1].chunk_index).toBe(1);
+  });
+
+  it("refuses the process's own environment", async () => {
+    await expect(ingestDocument({ source_id: "env", path: "/proc/self/environ" })).rejects.toThrow(
+      /Refusing to ingest \/proc\/self\/environ/,
+    );
+  });
+
+  it("refuses a symlink that leads into a system tree", async () => {
+    const link = join(workDir, "innocent.txt");
+    await symlink("/dev/null", link);
+    await expect(ingestDocument({ source_id: "link", path: link })).rejects.toThrow(/Refusing to ingest \/dev\/null/);
   });
 
   it("ingests a markdown file, stripping frontmatter and formatting", async () => {
