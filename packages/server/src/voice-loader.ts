@@ -42,15 +42,8 @@ export class VoiceConfigError extends Error {
   }
 }
 
-/**
- * Keep only the named tools of a voice.
- *
- * @param voice - The voice to narrow.
- * @param only - The tool names to keep. Every one must exist on the voice.
- * @returns A voice with the same lifecycle and fewer tools.
- * @throws {VoiceConfigError} When a name is not one of the voice's tools.
- */
-export function narrowVoice(voice: Voice, only: readonly string[]): Voice {
+/** The named tools of a voice, refusing any name it does not have. */
+function pickTools(voice: Voice, only: readonly string[]): Tool[] {
   const names = new Set(voice.tools.map((tool) => tool.name));
   const unknown = only.filter((name) => !names.has(name));
   if (unknown.length > 0) {
@@ -60,14 +53,37 @@ export function narrowVoice(voice: Voice, only: readonly string[]): Voice {
     );
   }
   const keep = new Set(only);
-  const tools: Tool[] = voice.tools.filter((tool) => keep.has(tool.name));
+  return voice.tools.filter((tool) => keep.has(tool.name));
+}
+
+/**
+ * Keep only the named tools of a voice.
+ *
+ * A voice that has no tools until `setup()` runs (`mcp` discovers its
+ * server's, `sandbox` builds its own per session) cannot be checked at
+ * construction, so its allowlist is applied after each `setup()` instead, and
+ * an unknown name there fails that run rather than the start.
+ *
+ * @param voice - The voice to narrow.
+ * @param only - The tool names to keep. Every one must exist on the voice.
+ * @returns A voice with the same lifecycle and fewer tools.
+ * @throws {VoiceConfigError} When a name is not one of the voice's tools.
+ */
+export function narrowVoice(voice: Voice, only: readonly string[]): Voice {
+  const setup = voice.setup?.bind(voice);
+  const late = setup !== undefined && voice.tools.length === 0;
   const narrowed: Voice = {
     name: voice.name,
-    tools,
+    tools: late ? [] : pickTools(voice, only),
     required_permissions: voice.required_permissions,
   };
   if (voice.description !== undefined) narrowed.description = voice.description;
-  if (voice.setup !== undefined) narrowed.setup = voice.setup.bind(voice);
+  if (setup !== undefined) {
+    narrowed.setup = async (context) => {
+      await setup(context);
+      if (late) narrowed.tools = pickTools(voice, only);
+    };
+  }
   if (voice.teardown !== undefined) narrowed.teardown = voice.teardown.bind(voice);
   return narrowed;
 }

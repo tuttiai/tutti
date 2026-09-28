@@ -20,6 +20,13 @@ export interface PlaywrightVoiceOptions {
   slowMo?: number;
   /** Default timeout in ms (default: 10000). */
   timeout?: number;
+  /**
+   * The Chromium binary to launch instead of Playwright's own download, which
+   * does not run on Alpine. Deliberately absent from
+   * `PlaywrightVoiceConfigSchema`: a stored document able to name the browser
+   * binary could name any binary, so only code constructing the voice sets it.
+   */
+  executablePath?: string;
 }
 
 export class PlaywrightVoice implements Voice {

@@ -128,11 +128,42 @@ The image runs one agent configured entirely by environment:
 | `TUTTI_MAX_COST_USD` | none | Hard cost ceiling per run |
 | `TUTTI_REQUIRE_APPROVAL` | `destructive` | Which tool calls wait for a person, below |
 
-The image carries four voices: `github`, `slack`, `email` and `web`. Each entry's `options` is
-validated by that voice's own `.strict()` config schema, credentials included, and `only` keeps
-just the named tools. Every voice needs the permissions it declares, so all four need
-`TUTTI_PERMISSIONS=network`. Any refusal (an unknown voice, an unknown option or tool, a missing
-permission) stops the process before it listens, and no refusal ever quotes an option's value.
+The image carries every voice the framework ships, and each entry's `options` is validated by
+that voice's own `.strict()` config schema, credentials included:
+
+| Voice | Needs | Credential in `options` |
+|---|---|---|
+| `github`, `slack`, `discord`, `telegram` | `network` | `token` |
+| `email` | `network` | `imap.password`, `smtp.password` |
+| `web` | `network` | none |
+| `whatsapp` | `network` | `accessToken`, beside `phoneNumberId` |
+| `twitter` | `network` | `bearer_token`, or the four OAuth 1.0a values to write |
+| `stripe` | `network` | `api_key` |
+| `postgres` | `network` | `connection_string` |
+| `rag` | `network` | `embeddings.api_key` |
+| `mcp` | `network` | none; `server` is a command the image runs |
+| `playwright` | `network`, `browser` | none |
+| `filesystem` | `filesystem` | none |
+| `sandbox` | `shell` | none |
+
+`only` keeps just the named tools. `sandbox` and `mcp` have no tools until a run's `setup()`
+builds them, so their `only` is checked then, and an unknown name fails that run rather than the
+start. Every voice needs the permissions it declares, and any other refusal (an unknown voice,
+an unknown option or tool, a missing permission) stops the process before it listens. No refusal
+ever quotes an option's value.
+
+Three things about the image matter to the heavier voices:
+
+- **`/app` is owned by root and read-only to the agent.** The server runs as `tutti`, and so does
+  anything `filesystem` writes or `sandbox` runs, so neither can rewrite the server. The working
+  directory is `/work`, which `tutti` owns, and relative paths land there.
+- **Playwright launches the image's Chromium**, `/usr/bin/chromium`, named by
+  `TUTTI_CHROMIUM_PATH`. The path is read from the image's environment and deliberately not from
+  `options`, because a document able to name the browser binary could name any binary.
+- **A shell reads the environment.** `sandbox` passes its whole environment to the code it runs,
+  and an `mcp` server or `sandbox` code can read its parent's, so an agent holding either can
+  read every credential in `TUTTI_VOICES` and the model key beside it. Give those voices to an
+  agent that holds no other credential.
 
 ```bash
 docker run -p 3847:3847 -e TUTTI_API_KEY=key -e ANTHROPIC_API_KEY=sk-... \

@@ -4,6 +4,8 @@ export interface BrowserOptions {
   headless?: boolean;
   slowMo?: number;
   timeout?: number;
+  /** The Chromium binary to launch. Playwright's own download when absent. */
+  executablePath?: string;
 }
 
 export class BrowserManager {
@@ -20,6 +22,7 @@ export class BrowserManager {
       this.browser = await chromium.launch({
         headless: this.options.headless ?? true,
         slowMo: this.options.slowMo,
+        ...(this.options.executablePath === undefined ? {} : { executablePath: this.options.executablePath }),
       });
       this.page = await this.browser.newPage();
       this.page.setDefaultTimeout(this.options.timeout ?? 10000);
