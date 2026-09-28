@@ -48,11 +48,11 @@ import type {
   ToolUseBlock,
 } from "@tuttiai/types";
 import type { Skill, SkillStore } from "@tuttiai/skills";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 import type { EventBus } from "../event-bus.js";
 import { PermissionError } from "../errors.js";
 import { logger } from "../logger.js";
+import { toolInputSchema } from "../tool-schema.js";
 
 /** Default inner-loop model — small, fast, cheap. Matches the proposer's default. */
 export const DEFAULT_SKILL_EXECUTOR_MODEL = "claude-haiku-4-5";
@@ -314,12 +314,10 @@ export class SkillExecutor {
 }
 
 function toolToDefinition(tool: Tool): ToolDefinition {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Zod generic variance; same exception as agent-runner.toolToDefinition.
-  const jsonSchema = zodToJsonSchema(tool.parameters, { target: "openApi3" });
   return {
     name: tool.name,
     description: tool.description,
-    input_schema: jsonSchema as Record<string, unknown>,
+    input_schema: toolInputSchema(tool.parameters),
   };
 }
 
