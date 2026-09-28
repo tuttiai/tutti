@@ -11,24 +11,18 @@
  * instead of failing the run. Pending approvals do not survive a restart.
  */
 
-import {
-  AnthropicProvider,
-  OpenAIProvider,
-  GeminiProvider,
-  PermissionGuard,
-  SecretsManager,
-  createLogger,
-} from "@tuttiai/core";
-import type { LLMProvider, ScoreConfig } from "@tuttiai/types";
+import { PermissionGuard, SecretsManager, createLogger } from "@tuttiai/core";
+import type { ScoreConfig } from "@tuttiai/types";
 
 import { createServer, DEFAULT_PORT } from "./index.js";
 import { readStartAgentEnv } from "./start-env.js";
+import { buildStartProvider } from "./start-provider.js";
 import { buildStartAgent, buildStartRuntime } from "./start-runtime.js";
 import { loadVoices } from "./voice-loader.js";
 
 const logger = createLogger("tutti-server");
 
-const PROVIDER = SecretsManager.optional("TUTTI_PROVIDER") ?? "anthropic";
+const PROVIDER = SecretsManager.optional("TUTTI_PROVIDER");
 const MODEL = SecretsManager.optional("TUTTI_MODEL") ?? "claude-sonnet-4-20250514";
 const SYSTEM_PROMPT =
   SecretsManager.optional("TUTTI_SYSTEM_PROMPT") ??
@@ -37,22 +31,6 @@ const AGENT_NAME = SecretsManager.optional("TUTTI_AGENT_NAME") ?? "assistant";
 const PORT_STR = SecretsManager.optional("TUTTI_PORT") ?? String(DEFAULT_PORT);
 const PORT = Number.parseInt(PORT_STR, 10);
 const HOST = SecretsManager.optional("TUTTI_HOST") ?? "0.0.0.0";
-
-function buildProvider(): LLMProvider {
-  switch (PROVIDER) {
-    case "anthropic":
-      return new AnthropicProvider();
-    case "openai":
-      return new OpenAIProvider();
-    case "gemini":
-      return new GeminiProvider();
-    default:
-      throw new Error(
-        `Unknown provider "${PROVIDER}".\n` +
-          "Set TUTTI_PROVIDER to one of: anthropic, openai, gemini",
-      );
-  }
-}
 
 // Malformed voice configuration stops the process before it listens, so a
 // deployment reports a failed start rather than an agent missing its tools.
@@ -67,7 +45,7 @@ const agent = buildStartAgent(
 );
 const score: ScoreConfig = {
   name: "tutti-server",
-  provider: buildProvider(),
+  provider: buildStartProvider(PROVIDER),
   default_model: MODEL,
   agents: { [AGENT_NAME]: agent },
 };
@@ -88,7 +66,7 @@ logger.info(
   {
     port: PORT,
     host: HOST,
-    provider: PROVIDER,
+    provider: PROVIDER ?? "anthropic",
     model: MODEL,
     agent: AGENT_NAME,
     // Names only: the options carry credentials.

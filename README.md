@@ -173,14 +173,16 @@ const router = new AgentRouter(score);
 const result = await router.run("Write and test a reverse function");
 ```
 
-### Three LLM Providers
+### LLM Providers
 
 ```ts
-import { AnthropicProvider, OpenAIProvider, GeminiProvider } from "@tuttiai/core";
+import { AnthropicProvider, OpenAIProvider, GeminiProvider, OpenRouterProvider, ClaudeCodeProvider } from "@tuttiai/core";
 
 new AnthropicProvider()          // ANTHROPIC_API_KEY
 new OpenAIProvider()             // OPENAI_API_KEY
 new GeminiProvider()             // GEMINI_API_KEY
+new OpenRouterProvider()         // OPENROUTER_API_KEY
+new ClaudeCodeProvider()         // the local `claude` CLI's own login, for your own agents
 ```
 
 ### Persistent Sessions (PostgreSQL)

@@ -109,13 +109,19 @@ docker run -p 3847:3847 -e TUTTI_API_KEY=key -e ANTHROPIC_API_KEY=sk-... tutti-s
 
 See the repo root `docker-compose.yml` for a full stack with Postgres and Redis.
 
+`TUTTI_PROVIDER=claude-code` answers through the Claude Code CLI and its own login instead of an
+API key. The stock image does not carry the CLI; build one that does with
+`--build-arg CLAUDE_CODE_VERSION=<exact version>`, and pass `CLAUDE_CODE_OAUTH_TOKEN` from
+`claude setup-token` rather than `ANTHROPIC_API_KEY`. It is for your own agents on your own
+machine; see the providers guide.
+
 The image runs one agent configured entirely by environment:
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `TUTTI_AGENT_NAME` | `assistant` | The agent's key |
 | `TUTTI_SYSTEM_PROMPT` | `You are a helpful assistant.` | Its system prompt |
-| `TUTTI_PROVIDER`, `TUTTI_MODEL` | `anthropic`, a Sonnet model | Provider and model |
+| `TUTTI_PROVIDER`, `TUTTI_MODEL` | `anthropic`, a Sonnet model | Provider (`anthropic`, `openai`, `gemini` or `claude-code`) and model |
 | `TUTTI_VOICES` | none | JSON array of `{ "voice", "options", "only"? }` |
 | `TUTTI_PERMISSIONS` | none | Comma-separated: `network`, `filesystem`, `shell`, `browser` |
 | `TUTTI_MAX_TURNS`, `TUTTI_MAX_TOOL_CALLS` | runtime defaults | Loop limits |

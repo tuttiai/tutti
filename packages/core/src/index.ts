@@ -312,6 +312,13 @@ export { GeminiProvider } from "./providers/gemini.js";
 export type { GeminiProviderOptions } from "./providers/gemini.js";
 export { OpenRouterProvider } from "./providers/openrouter.js";
 export type { OpenRouterProviderOptions } from "./providers/openrouter.js";
+export { ClaudeCodeProvider } from "./providers/claude-code.js";
+export type { ClaudeCodeProviderOptions } from "./providers/claude-code.js";
+export type {
+  ClaudeCodeRunner,
+  ClaudeCodeInvocation,
+  ClaudeCodeRunResult,
+} from "./providers/claude-code-process.js";
 
 // Re-export all types for convenience
 export type {

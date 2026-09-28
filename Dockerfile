@@ -143,6 +143,20 @@ COPY --from=builder --chown=tutti:tutti /app/voices/web/dist            voices/w
 
 ENV NODE_ENV=production
 
+# Opt-in: the Claude Code CLI, for TUTTI_PROVIDER=claude-code. Empty by
+# default, so the stock image carries nothing extra. Pin an exact version:
+#   docker build --build-arg CLAUDE_CODE_VERSION=2.1.284 -t tutti-server:claude-code .
+# The CLI signs in from CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`) at run
+# time; no credential is baked in. On Alpine it needs the system ripgrep and
+# the C++ runtime rather than its bundled glibc builds.
+ARG CLAUDE_CODE_VERSION=""
+RUN if [ -n "$CLAUDE_CODE_VERSION" ]; then \
+      apk add --no-cache libgcc libstdc++ ripgrep && \
+      npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" && \
+      npm cache clean --force; \
+    fi
+ENV USE_BUILTIN_RIPGREP=0
+
 USER tutti
 
 EXPOSE 3847

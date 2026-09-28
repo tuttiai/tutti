@@ -45,7 +45,8 @@ console.log(result.output);
 - **OpenAIProvider** — `openai`
 - **GeminiProvider** — `@google/generative-ai`
 - **OpenRouterProvider** — OpenAI-compatible aggregator for 300+ models across providers via one API key. See [openrouter.ai/models](https://openrouter.ai/models) for the live catalogue. Per-call USD cost is returned inline on `ChatResponse.usage.cost_usd` (via OpenRouter's `usage: { include: true }` extension).
-- All four support streaming, tool calling, and prompt caching where the underlying API supports it
+- **ClaudeCodeProvider** — runs the local Claude Code CLI (`claude -p`) with its own login, so your own agents can use your Claude subscription. Tools go through structured output; `stream()` yields the finished reply.
+- All five support tool calling; the four API providers also stream token by token, with prompt caching where the underlying API supports it
 
 ### Sessions & memory
 - **InMemorySessionStore**, **PostgresSessionStore** — session persistence
