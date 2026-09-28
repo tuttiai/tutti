@@ -121,4 +121,27 @@ describe("narrowVoice", () => {
     expect(narrowed.description).toBe("described");
     expect(narrowed.required_permissions).toEqual(["network"]);
   });
+
+  it("narrows a voice whose tools are built in setup once setup has run", async () => {
+    const late = fakeVoice("late", []);
+    late.setup = async function (this: Voice) {
+      this.tools = fakeVoice("late", ["run", "install"]).tools;
+    };
+
+    const narrowed = narrowVoice(late, ["run"]);
+    expect(narrowed.tools).toEqual([]);
+    await narrowed.setup?.({ session_id: "s", agent_name: "a" });
+
+    expect(narrowed.tools.map((tool) => tool.name)).toEqual(["run"]);
+  });
+
+  it("refuses an unknown name on a setup-built voice when setup runs", async () => {
+    const late = fakeVoice("late", []);
+    late.setup = async function (this: Voice) {
+      this.tools = fakeVoice("late", ["run"]).tools;
+    };
+
+    const narrowed = narrowVoice(late, ["rn"]);
+    await expect(narrowed.setup?.({ session_id: "s", agent_name: "a" })).rejects.toThrow(VoiceConfigError);
+  });
 });
