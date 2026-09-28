@@ -4,6 +4,15 @@
 
 ### Added
 
+**The stock server image carries every voice.** It could build four, `github`, `slack`, `email` and `web`, so a product configuring agents through `TUTTI_VOICES` could offer a quarter of what the framework ships. `src/voice-registry.ts` now holds all fifteen, and a test compares it with `voices/` so a new voice cannot be left out of the image by accident.
+
+- **`only` works on a voice that builds its tools in `setup()`.** `mcp` discovers its server's tools and `sandbox` builds its own per session, so both have none at construction, and `narrowVoice()` refused every name. The allowlist is now applied after each `setup()`, and an unknown name fails that run rather than the start, because nothing can be checked sooner.
+- **The image ships Chromium, bash and python3.** Playwright's own browser is built for glibc and does not start on Alpine, so the image installs Alpine's and names it in `TUTTI_CHROMIUM_PATH`. `PlaywrightVoice` takes an `executablePath` constructor option for it, kept out of `PlaywrightVoiceConfigSchema` on purpose: a stored document able to name the browser binary could name any binary. `sandbox` runs bash and Python, which Alpine did not have.
+- **`/app` is owned by root and the agent works in `/work`.** The server ran as `tutti` over files `tutti` owned, so a `filesystem` or `sandbox` tool could rewrite the server it runs in. Everything under `/app` is now read-only to that user, and the process starts in `/work`, which it owns, so a relative path lands there. `CMD` names the start script by absolute path.
+- **A voice that runs code can read the credentials beside it.** `sandbox` passes its environment to the code it runs, and an `mcp` server is a command the image executes, so either can read `TUTTI_VOICES` and the model key. The server README says so and says what to do about it: give those voices to an agent holding no other credential.
+
+The image grows from 402 MB to 1.21 GB, most of it Chromium and the libraries it pulls in, and every agent's container pays for it whether or not it holds `playwright`.
+
 **`ClaudeCodeProvider`: run your own agents on your Claude subscription.** Every provider billed per token through an API key, so trying agents out locally cost money on every turn even for someone already paying for Claude Pro or Max. The new provider answers through the locally installed Claude Code CLI, `claude -p`, using whatever login that CLI holds.
 
 - **Tutti never touches the credential.** The CLI signs itself in, interactively or from `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`). If `ANTHROPIC_API_KEY` is set, Claude Code bills the API instead, and the provider warns at construction.

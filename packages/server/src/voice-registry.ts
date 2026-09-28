@@ -7,7 +7,7 @@
  * rather than something.
  *
  * Each voice is imported lazily, so a library user of `@tuttiai/server` does
- * not install fifteen voices, and the image carries only the ones listed here.
+ * not install fifteen voices. The image carries every one of them.
  * Every entry validates with the voice's own `.strict()` config schema before
  * constructing, so an unknown option is refused rather than ignored.
  *
@@ -15,6 +15,7 @@
  * image refuses it at start with "not installed in this image".
  */
 
+import { SecretsManager } from "@tuttiai/core";
 import type { Voice } from "@tuttiai/types";
 
 /** One schema issue, stripped to where it is and what kind it is. Never the value. */
@@ -71,39 +72,87 @@ export function fromSchema<T>(schema: OptionSchema<T>, construct: (options: T) =
 export type VoiceLoader = () => Promise<VoiceBuilder>;
 
 /**
- * Every voice the stock image knows, by registry key.
+ * Where the image's Chromium lives, for the Playwright voice. Set by the
+ * `Dockerfile`, because Playwright's own download does not run on Alpine.
  *
- * Four to start, chosen because each is request and response rather than a
- * long-lived listener: `github`, `slack` and `email` carry a credential, and
- * `web` needs none.
+ * Read from the image's environment and never from a voice's options: a
+ * stored document that could name the browser binary could name any binary.
+ */
+function chromiumPath(): { executablePath?: string } {
+  const path = SecretsManager.optional("TUTTI_CHROMIUM_PATH");
+  return path === undefined || path === "" ? {} : { executablePath: path };
+}
+
+/**
+ * Every voice the stock image knows, by registry key: all fifteen the
+ * framework ships.
+ *
+ * The first four were chosen for answering a call and returning. The rest
+ * joined once each was checked to open nothing at construction: a client
+ * connects on its first tool call (Discord's gateway included), and a
+ * listener such as WhatsApp's webhook starts only when an inbox subscribes,
+ * which this image never does. `sandbox` and `mcp` build their tools in
+ * `setup()`, which `narrowVoice()` allows for.
  */
 export const VOICE_LOADERS: ReadonlyMap<string, VoiceLoader> = new Map<string, VoiceLoader>([
-  [
-    "github",
-    async () => {
-      const m = await import("@tuttiai/github");
-      return fromSchema(m.GitHubVoiceConfigSchema, (options) => new m.GitHubVoice(options));
-    },
-  ],
-  [
-    "slack",
-    async () => {
-      const m = await import("@tuttiai/slack");
-      return fromSchema(m.SlackVoiceConfigSchema, (options) => new m.SlackVoice(options));
-    },
-  ],
-  [
-    "email",
-    async () => {
-      const m = await import("@tuttiai/email");
-      return fromSchema(m.EmailVoiceConfigSchema, (options) => new m.EmailVoice(options));
-    },
-  ],
-  [
-    "web",
-    async () => {
-      const m = await import("@tuttiai/web");
-      return fromSchema(m.WebVoiceConfigSchema, (options) => new m.WebVoice(options));
-    },
-  ],
+  ["github", async () => {
+    const m = await import("@tuttiai/github");
+    return fromSchema(m.GitHubVoiceConfigSchema, (options) => new m.GitHubVoice(options));
+  }],
+  ["slack", async () => {
+    const m = await import("@tuttiai/slack");
+    return fromSchema(m.SlackVoiceConfigSchema, (options) => new m.SlackVoice(options));
+  }],
+  ["email", async () => {
+    const m = await import("@tuttiai/email");
+    return fromSchema(m.EmailVoiceConfigSchema, (options) => new m.EmailVoice(options));
+  }],
+  ["web", async () => {
+    const m = await import("@tuttiai/web");
+    return fromSchema(m.WebVoiceConfigSchema, (options) => new m.WebVoice(options));
+  }],
+  ["discord", async () => {
+    const m = await import("@tuttiai/discord");
+    return fromSchema(m.DiscordVoiceConfigSchema, (options) => new m.DiscordVoice(options));
+  }],
+  ["telegram", async () => {
+    const m = await import("@tuttiai/telegram");
+    return fromSchema(m.TelegramVoiceConfigSchema, (options) => new m.TelegramVoice(options));
+  }],
+  ["whatsapp", async () => {
+    const m = await import("@tuttiai/whatsapp");
+    return fromSchema(m.WhatsAppVoiceConfigSchema, (options) => new m.WhatsAppVoice(options));
+  }],
+  ["twitter", async () => {
+    const m = await import("@tuttiai/twitter");
+    return fromSchema(m.TwitterVoiceConfigSchema, (options) => new m.TwitterVoice(options));
+  }],
+  ["stripe", async () => {
+    const m = await import("@tuttiai/stripe");
+    return fromSchema(m.StripeVoiceConfigSchema, (options) => new m.StripeVoice(options));
+  }],
+  ["postgres", async () => {
+    const m = await import("@tuttiai/postgres");
+    return fromSchema(m.PostgresVoiceConfigSchema, (options) => new m.PostgresVoice(options));
+  }],
+  ["rag", async () => {
+    const m = await import("@tuttiai/rag");
+    return fromSchema(m.RagVoiceConfigSchema, (options) => m.RagVoice(options));
+  }],
+  ["filesystem", async () => {
+    const m = await import("@tuttiai/filesystem");
+    return fromSchema(m.FilesystemVoiceConfigSchema, () => new m.FilesystemVoice());
+  }],
+  ["playwright", async () => {
+    const m = await import("@tuttiai/playwright");
+    return fromSchema(m.PlaywrightVoiceConfigSchema, (options) => new m.PlaywrightVoice({ ...options, ...chromiumPath() }));
+  }],
+  ["sandbox", async () => {
+    const m = await import("@tuttiai/sandbox");
+    return fromSchema(m.SandboxVoiceConfigSchema, (options) => new m.SandboxVoice(options));
+  }],
+  ["mcp", async () => {
+    const m = await import("@tuttiai/mcp");
+    return fromSchema(m.McpVoiceConfigSchema, (options) => new m.McpVoice(options));
+  }],
 ]);

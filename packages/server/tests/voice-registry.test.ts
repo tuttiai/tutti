@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { readdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { PermissionGuard } from "@tuttiai/core";
 import type { Voice } from "@tuttiai/types";
 
@@ -12,9 +15,20 @@ import { VOICE_LOADERS } from "../src/voice-registry.js";
 
 const MAIL = { host: "mail.example.com", port: 993, user: "bot", password: "app-password" };
 
+const EVERY_VOICE = [
+  "github", "slack", "email", "web", "discord", "telegram", "whatsapp", "twitter",
+  "stripe", "postgres", "rag", "filesystem", "playwright", "sandbox", "mcp",
+];
+
 describe("VOICE_LOADERS", () => {
-  it("carries exactly the four voices the image ships", () => {
-    expect([...VOICE_LOADERS.keys()]).toEqual(["github", "slack", "email", "web"]);
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("carries every voice the framework ships", async () => {
+    expect([...VOICE_LOADERS.keys()]).toEqual(EVERY_VOICE);
+    const shipped = await readdir(fileURLToPath(new URL("../../../voices", import.meta.url)));
+    expect([...VOICE_LOADERS.keys()].sort()).toEqual(shipped.sort());
   });
 
   it("builds each voice from options its own schema accepts", async () => {
@@ -23,13 +37,52 @@ describe("VOICE_LOADERS", () => {
       { voice: "slack", options: { token: "xoxb-test" } },
       { voice: "email", options: { imap: MAIL, smtp: { ...MAIL, port: 465 }, from: "Bot <bot@example.com>" } },
       { voice: "web", options: { provider: "duckduckgo", cache: false } },
+      { voice: "discord", options: { token: "discord-test" } },
+      { voice: "telegram", options: { token: "1:telegram-test" } },
+      { voice: "whatsapp", options: { phoneNumberId: "100", accessToken: "wa-test" } },
+      { voice: "twitter", options: { bearer_token: "bearer-test" } },
+      { voice: "stripe", options: { api_key: "sk_test_x" } },
+      { voice: "postgres", options: { connection_string: "postgres://u:p@db.example.com:5432/app" } },
+      { voice: "rag", options: { collection: "docs", embeddings: { provider: "openai", api_key: "sk-test" }, storage: { provider: "memory" } } },
+      { voice: "filesystem", options: {} },
+      { voice: "playwright", options: { headless: true } },
+      { voice: "sandbox", options: { allowed_languages: ["python"] } },
+      { voice: "mcp", options: { server: "npx some-mcp-server" } },
     ]);
     const byName = new Map(voices.map((voice): [string, Voice] => [voice.name, voice]));
-    expect([...byName.keys()]).toEqual(["github", "slack", "email", "web"]);
     expect(byName.get("github")?.tools.map((tool) => tool.name)).toContain("create_pull_request");
     expect(byName.get("web")?.tools.map((tool) => tool.name)).toEqual(
       expect.arrayContaining(["web_search", "fetch_url"]),
     );
+    expect(byName.get("stripe")?.tools.find((tool) => tool.name === "create_refund")?.destructive).toBe(true);
+    // Both build their tools in setup(), which opens nothing until a run.
+    expect(byName.get("sandbox")?.tools).toEqual([]);
+    expect(byName.get("mcp-some-mcp-server")?.tools).toEqual([]);
+  });
+
+  it("narrows sandbox to the tools it builds in setup", async () => {
+    const [sandbox] = await loadVoices([{ voice: "sandbox", options: {}, only: ["execute_code"] }]);
+    try {
+      await sandbox?.setup?.({ session_id: "narrow-sandbox", agent_name: "coder" });
+      expect(sandbox?.tools.map((tool) => tool.name)).toEqual(["execute_code"]);
+    } finally {
+      await sandbox?.teardown?.();
+    }
+  });
+
+  it("refuses a stored option naming the browser binary", async () => {
+    await expect(
+      loadVoices([{ voice: "playwright", options: { executablePath: "/bin/sh" } }]),
+    ).rejects.toThrow(/Voice "playwright" refused its options: \(options\) \(unrecognized_keys\)/);
+  });
+
+  it("builds playwright whether or not the image names a browser", async () => {
+    vi.stubEnv("TUTTI_CHROMIUM_PATH", "/usr/bin/chromium");
+    const [named] = await loadVoices([{ voice: "playwright", options: {} }]);
+    vi.stubEnv("TUTTI_CHROMIUM_PATH", "");
+    const [unnamed] = await loadVoices([{ voice: "playwright", options: {} }]);
+    expect(named?.tools.map((tool) => tool.name)).toContain("navigate");
+    expect(unnamed?.tools.map((tool) => tool.name)).toContain("navigate");
   });
 
   it("refuses options the voice's schema does not know", async () => {
