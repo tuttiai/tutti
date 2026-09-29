@@ -29,10 +29,10 @@ const BUILTIN_VOICES: VoiceEntry[] = [
   {
     name: "github",
     package: "@tuttiai/github",
-    description: "Interact with GitHub repos, issues, PRs, and code search",
+    description: "Interact with GitHub repos, issues, PRs, branches, commits, and code search",
     tags: ["github", "git", "code", "issues", "pull-requests", "api"],
     official: true,
-    tools: 10,
+    tools: 13,
   },
   {
     name: "playwright",
@@ -81,7 +81,7 @@ async function fetchRegistry(): Promise<VoiceEntry[]> {
 }
 
 function toolCount(name: string): number {
-  const counts = new Map<string, number>([["filesystem", 7], ["github", 10], ["playwright", 12]]);
+  const counts = new Map<string, number>([["filesystem", 7], ["github", 13], ["playwright", 12]]);
   return counts.get(name) ?? 0;
 }
 

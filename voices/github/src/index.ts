@@ -6,6 +6,8 @@ import { createCreateIssueTool } from "./tools/create-issue.js";
 import { createCommentOnIssueTool } from "./tools/comment-on-issue.js";
 import { createListPullRequestsTool } from "./tools/list-pull-requests.js";
 import { createGetPullRequestTool } from "./tools/get-pull-request.js";
+import { createCreateBranchTool } from "./tools/create-branch.js";
+import { createCommitFilesTool } from "./tools/commit-files.js";
 import { createCreatePullRequestTool } from "./tools/create-pull-request.js";
 import { createGetFileContentsTool } from "./tools/get-file-contents.js";
 import { createSearchCodeTool } from "./tools/search-code.js";
@@ -19,7 +21,7 @@ export interface GitHubVoiceOptions {
 
 export class GitHubVoice implements Voice {
   name = "github";
-  description = "Interact with GitHub repositories, issues, and pull requests";
+  description = "Interact with GitHub repositories, issues, pull requests, branches, and commits";
   required_permissions: Permission[] = ["network"];
   tools: Tool[];
 
@@ -32,6 +34,8 @@ export class GitHubVoice implements Voice {
       createCommentOnIssueTool(octokit),
       createListPullRequestsTool(octokit),
       createGetPullRequestTool(octokit),
+      createCreateBranchTool(octokit),
+      createCommitFilesTool(octokit),
       createCreatePullRequestTool(octokit),
       createGetFileContentsTool(octokit),
       createSearchCodeTool(octokit),
