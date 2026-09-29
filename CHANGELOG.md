@@ -72,6 +72,8 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Fixed
 
+**`main` passes CI again.** The server test that builds every voice timed out on each run since the image started carrying all fifteen: importing them all takes under a second locally but just past vitest's 5 s default on a cold CI runner with coverage on. That one test now has a 30 s ceiling. It opens no connection, so the longer limit hides nothing that could reach the network.
+
 **Tool schemas Anthropic accepts.** `z.number().positive()` was sent as draft-04's `{ minimum: 0, exclusiveMinimum: true }`, and Anthropic, which validates against JSON Schema draft 2020-12, refused every request from an agent holding such a tool: the `web` voice's `fetch_url` made every agent with that voice unusable. Exclusive bounds are now written as numbers (`{ exclusiveMinimum: 0 }`); the `openApi3` target the Gemini provider relies on stays. One converter, `src/tool-schema.ts`, serves the agent runner and the skills executor.
 
 **An agent stopped at a limit gives its answer.** Reaching `max_tool_calls` or `max_turns` ended the run right after a tool call, so its output was empty however much it had done. The runner now makes one more call asking it to answer from what it has and to say what it could not check (`src/final-answer.ts`), counted in the run's usage. A run that answered within its limits is unchanged.

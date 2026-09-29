@@ -31,6 +31,9 @@ describe("VOICE_LOADERS", () => {
     expect([...VOICE_LOADERS.keys()].sort()).toEqual(shipped.sort());
   });
 
+  // The first import of all fifteen voice packages is the whole cost: under a second locally, but
+  // past vitest's 5 s default on a cold CI runner with coverage on. It opens no connection, so a
+  // longer ceiling hides no hang that could reach the network.
   it("builds each voice from options its own schema accepts", async () => {
     const voices = await loadVoices([
       { voice: "github", options: { token: "ghp_test" } },
@@ -58,7 +61,7 @@ describe("VOICE_LOADERS", () => {
     // Both build their tools in setup(), which opens nothing until a run.
     expect(byName.get("sandbox")?.tools).toEqual([]);
     expect(byName.get("mcp-some-mcp-server")?.tools).toEqual([]);
-  });
+  }, 30_000);
 
   it("narrows sandbox to the tools it builds in setup", async () => {
     const [sandbox] = await loadVoices([{ voice: "sandbox", options: {}, only: ["execute_code"] }]);
