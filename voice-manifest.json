@@ -172,6 +172,49 @@
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
     },
+    "knowledge": {
+      "package": "@tuttiai/knowledge",
+      "version": "0.1.0",
+      "description": "Tutti voice — search knowledge bases a knowledge service holds for the agent, read-only",
+      "required_permissions": [
+        "network"
+      ],
+      "lossy": false,
+      "unexpressed_rules": [],
+      "config": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The knowledge service's address for this agent. GET <url>/bases and POST <url>/search are called under it."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bearer token the service identifies this agent by. Never sent anywhere but url."
+          },
+          "default_top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "How many passages a search returns when the model does not say. Default 5."
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 60000,
+            "description": "How long one call to the service may take. Default 15000."
+          }
+        },
+        "required": [
+          "url",
+          "token"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
     "mcp": {
       "package": "@tuttiai/mcp",
       "version": "0.1.2",

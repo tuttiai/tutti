@@ -1,0 +1,56 @@
+---
+title: "Knowledge Voice"
+description: "@tuttiai/knowledge — read-only search over knowledge bases a service holds for the agent"
+sidebar:
+  order: 16
+---
+
+The Knowledge voice gives an agent search over knowledge bases that live somewhere else. A service
+ingests, stores and scopes them, and the agent can list and search only the bases it was given.
+Neither tool changes anything, so neither is destructive.
+
+Use [RAG](/voices/rag) when the agent should ingest documents into its own process instead.
+
+## Installation
+
+```bash
+npm install @tuttiai/knowledge
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Configuration
+
+```ts
+new KnowledgeVoice({
+  url: "https://kb.example.com/agents/support-lead", // the service's address for this agent
+  token: process.env.KNOWLEDGE_TOKEN!,              // bearer token identifying the agent
+  default_top_k: 5,                                  // optional, 1 to 20
+  timeout_ms: 15_000,                                // optional
+});
+```
+
+`url` is set by whoever deploys the agent and has no host policy, because no tool takes an address.
+Never derive it from agent or user input.
+
+## Tools
+
+| Tool | Description |
+|---|---|
+| `list_knowledge_bases` | The bases the agent may search, with what each holds |
+| `search_knowledge_bases` | Passages relevant to a query, each naming its base and source |
+
+## Service protocol
+
+```
+GET  <url>/bases   →  { bases: [{ handle, name, description, sources, chunks }] }
+POST <url>/search  ←  { query, top_k, bases? }
+                   →  { results: [{ base, source, title, text, score, location }], mode, searched }
+```
+
+Both calls carry `Authorization: Bearer <token>`. The service decides which bases the agent may
+read; one it withholds is absent from both answers.

@@ -17,7 +17,7 @@ const MAIL = { host: "mail.example.com", port: 993, user: "bot", password: "app-
 
 const EVERY_VOICE = [
   "github", "slack", "email", "web", "discord", "telegram", "whatsapp", "twitter",
-  "stripe", "postgres", "rag", "filesystem", "playwright", "sandbox", "mcp",
+  "stripe", "postgres", "rag", "filesystem", "playwright", "sandbox", "mcp", "knowledge",
 ];
 
 describe("VOICE_LOADERS", () => {
@@ -51,6 +51,7 @@ describe("VOICE_LOADERS", () => {
       { voice: "playwright", options: { headless: true } },
       { voice: "sandbox", options: { allowed_languages: ["python"] } },
       { voice: "mcp", options: { server: "npx some-mcp-server" } },
+      { voice: "knowledge", options: { url: "http://control-plane:4849/agent/v1/knowledge", token: "agent-test" } },
     ]);
     const byName = new Map(voices.map((voice): [string, Voice] => [voice.name, voice]));
     expect(byName.get("github")?.tools.map((tool) => tool.name)).toContain("create_pull_request");
