@@ -74,6 +74,7 @@ export default defineConfig({
             { label: "Web", slug: "voices/web" },
             { label: "Sandbox", slug: "voices/sandbox" },
             { label: "RAG", slug: "voices/rag" },
+            { label: "Knowledge", slug: "voices/knowledge" },
             { label: "Realtime", slug: "voices/realtime" },
             { label: "MCP bridge", slug: "voices/mcp" },
           ],

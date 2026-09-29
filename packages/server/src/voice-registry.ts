@@ -155,4 +155,8 @@ export const VOICE_LOADERS: ReadonlyMap<string, VoiceLoader> = new Map<string, V
     const m = await import("@tuttiai/mcp");
     return fromSchema(m.McpVoiceConfigSchema, (options) => new m.McpVoice(options));
   }],
+  ["knowledge", async () => {
+    const m = await import("@tuttiai/knowledge");
+    return fromSchema(m.KnowledgeVoiceConfigSchema, (options) => new m.KnowledgeVoice(options));
+  }],
 ]);

@@ -13,6 +13,13 @@
 
 Both are marked `destructive: true`, so they gate on human approval by default. The voice now exposes 13 tools, and the tool counts in the READMEs, the docs and `tutti-ai search`'s built-in list are corrected (they still said 10). No public-API change: `GitHubVoice` and its options are unchanged, and the tool factories are internal.
 
+**`@tuttiai/knowledge`: search knowledge bases a service holds for the agent.** `rag` ingests and stores inside the agent's own process, in memory unless it is handed a Postgres connection string, so documents a person manages elsewhere could not reach an agent without also handing it the whole store. The new voice holds nothing: a service ingests, stores and decides which bases the agent may read, and the agent lists and searches only those.
+
+- **Two read-only tools**, `list_knowledge_bases` and `search_knowledge_bases`, the second narrowable to some of the agent's bases. Neither is destructive.
+- **The protocol is two calls under a configured `url`**, `GET /bases` and `POST /search`, each with a bearer token, documented in the voice's README and exported as schemas.
+- **`url` has no host policy**, because the deployer sets it and no tool takes an address; the service usually sits on a private network a policy would refuse. The token never follows a redirect and is scrubbed from any refusal the service sends back.
+- **The stock image carries it** as a sixteenth voice, `knowledge`, taking `url` and `token` in its options.
+
 **The stock server image carries every voice.** It could build four, `github`, `slack`, `email` and `web`, so a product configuring agents through `TUTTI_VOICES` could offer a quarter of what the framework ships. `src/voice-registry.ts` now holds all fifteen, and a test compares it with `voices/` so a new voice cannot be left out of the image by accident.
 
 - **`only` works on a voice that builds its tools in `setup()`.** `mcp` discovers its server's tools and `sandbox` builds its own per session, so both have none at construction, and `narrowVoice()` refused every name. The allowlist is now applied after each `setup()`, and an unknown name fails that run rather than the start, because nothing can be checked sooner.
