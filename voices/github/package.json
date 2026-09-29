@@ -1,7 +1,7 @@
 {
   "name": "@tuttiai/github",
   "version": "0.2.0",
-  "description": "Tutti voice — interact with GitHub repositories, issues, and pull requests",
+  "description": "Tutti voice — interact with GitHub repositories, issues, pull requests, branches, and commits",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

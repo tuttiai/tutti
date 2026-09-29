@@ -1,8 +1,8 @@
 # @tuttiai/github
 
-GitHub voice for [Tutti](https://tutti-ai.com) — gives agents the ability to interact with GitHub repositories, issues, and pull requests.
+GitHub voice for [Tutti](https://tutti-ai.com) — gives agents the ability to interact with GitHub repositories, issues, pull requests, branches, and commits.
 
-`create_pull_request` is marked `destructive: true`, so HITL-enabled runtimes gate it behind human approval before a PR is opened. There is deliberately no tool that merges a pull request.
+An agent can take a change all the way to a pull request through the API alone, with no git binary or shell: `create_branch`, then `commit_files`, then `create_pull_request`. All three are marked `destructive: true`, so HITL-enabled runtimes gate each behind human approval. `commit_files` refuses to commit to the repository's default branch, so an agent's changes always arrive through a pull request, and there is deliberately no tool that merges one.
 
 ## Install
 
@@ -53,6 +53,8 @@ Without a token, tools still work for public repos but are limited to 60 request
 | `comment_on_issue` | Comment on an issue or PR |
 | `list_pull_requests` | List PRs with state filtering |
 | `get_pull_request` | Get full PR details with diff stats |
+| `create_branch` | Create a branch from the default branch or a named one. Destructive, gated behind HITL. |
+| `commit_files` | Commit full-content file writes and deletions onto a branch in one commit. Refuses the default branch; at most 100 entries, 1 MB per file. Destructive, gated behind HITL. |
 | `create_pull_request` | Open a PR from an existing branch. Destructive — gated behind HITL. Does not merge. |
 | `get_file_contents` | Read a file from a repo |
 | `search_code` | Search code across repos |

@@ -12,7 +12,7 @@ import { createGetFileContentsTool } from "../src/tools/get-file-contents.js";
 import { createSearchCodeTool } from "../src/tools/search-code.js";
 import { createListRepositoriesTool } from "../src/tools/list-repositories.js";
 import { createGetRepositoryTool } from "../src/tools/get-repository.js";
-import { ghErrorMessage, truncate, formatNumber } from "../src/utils/format.js";
+import { ghErrorMessage, httpStatus, truncate, formatNumber } from "../src/utils/format.js";
 
 const ctx: ToolContext = { session_id: "test", agent_name: "test" };
 
@@ -53,22 +53,35 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("GitHubVoice", () => {
-  it("implements Voice with 11 tools", () => {
+  it("implements Voice with 13 tools", () => {
     const voice = new GitHubVoice({ token: "fake" });
     expect(voice.name).toBe("github");
-    expect(voice.tools).toHaveLength(11);
-    const names = voice.tools.map((t) => t.name);
-    expect(names).toContain("list_issues");
-    expect(names).toContain("get_issue");
-    expect(names).toContain("create_issue");
-    expect(names).toContain("comment_on_issue");
-    expect(names).toContain("list_pull_requests");
-    expect(names).toContain("get_pull_request");
-    expect(names).toContain("create_pull_request");
-    expect(names).toContain("get_file_contents");
-    expect(names).toContain("search_code");
-    expect(names).toContain("list_repositories");
-    expect(names).toContain("get_repository");
+    expect(voice.tools).toHaveLength(13);
+  });
+
+  it("lists branch and commit tools between reading a PR and opening one", () => {
+    const voice = new GitHubVoice({ token: "fake" });
+    expect(voice.tools.map((t) => t.name)).toEqual([
+      "list_issues",
+      "get_issue",
+      "create_issue",
+      "comment_on_issue",
+      "list_pull_requests",
+      "get_pull_request",
+      "create_branch",
+      "commit_files",
+      "create_pull_request",
+      "get_file_contents",
+      "search_code",
+      "list_repositories",
+      "get_repository",
+    ]);
+  });
+
+  it("marks exactly the outward-facing writes that must not run unattended as destructive", () => {
+    const voice = new GitHubVoice({ token: "fake" });
+    const destructive = voice.tools.filter((t) => t.destructive === true).map((t) => t.name);
+    expect(destructive).toEqual(["create_branch", "commit_files", "create_pull_request"]);
   });
 });
 
@@ -729,5 +742,16 @@ describe("format utilities", () => {
 
   it("formatNumber adds commas", () => {
     expect(formatNumber(12345)).toBe("12,345");
+  });
+
+  it("httpStatus reads a numeric status", () => {
+    expect(httpStatus(Object.assign(new Error("x"), { status: 422 }))).toBe(422);
+  });
+
+  it("httpStatus ignores a missing or non-numeric status", () => {
+    expect(httpStatus(new Error("x"))).toBeUndefined();
+    expect(httpStatus({ status: "422" })).toBeUndefined();
+    expect(httpStatus(null)).toBeUndefined();
+    expect(httpStatus("boom")).toBeUndefined();
   });
 });

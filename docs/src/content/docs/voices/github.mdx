@@ -1,11 +1,13 @@
 ---
 title: "GitHub Voice"
-description: "@tuttiai/github — interact with GitHub repositories, issues, and PRs"
+description: "@tuttiai/github — interact with GitHub repositories, issues, PRs, branches, and commits"
 sidebar:
   order: 3
 ---
 
 The GitHub voice gives agents access to the GitHub API — issues, pull requests, repositories, and code search.
+
+It can also take a change all the way to a pull request with no git binary or shell: `create_branch`, then `commit_files`, then `create_pull_request`. All three are marked `destructive: true`, so they wait for human approval by default.
 
 ## Installation
 
@@ -50,7 +52,10 @@ new GitHubVoice({ token: "ghp_..." })
 | `create_issue` | Create a new issue | `owner`, `repo`, `title`, `body`, `labels` |
 | `comment_on_issue` | Add a comment | `owner`, `repo`, `issue_number`, `body` |
 | `list_pull_requests` | List PRs | `owner`, `repo`, `state`, `limit` |
-| `get_pull_request` | Get PR details | `owner`, `repo`, `pull_number` |
+| `get_pull_request` | Get PR details | `owner`, `repo`, `pr_number` |
+| `create_branch` | Create a branch (destructive) | `owner`, `repo`, `branch`, `from` |
+| `commit_files` | Commit files and deletions to a branch (destructive) | `owner`, `repo`, `branch`, `message`, `files`, `deletions` |
+| `create_pull_request` | Open a PR from an existing branch (destructive) | `owner`, `repo`, `title`, `head`, `base`, `body`, `draft` |
 | `get_file_contents` | Get a file from a repo | `owner`, `repo`, `path`, `ref` |
 | `search_code` | Search code across GitHub | `query`, `limit` |
 | `list_repositories` | List repos for a user/org | `owner`, `type`, `limit` |
@@ -75,6 +80,32 @@ new GitHubVoice({ token: "ghp_..." })
 | `title` | `string` | — | Issue title |
 | `body` | `string?` | — | Issue body (Markdown) |
 | `labels` | `string[]?` | — | Labels to apply |
+
+### create_branch
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `owner` | `string` | — | Repository owner |
+| `repo` | `string` | — | Repository name |
+| `branch` | `string` | — | Name of the new branch |
+| `from` | `string?` | default branch | Existing branch to start from |
+
+A branch that already exists comes back as an error pointing at `commit_files`.
+
+### commit_files
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `owner` | `string` | — | Repository owner |
+| `repo` | `string` | — | Repository name |
+| `branch` | `string` | — | Existing branch to commit onto |
+| `message` | `string` | — | Commit message |
+| `files` | `{ path, content }[]` | `[]` | Files to write, each with its full new UTF-8 content (1 MB max each) |
+| `deletions` | `string[]` | `[]` | Paths to delete |
+
+Writes one commit through the Git Data API and fast-forwards the branch; it never force-pushes, so a branch that moved in the meantime is reported and left alone. At least one entry and at most 100 across `files` and `deletions`. Every path is checked before any request: absolute paths, `..`, backslashes, empty segments, anything inside `.git`, and a path listed twice are all refused.
+
+**It refuses the repository's default branch.** Call `create_branch` first, commit onto that, then `create_pull_request`, so an agent's change always reaches the default branch through a reviewed pull request.
 
 ### search_code
 

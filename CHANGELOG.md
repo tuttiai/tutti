@@ -4,6 +4,15 @@
 
 ### Added
 
+**`create_branch` and `commit_files` on the GitHub voice.** `create_pull_request` needs a head branch that already exists and carries a commit, and nothing in the voice could make either, so a workflow ending in a pull request still had to shell out to `git` for everything before the last step. The two new tools close that gap through the GitHub API alone: `create_branch`, then `commit_files`, then `create_pull_request`.
+
+- **`create_branch`** creates a branch from the head of `from`, or of the repository's default branch when `from` is omitted. A branch that already exists comes back as an error pointing at `commit_files`.
+- **`commit_files`** writes one commit onto an existing branch: `files` carry each path's full new UTF-8 content and `deletions` name paths to remove. It builds a tree on the branch head, commits it and fast-forwards the branch with `force: false`, so a branch that moved in the meantime is reported with a hint to retry rather than overwritten.
+- **Every path is validated before any request.** Absolute paths, `..` and `.` segments, backslashes, empty segments, control characters, anything inside `.git`, and a path listed twice across `files` and `deletions` are all refused, as are an empty change set, more than 100 entries and content over 1 MB (GitHub's limit for inline tree content). This is a repository-relative check in the voice, not `PathSanitizer`, which resolves against the local filesystem.
+- **`commit_files` refuses the repository's default branch.** An agent's change always lands on a branch of its own and reaches the default branch only through a pull request a person can review. Together with there being no merge tool, the voice cannot change a default branch on its own.
+
+Both are marked `destructive: true`, so they gate on human approval by default. The voice now exposes 13 tools, and the tool counts in the READMEs, the docs and `tutti-ai search`'s built-in list are corrected (they still said 10). No public-API change: `GitHubVoice` and its options are unchanged, and the tool factories are internal.
+
 **The stock server image carries every voice.** It could build four, `github`, `slack`, `email` and `web`, so a product configuring agents through `TUTTI_VOICES` could offer a quarter of what the framework ships. `src/voice-registry.ts` now holds all fifteen, and a test compares it with `voices/` so a new voice cannot be left out of the image by accident.
 
 - **`only` works on a voice that builds its tools in `setup()`.** `mcp` discovers its server's tools and `sandbox` builds its own per session, so both have none at construction, and `narrowVoice()` refused every name. The allowlist is now applied after each `setup()`, and an unknown name fails that run rather than the start, because nothing can be checked sooner.

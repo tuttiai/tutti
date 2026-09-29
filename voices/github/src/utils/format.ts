@@ -29,3 +29,14 @@ export function ghErrorMessage(error: unknown, context?: string): string {
   }
   return String(error);
 }
+
+/**
+ * Read the HTTP status from an Octokit error without a type assertion.
+ *
+ * @param error - Anything caught from an Octokit call.
+ * @returns The numeric `status`, or `undefined` when there is none.
+ */
+export function httpStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null || !("status" in error)) return undefined;
+  return typeof error.status === "number" ? error.status : undefined;
+}
