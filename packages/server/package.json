@@ -40,6 +40,7 @@
     "@tuttiai/github": ">=0.2.0",
     "@tuttiai/knowledge": ">=0.1.0",
     "@tuttiai/mcp": ">=0.1.2",
+    "@tuttiai/notion": ">=0.1.0",
     "@tuttiai/playwright": ">=0.1.2",
     "@tuttiai/postgres": ">=0.1.1",
     "@tuttiai/rag": ">=0.1.1",
@@ -68,6 +69,9 @@
       "optional": true
     },
     "@tuttiai/mcp": {
+      "optional": true
+    },
+    "@tuttiai/notion": {
       "optional": true
     },
     "@tuttiai/playwright": {
@@ -110,6 +114,7 @@
     "@tuttiai/github": "0.2.0",
     "@tuttiai/knowledge": "0.1.0",
     "@tuttiai/mcp": "0.1.2",
+    "@tuttiai/notion": "0.1.0",
     "@tuttiai/playwright": "0.1.2",
     "@tuttiai/postgres": "0.1.1",
     "@tuttiai/rag": "0.1.1",

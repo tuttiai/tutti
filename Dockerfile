@@ -22,6 +22,7 @@ COPY voices/filesystem/package.json   voices/filesystem/
 COPY voices/github/package.json       voices/github/
 COPY voices/knowledge/package.json    voices/knowledge/
 COPY voices/mcp/package.json          voices/mcp/
+COPY voices/notion/package.json       voices/notion/
 COPY voices/playwright/package.json   voices/playwright/
 COPY voices/postgres/package.json     voices/postgres/
 COPY voices/rag/package.json          voices/rag/
@@ -90,6 +91,10 @@ COPY voices/mcp/src/                   voices/mcp/src/
 COPY voices/mcp/tsconfig.json          voices/mcp/
 COPY voices/mcp/tsup.config.ts         voices/mcp/
 
+COPY voices/notion/src/                voices/notion/src/
+COPY voices/notion/tsconfig.json       voices/notion/
+COPY voices/notion/tsup.config.ts      voices/notion/
+
 COPY voices/playwright/src/            voices/playwright/src/
 COPY voices/playwright/tsconfig.json   voices/playwright/
 COPY voices/playwright/tsup.config.ts  voices/playwright/
@@ -156,6 +161,7 @@ COPY voices/filesystem/package.json   voices/filesystem/
 COPY voices/github/package.json       voices/github/
 COPY voices/knowledge/package.json    voices/knowledge/
 COPY voices/mcp/package.json          voices/mcp/
+COPY voices/notion/package.json       voices/notion/
 COPY voices/playwright/package.json   voices/playwright/
 COPY voices/postgres/package.json     voices/postgres/
 COPY voices/rag/package.json          voices/rag/
@@ -219,6 +225,8 @@ COPY --from=deps    /app/voices/knowledge/package.json  voices/knowledge/
 COPY --from=builder /app/voices/knowledge/dist          voices/knowledge/dist
 COPY --from=deps    /app/voices/mcp/package.json        voices/mcp/
 COPY --from=builder /app/voices/mcp/dist                voices/mcp/dist
+COPY --from=deps    /app/voices/notion/package.json     voices/notion/
+COPY --from=builder /app/voices/notion/dist             voices/notion/dist
 COPY --from=deps    /app/voices/playwright/package.json voices/playwright/
 COPY --from=builder /app/voices/playwright/dist         voices/playwright/dist
 COPY --from=deps    /app/voices/postgres/package.json   voices/postgres/

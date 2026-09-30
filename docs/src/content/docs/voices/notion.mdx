@@ -1,0 +1,64 @@
+---
+title: "Notion Voice"
+description: "@tuttiai/notion: search, read and write the Notion pages and databases shared with an integration"
+sidebar:
+  order: 17
+---
+
+The Notion voice gives an agent the pages and databases a Notion internal integration has been
+given: search them, read a page's properties and body, query a database, and create, append to,
+update and archive pages. It calls Notion's REST API with `fetch`, pinned to
+`Notion-Version: 2022-06-28`.
+
+Notion shows an integration nothing until a person shares a page with it through the page's
+**Connections** menu, so what the agent can reach is decided in Notion, page by page.
+
+## Installation
+
+```bash
+npx tutti-ai add notion
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+| Var | Description |
+| --- | ----------- |
+| `NOTION_TOKEN` | Internal integration secret (`ntn_...` or `secret_...`), unless `token` is passed |
+
+```bash title=".env"
+NOTION_TOKEN=ntn_...
+```
+
+Create the integration at [notion.so/profile/integrations](https://www.notion.so/profile/integrations),
+enable the content capabilities the agent needs, then add it to each page or database through
+**•••** → **Connections**.
+
+## Configuration
+
+```ts
+new NotionVoice({
+  token: process.env.NOTION_TOKEN, // optional; falls back to NOTION_TOKEN
+});
+```
+
+## Tools
+
+| Tool | Destructive | Description |
+|---|---|---|
+| `search` | no | Pages and databases whose title matches a query |
+| `get_page` | no | A page's title, link and properties as text |
+| `get_page_body` | no | A page's body as markdown-like text |
+| `query_database` | no | A database's rows, with an optional filter and sorts |
+| `create_page` | yes | A new page under a page, or a row in a database, with optional body |
+| `append_to_page` | yes | Text added to the end of a page |
+| `update_page` | yes | New values for some of a page's properties |
+| `archive_page` | yes | The page and everything under it moved to Notion's Trash |
+
+Ids accept 32 hex characters with or without dashes, or a `notion.so` link ending in one. A 404
+from Notion comes back telling the agent the page must be shared with the integration.

@@ -142,6 +142,7 @@ for the latest published version.
 | [`@tuttiai/slack`](voices/slack) | 11 Slack tools (channels, threads, DMs, reactions) |
 | [`@tuttiai/postgres`](voices/postgres) | 8 Postgres tools (query/execute + schema introspection) |
 | [`@tuttiai/stripe`](voices/stripe) | 27 Stripe tools (customers, payments, subs, invoices, balance) |
+| [`@tuttiai/notion`](voices/notion) | 8 Notion tools (search, read pages and databases, create, append, update, archive) |
 | [`@tuttiai/twitter`](voices/twitter) | 9 Twitter / X tools (tweets, threads, mentions, timeline) |
 
 ## Features
