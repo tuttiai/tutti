@@ -142,6 +142,7 @@ that voice's own `.strict()` config schema, credentials included:
 | `postgres` | `network` | `connection_string` |
 | `rag` | `network` | `embeddings.api_key` |
 | `knowledge` | `network` | `token`, beside the service `url` |
+| `notion` | `network` | `token` |
 | `mcp` | `network` | none; `server` is a command the image runs |
 | `playwright` | `network`, `browser` | none |
 | `filesystem` | `filesystem` | none |

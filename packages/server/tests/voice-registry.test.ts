@@ -18,6 +18,7 @@ const MAIL = { host: "mail.example.com", port: 993, user: "bot", password: "app-
 const EVERY_VOICE = [
   "github", "slack", "email", "web", "discord", "telegram", "whatsapp", "twitter",
   "stripe", "postgres", "rag", "filesystem", "playwright", "sandbox", "mcp", "knowledge",
+  "notion",
 ];
 
 describe("VOICE_LOADERS", () => {
@@ -52,6 +53,7 @@ describe("VOICE_LOADERS", () => {
       { voice: "sandbox", options: { allowed_languages: ["python"] } },
       { voice: "mcp", options: { server: "npx some-mcp-server" } },
       { voice: "knowledge", options: { url: "http://control-plane:4849/agent/v1/knowledge", token: "agent-test" } },
+      { voice: "notion", options: { token: "ntn_test" } },
     ]);
     const byName = new Map(voices.map((voice): [string, Voice] => [voice.name, voice]));
     expect(byName.get("github")?.tools.map((tool) => tool.name)).toContain("create_pull_request");
@@ -59,6 +61,7 @@ describe("VOICE_LOADERS", () => {
       expect.arrayContaining(["web_search", "fetch_url"]),
     );
     expect(byName.get("stripe")?.tools.find((tool) => tool.name === "create_refund")?.destructive).toBe(true);
+    expect(byName.get("notion")?.tools.find((tool) => tool.name === "archive_page")?.destructive).toBe(true);
     // Both build their tools in setup(), which opens nothing until a run.
     expect(byName.get("sandbox")?.tools).toEqual([]);
     expect(byName.get("mcp-some-mcp-server")?.tools).toEqual([]);

@@ -259,6 +259,28 @@
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
     },
+    "notion": {
+      "package": "@tuttiai/notion",
+      "version": "0.1.0",
+      "description": "Tutti voice: search, read and write the Notion pages and databases shared with an integration",
+      "required_permissions": [
+        "network"
+      ],
+      "lossy": false,
+      "unexpressed_rules": [],
+      "config": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notion internal integration secret (ntn_... or secret_...). Falls back to the NOTION_TOKEN environment variable. The voice sees only the pages and databases shared with that integration."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
     "playwright": {
       "package": "@tuttiai/playwright",
       "version": "0.1.2",
