@@ -96,6 +96,14 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Fixed
 
+**The sandbox no longer hands an agent an empty directory on every reply.** Its working directory was `/tmp/tutti-sandbox/{session_id}/`, and a caller that gives each reply a session of its own, as a team's run does, started every reply in a new one. A coding agent's files from one reply sat beside the next reply's directory, intact and unreachable, and the agent reported its work as lost: one tutti-app container held 215 such directories, one per reply. A run can now name its conversation:
+
+- **`POST /run` and `POST /run/stream` take an optional `conversation_id`**, 1 to 128 characters of `A-Z a-z 0-9 _ -`, since a voice may build a path from it. Anything else is refused with `400`.
+- **It reaches every voice's `setup()`** as the new optional `VoiceContext.conversation_id`, through `AgentRunOptions.conversation_id`. The runtime treats it as opaque.
+- **The sandbox keys its directory by it**, and by `session_id` when it is absent, so every run of one conversation shares one directory and two conversations stay apart.
+
+A request without the field behaves exactly as before. An older server drops the field rather than refusing it, as Fastify strips properties a body schema does not list, so a caller can send it before every server is upgraded. The directory still lives in the container's `/tmp`, so a container that is replaced starts with none.
+
 **`main` passes CI again.** The server test that builds every voice timed out on each run since the image started carrying all fifteen: importing them all takes under a second locally but just past vitest's 5 s default on a cold CI runner with coverage on. That one test now has a 30 s ceiling. It opens no connection, so the longer limit hides nothing that could reach the network.
 
 **Tool schemas Anthropic accepts.** `z.number().positive()` was sent as draft-04's `{ minimum: 0, exclusiveMinimum: true }`, and Anthropic, which validates against JSON Schema draft 2020-12, refused every request from an agent holding such a tool: the `web` voice's `fetch_url` made every agent with that voice unusable. Exclusive bounds are now written as numbers (`{ exclusiveMinimum: 0 }`); the `openApi3` target the Gemini provider relies on stays. One converter, `src/tool-schema.ts`, serves the agent runner and the skills executor.

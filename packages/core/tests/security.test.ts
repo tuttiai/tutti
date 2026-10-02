@@ -17,7 +17,7 @@ import {
   toolUseResponse,
   simpleAgent,
 } from "./helpers/mock-provider.js";
-import type { TuttiEvent, Voice, Permission } from "@tuttiai/types";
+import type { TuttiEvent, Voice, VoiceContext, Permission } from "@tuttiai/types";
 
 // ─── 1. Secret Redaction ────────────────────────────────────────
 
@@ -297,6 +297,26 @@ describe("Voice lifecycle", () => {
 
     expect(setupOrder).toEqual(["setup-called", "execute-called"]);
     expect(result.output).toBe("done");
+  });
+
+  it("hands a voice's setup() the run's conversation, and leaves it out when the run names none", async () => {
+    const seen: VoiceContext[] = [];
+    const keeping: Voice = {
+      name: "keeping",
+      required_permissions: [],
+      tools: [],
+      setup: async (context) => {
+        seen.push(context);
+      },
+    };
+    const runner = new AgentRunner(createMockProvider([textResponse("one"), textResponse("two")]), new EventBus(), new InMemorySessionStore());
+
+    await runner.run({ ...simpleAgent, voices: [keeping] }, "first", undefined, { conversation_id: "conv-1" });
+    await runner.run({ ...simpleAgent, voices: [keeping] }, "second");
+
+    expect(seen.at(0)).toMatchObject({ agent_name: simpleAgent.name, conversation_id: "conv-1" });
+    expect(seen.at(1)).not.toHaveProperty("conversation_id");
+    expect(seen.at(0)?.session_id).not.toBe(seen.at(1)?.session_id);
   });
 });
 

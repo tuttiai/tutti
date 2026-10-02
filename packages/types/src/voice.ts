@@ -104,6 +104,14 @@ export interface Tool<T = unknown> {
 export interface VoiceContext {
   session_id: string;
   agent_name: string;
+  /**
+   * An id the caller gives that outlives one session: every run of one
+   * conversation carries the same one, while each may have a session of its
+   * own. A voice that keeps state across runs, such as the sandbox's working
+   * directory, keys it by this when it is present and by `session_id` when it
+   * is not. Opaque to the runtime.
+   */
+  conversation_id?: string;
 }
 
 export interface Voice {

@@ -22,6 +22,7 @@ import type {
   ToolUseBlock,
   TokenUsage,
   TuttiHooks,
+  VoiceContext,
 } from "@tuttiai/types";
 import type { Checkpoint, CheckpointStore } from "./checkpoint/index.js";
 import type { EventBus } from "./event-bus.js";
@@ -661,7 +662,11 @@ export class AgentRunner {
       });
 
       // Initialize voices that have setup hooks (e.g., MCP voice discovers tools)
-      const voiceCtx = { session_id: session.id, agent_name: agent.name };
+      const voiceCtx: VoiceContext = {
+        session_id: session.id,
+        agent_name: agent.name,
+        ...(options?.conversation_id !== undefined ? { conversation_id: options.conversation_id } : {}),
+      };
       for (const voice of agent.voices) {
         if (voice.setup) {
           await voice.setup(voiceCtx);

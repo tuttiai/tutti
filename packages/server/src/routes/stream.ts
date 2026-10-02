@@ -6,7 +6,7 @@ import type { TuttiEvent } from "@tuttiai/types";
 import { estimateCostUsd } from "../cost.js";
 import { scopeRunEvents } from "../run-scope.js";
 import type { RunBody } from "./schemas.js";
-import { runBodySchema } from "./schemas.js";
+import { conversationOf, runBodySchema } from "./schemas.js";
 
 /**
  * Write a single SSE frame.
@@ -140,7 +140,7 @@ export function registerStreamRoute(
 
     try {
       const result = await scope.run(() =>
-        runtime.run(options.agent_name, request.body.input, request.body.session_id),
+        runtime.run(options.agent_name, request.body.input, request.body.session_id, conversationOf(request.body)),
       );
 
       if (!clientClosed) {
