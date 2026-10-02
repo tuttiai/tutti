@@ -49,9 +49,16 @@ export interface SandboxConfig {
  * Sandbox voice — gives agents secure code execution with per-session
  * filesystem isolation.
  *
- * On {@link setup}, creates `/tmp/tutti-sandbox/{session_id}/`. All
- * tools are confined to this directory. On {@link teardown}, the
- * directory is deleted.
+ * On {@link setup}, creates `/tmp/tutti-sandbox/{conversation_id}/`
+ * when the run names its conversation, and `/tmp/tutti-sandbox/{session_id}/`
+ * when it does not. All tools are confined to this directory. On
+ * {@link teardown}, the directory is deleted.
+ *
+ * **The directory outlives a session when the run names its
+ * conversation.** A caller that gives each reply a session of its own,
+ * as a team's run does, would otherwise hand the agent an empty directory
+ * on every reply, and the files it wrote on the last one would sit
+ * unreachable beside it.
  *
  * Tools: `execute_code`, `read_file`, `write_file`, `install_package`.
  *
@@ -90,11 +97,12 @@ export class SandboxVoice implements Voice {
   }
 
   /**
-   * Called once per runtime — creates the per-session sandbox directory
-   * and builds the tool array.
+   * Called at the start of each run — creates the conversation's sandbox
+   * directory, or the session's when the run names no conversation, and
+   * builds the tool array.
    */
   async setup(context: VoiceContext): Promise<void> {
-    this.sandbox = new SessionSandbox(context.session_id);
+    this.sandbox = new SessionSandbox(context.conversation_id ?? context.session_id);
     await this.sandbox.init();
 
     this.tools = [

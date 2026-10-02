@@ -185,3 +185,51 @@ describe("execute_code tool", () => {
     ).toThrow();
   });
 });
+
+// ── One directory per conversation ───────────────────────────
+
+describe("SandboxVoice across the runs of one conversation", () => {
+  const voices: SandboxVoice[] = [];
+
+  afterEach(async () => {
+    for (const voice of voices.splice(0)) await voice.teardown();
+  });
+
+  /** Set a voice up for one run, keeping it for teardown. */
+  async function runOf(context: VoiceContext): Promise<SandboxVoice> {
+    const voice = new SandboxVoice();
+    voices.push(voice);
+    await voice.setup(context);
+    return voice;
+  }
+
+  /** Call one of a voice's tools by name. */
+  async function call(voice: SandboxVoice, name: string, input: Record<string, unknown>): Promise<string> {
+    const tool = voice.tools.find((t) => t.name === name);
+    if (tool === undefined) throw new Error(`no tool ${name}`);
+    return (await tool.execute(tool.parameters.parse(input), ctx)).content;
+  }
+
+  it("gives every run that names one conversation the same directory, whatever its session", async () => {
+    const conversation_id = "conv-" + Date.now();
+    const first = await runOf({ session_id: "s-first-" + Date.now(), agent_name: "developer", conversation_id });
+    await call(first, "write_file", { path: "pr1/index.ts", content: "export const one = 1;\n" });
+    const next = await runOf({ session_id: "s-next-" + Date.now(), agent_name: "developer", conversation_id });
+    expect(await call(next, "read_file", { path: "pr1/index.ts" })).toContain("export const one = 1;");
+  });
+
+  it("keeps two sessions apart when no conversation is named", async () => {
+    const first = await runOf({ session_id: "s-alone-a-" + Date.now(), agent_name: "developer" });
+    await call(first, "write_file", { path: "notes.txt", content: "first" });
+    const other = await runOf({ session_id: "s-alone-b-" + Date.now(), agent_name: "developer" });
+    expect(await call(other, "read_file", { path: "notes.txt" })).not.toContain("first");
+  });
+
+  it("keeps two conversations apart", async () => {
+    const stamp = String(Date.now());
+    const first = await runOf({ session_id: "s-c1-" + stamp, agent_name: "developer", conversation_id: "conv-a-" + stamp });
+    await call(first, "write_file", { path: "notes.txt", content: "conversation a" });
+    const other = await runOf({ session_id: "s-c2-" + stamp, agent_name: "developer", conversation_id: "conv-b-" + stamp });
+    expect(await call(other, "read_file", { path: "notes.txt" })).not.toContain("conversation a");
+  });
+});

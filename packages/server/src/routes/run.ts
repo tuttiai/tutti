@@ -7,7 +7,7 @@ import { estimateCostUsd } from "../cost.js";
 import { DEFAULT_TIMEOUT_MS } from "../config.js";
 import { scopeRunEvents } from "../run-scope.js";
 import type { RunBody } from "./schemas.js";
-import { runBodySchema } from "./schemas.js";
+import { conversationOf, runBodySchema } from "./schemas.js";
 
 /**
  * Register `POST /run` — execute the configured entrypoint to completion.
@@ -49,7 +49,7 @@ export function registerRunRoute(
     try {
       const result = await Promise.race([
         scope.run(() =>
-          runEntry(runtime, graph, agentName, request.body.input, request.body.session_id),
+          runEntry(runtime, graph, agentName, request.body),
         ),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs);
@@ -107,11 +107,11 @@ async function runEntry(
   runtime: TuttiRuntime,
   graph: TuttiGraph | undefined,
   agentName: string,
-  input: string,
-  sessionId: string | undefined,
+  body: RunBody,
 ): Promise<RunResult> {
+  const { input, session_id: sessionId } = body;
   if (!graph) {
-    const result = await runtime.run(agentName, input, sessionId);
+    const result = await runtime.run(agentName, input, sessionId, conversationOf(body));
     return {
       output: result.output,
       session_id: result.session_id,

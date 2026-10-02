@@ -197,6 +197,12 @@ export interface AgentRunOptions {
    * choose the namespace (email, internal id, anonymous cookie hash).
    */
   user_id?: string;
+  /**
+   * The conversation this run belongs to, handed to each voice's `setup()` as
+   * `VoiceContext.conversation_id`, so a voice can keep state across the
+   * conversation's runs. Opaque to the runtime.
+   */
+  conversation_id?: string;
 }
 
 // Re-export the agent-level config from @tuttiai/types so consumers
