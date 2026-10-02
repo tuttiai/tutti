@@ -92,6 +92,8 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Security
 
+**High npm advisories cleared again.** `npm audit --audit-level=high` had been red on `main` since 30 September, failing CI's `security` job on every push and pull request, after advisories landed against packages already pinned here. `fastify` goes from 5.8.5 to 5.12.5 in `@tuttiai/server` and `@tuttiai/whatsapp` (schema validation bypass, `X-Forwarded-*` spoofing, a not-found handler authentication bypass, among seven). `@tuttiai/email` moves `mailparser` from 3.9.23 to 3.9.28 and `nodemailer` from 10.0.1 to 10.0.10 (cross-tenant SMTP credential disclosure through a shared DNS cache, and several parser denial-of-service bugs). `@grpc/grpc-js`, `brace-expansion`, `fast-uri` and `ip-address` move within their existing ranges in the lockfile. Each pin is the oldest release that clears its advisories rather than the newest, so nothing published in the last few days comes in. Four moderate findings and one low remain: `vitest` and `turbo` need releases from this week or a major bump, and `esbuild` affects only the Windows dev server.
+
 **The RAG voice no longer ingests the process's own state.** `ingest_document` read any local path it was given, so an agent could ingest `/proc/self/environ`, which holds every credential the process started with. The text was then sent to the embeddings provider and returned by `search_knowledge`. The voice declares only `network`, so nothing in the permission model stopped it. `loadFromFile()` now refuses a path in `/proc`, `/sys` or `/dev`, and checks again after following symlinks, so a link into one is refused too. Every other readable file still ingests as before.
 
 ### Fixed
