@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 
+import { childEnv } from "./utils/child-env.js";
 import { stripAnsi, truncateOutput, redactPaths } from "./utils/sanitize.js";
 
 /**
@@ -43,7 +44,11 @@ export type Language = "typescript" | "python" | "bash";
 export interface ExecOptions {
   /** Wall-clock timeout in ms. Default: 30 000 (30 s). */
   timeout_ms?: number;
-  /** Extra environment variables merged with the child process env. */
+  /**
+   * Extra environment variables for the child process. It inherits only an
+   * allowlist of this process's variables (see `utils/child-env.ts`), so
+   * anything else a snippet needs must be passed here.
+   */
   env?: Record<string, string>;
   /** Working directory for the child process. */
   working_dir?: string;
@@ -122,7 +127,7 @@ export async function execute(
 
     const child = spawn(cmd, args, {
       cwd,
-      env: { ...process.env, ...options.env },
+      env: childEnv(options.env),
       stdio: ["ignore", "pipe", "pipe"],
       detached: false,
       timeout: 0, // we handle timeout ourselves
