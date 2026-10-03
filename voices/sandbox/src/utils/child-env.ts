@@ -6,8 +6,12 @@ import { SecretsManager } from "@tuttiai/core";
  * Enough to find binaries, write a cache under `HOME`, keep the locale and
  * reach the network through a proxy or a private CA. Everything else is left
  * behind because the agent's environment holds its credentials: the model
- * login, and every voice's token inside `TUTTI_VOICES`. A snippet that could
- * read those could print them into the conversation.
+ * login, and every voice's token inside `TUTTI_VOICES`. A snippet given those
+ * could print them into the conversation without meaning to.
+ *
+ * This is not isolation. The child runs as the server's own user, so code
+ * that sets out to can still read them from `/proc/1/environ`. Only a
+ * container that holds no credential is safe to give `shell`.
  *
  * `NODE_ENV` is left behind too. The server image sets it to `production`,
  * which makes `npm ci` skip devDependencies and so breaks every build and

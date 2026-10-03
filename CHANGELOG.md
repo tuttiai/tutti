@@ -96,6 +96,7 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 **`sandbox` no longer hands the agent's environment to the code it runs.** Every snippet and package install started with the whole of the server's `process.env`, which in the stock image holds the model credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and every voice's token inside `TUTTI_VOICES`. One `echo` was enough to print them into the conversation. A child process now inherits only an allowlist: `PATH`, `HOME`, user, shell, locale, `TZ`, `TMPDIR`, `TERM`, the proxy variables and the CA bundle variables. The voice's `env` option is unchanged and still wins over anything inherited.
 
+- **This is not isolation.** Sandboxed code runs as the same user as the server, so it can still read the server's credentials from `/proc/1/environ`. What changed is that a snippet no longer receives them unasked, and so cannot print them by accident. Give `shell` only to an agent whose container holds nothing worth taking; tutti-app's deploy check already refuses it beside a connection.
 - **Behaviour change.** A snippet that relied on reading some other variable from the agent's environment now has to be given it through the voice's `env` option.
 - **`NODE_ENV` is no longer inherited.** The server image sets it to `production`, so `npm ci` in the sandbox skipped devDependencies and no TypeScript project could be built or tested there.
 
