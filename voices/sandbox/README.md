@@ -62,7 +62,7 @@ new SandboxVoice(config?: SandboxConfig)
 | `allowed_packages` | `string[]` | all | Allowlist for `install_package` |
 | `timeout_ms` | `number` | `30000` | Default execution timeout |
 | `max_file_size_bytes` | `number` | `1048576` (1 MB) | Max file size for `write_file` |
-| `env` | `Record<string, string>` | — | Extra env vars for child processes |
+| `env` | `Record<string, string>` | — | Extra env vars for child processes. They inherit only `PATH`, `HOME`, user, shell, locale, `TZ`, `TMPDIR`, `TERM`, proxy and CA variables from the agent, so pass anything else here |
 | `install_timeout_ms` | `number` | `60000` | Timeout for package installs |
 
 ## Tools

@@ -180,9 +180,11 @@ FROM node:24-alpine AS runner
 
 # What the heavier voices run on. Chromium for playwright, because the browser
 # Playwright downloads is built for glibc and does not start on Alpine; bash
-# and python3 for sandbox, which runs code in either. Node, npm and npx for
-# sandbox's TypeScript and for mcp's servers come with the base image.
-RUN apk add --no-cache chromium ttf-freefont bash python3
+# and python3 for sandbox, which runs code in either. git for sandbox too, so
+# an agent can clone the repository it is changing and run its build and tests
+# rather than ship code nothing has executed. Node, npm and npx for sandbox's
+# TypeScript and for mcp's servers come with the base image.
+RUN apk add --no-cache chromium ttf-freefont bash python3 git
 
 RUN addgroup -g 1001 -S tutti && \
     adduser  -u 1001 -S tutti -G tutti

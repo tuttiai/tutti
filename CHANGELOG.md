@@ -4,6 +4,8 @@
 
 ### Added
 
+**`git` in the server image.** Together with `sandbox`, an agent can now clone the repository it is changing, install it and run its typecheck and tests, instead of reporting work as finished that nothing has executed. Before this the image had Node, npm, bash and python3 but no way to fetch a repository's source.
+
 **`create_branch` and `commit_files` on the GitHub voice.** `create_pull_request` needs a head branch that already exists and carries a commit, and nothing in the voice could make either, so a workflow ending in a pull request still had to shell out to `git` for everything before the last step. The two new tools close that gap through the GitHub API alone: `create_branch`, then `commit_files`, then `create_pull_request`.
 
 - **`create_branch`** creates a branch from the head of `from`, or of the repository's default branch when `from` is omitted. A branch that already exists comes back as an error pointing at `commit_files`.
@@ -91,6 +93,11 @@ Each voice now exports a `*VoiceConfigSchema` from its index: `GitHubVoiceConfig
 No behaviour changes. No voice reads its schema yet, no constructor validates, and nothing is removed: the existing options interfaces are untouched and every voice accepts exactly what it accepted before.
 
 ### Security
+
+**`sandbox` no longer hands the agent's environment to the code it runs.** Every snippet and package install started with the whole of the server's `process.env`, which in the stock image holds the model credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and every voice's token inside `TUTTI_VOICES`. One `echo` was enough to print them into the conversation. A child process now inherits only an allowlist: `PATH`, `HOME`, user, shell, locale, `TZ`, `TMPDIR`, `TERM`, the proxy variables and the CA bundle variables. The voice's `env` option is unchanged and still wins over anything inherited.
+
+- **Behaviour change.** A snippet that relied on reading some other variable from the agent's environment now has to be given it through the voice's `env` option.
+- **`NODE_ENV` is no longer inherited.** The server image sets it to `production`, so `npm ci` in the sandbox skipped devDependencies and no TypeScript project could be built or tested there.
 
 **High npm advisories cleared again.** `npm audit --audit-level=high` had been red on `main` since 30 September, failing CI's `security` job on every push and pull request, after advisories landed against packages already pinned here. `fastify` goes from 5.8.5 to 5.12.5 in `@tuttiai/server` and `@tuttiai/whatsapp` (schema validation bypass, `X-Forwarded-*` spoofing, a not-found handler authentication bypass, among seven). `@tuttiai/email` moves `mailparser` from 3.9.23 to 3.9.28 and `nodemailer` from 10.0.1 to 10.0.10 (cross-tenant SMTP credential disclosure through a shared DNS cache, and several parser denial-of-service bugs). `@grpc/grpc-js`, `brace-expansion`, `fast-uri` and `ip-address` move within their existing ranges in the lockfile. Each pin is the oldest release that clears its advisories rather than the newest, so nothing published in the last few days comes in. Four moderate findings and one low remain: `vitest` and `turbo` need releases from this week or a major bump, and `esbuild` affects only the Windows dev server.
 
