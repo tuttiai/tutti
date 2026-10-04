@@ -37,3 +37,53 @@ describe("runClaudeCode", () => {
     expect(result.spawn_error?.code).toBe("ENOENT");
   });
 });
+
+describe("runClaudeCode with a signal", () => {
+  it("kills the process when the signal aborts", async () => {
+    const controller = new AbortController();
+    const pending = runClaudeCode({
+      command: process.execPath,
+      args: ["-e", "setInterval(()=>{},1000)"],
+      stdin: "",
+      timeout_ms: 5_000,
+      cwd: process.cwd(),
+      signal: controller.signal,
+    });
+    controller.abort();
+
+    const result = await pending;
+    expect(result).toMatchObject({ aborted: true, timed_out: false, exit_code: null });
+  });
+
+  it("never starts the process when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    // A missing binary would report ENOENT had anything been spawned.
+    const result = await runClaudeCode({
+      command: "definitely-not-a-claude-binary",
+      args: [],
+      stdin: "",
+      timeout_ms: 5_000,
+      cwd: process.cwd(),
+      signal: controller.signal,
+    });
+
+    expect(result.aborted).toBe(true);
+    expect(result.spawn_error).toBeUndefined();
+  });
+
+  it("leaves aborted unset on a run that finished normally", async () => {
+    const result = await runClaudeCode({
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('ok')"],
+      stdin: "",
+      timeout_ms: 5_000,
+      cwd: process.cwd(),
+      signal: new AbortController().signal,
+    });
+
+    expect(result).toMatchObject({ exit_code: 0, stdout: "ok" });
+    expect(result.aborted).toBeUndefined();
+  });
+});

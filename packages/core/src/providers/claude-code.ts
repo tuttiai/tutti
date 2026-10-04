@@ -2,7 +2,7 @@ import { tmpdir } from "node:os";
 
 import type { ChatRequest, ChatResponse, LLMProvider, StreamChunk } from "@tuttiai/types";
 
-import { AuthenticationError, ProviderError, RateLimitError } from "../errors.js";
+import { AuthenticationError, ProviderError, RateLimitError, RunAbortedError } from "../errors.js";
 import { logger } from "../logger.js";
 import { SecretsManager } from "../secrets.js";
 import { runClaudeCode } from "./claude-code-process.js";
@@ -87,6 +87,7 @@ export class ClaudeCodeProvider implements LLMProvider {
    * @throws {ProviderError} When no model is set, the CLI is missing or fails, or the reply is malformed.
    * @throws {AuthenticationError} When the CLI is not signed in.
    * @throws {RateLimitError} When the account's usage limit is reached.
+   * @throws {RunAbortedError} When `request.signal` aborts; the process is killed.
    */
   async chat(request: ChatRequest): Promise<ChatResponse> {
     if (!request.model) {
@@ -102,6 +103,7 @@ export class ClaudeCodeProvider implements LLMProvider {
       stdin: buildPrompt(request),
       timeout_ms: this.timeoutMs,
       cwd: this.cwd,
+      ...(request.signal !== undefined && { signal: request.signal }),
     });
     return toResponse(parseResult(run, this.command), request);
   }
@@ -147,6 +149,7 @@ function parseResult(run: ClaudeCodeRunResult, command: string): ClaudeCodeResul
       : run.spawn_error.message;
     throw new ProviderError(`Could not start Claude Code: ${hint}`, { provider: PROVIDER });
   }
+  if (run.aborted === true) throw new RunAbortedError("the Claude Code process was stopped by the run's signal"); // not retried: not a ProviderError
   if (run.timed_out) {
     throw new ProviderError("Claude Code did not answer in time. Raise timeout_ms, or check the CLI runs.", { provider: PROVIDER });
   }

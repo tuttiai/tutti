@@ -114,7 +114,7 @@ export class OpenAIProvider implements LLMProvider {
         max_tokens: request.max_tokens,
         temperature: request.temperature,
         stop: request.stop_sequences,
-      });
+      }, requestOptions(request));
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "openai" }, "Provider request failed");
@@ -224,7 +224,7 @@ export class OpenAIProvider implements LLMProvider {
         stop: request.stop_sequences,
         stream: true,
         stream_options: { include_usage: true },
-      });
+      }, requestOptions(request));
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "openai" }, "Provider stream failed");
@@ -282,4 +282,9 @@ export class OpenAIProvider implements LLMProvider {
       }
     }
   }
+}
+
+/** The SDK's per-request options: the run's signal, so an abort cancels the HTTP call. */
+function requestOptions(request: ChatRequest): { signal: AbortSignal } | undefined {
+  return request.signal ? { signal: request.signal } : undefined;
 }
