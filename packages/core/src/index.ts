@@ -16,6 +16,7 @@ export {
   PathTraversalError,
   UrlValidationError,
   InterruptDeniedError,
+  RunAbortedError,
 } from "./errors.js";
 
 // Hooks

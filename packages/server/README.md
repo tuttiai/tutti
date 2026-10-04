@@ -90,6 +90,11 @@ a chunk. So `/run/stream` writes an SSE comment, `: heartbeat`, every `stream_he
 long as the stream is open. SSE clients discard comments; a hand-written parser should skip any
 line starting with `:`.
 
+Closing the connection cancels the run. It makes no further model call and runs no further tool,
+and a pending approval is resolved as denied with the reason `run aborted`. `POST /run` does the
+same when its client disconnects or when it answers `504`. To pick a run back up later, start a
+new one on the same `session_id`.
+
 ## Middleware
 
 Registered in order: request ID → CORS → rate limit → bearer auth → global error handler → routes.

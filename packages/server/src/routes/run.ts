@@ -20,6 +20,10 @@ import { conversationOf, runBodySchema } from "./schemas.js";
  * (`output`, `session_id`, `duration_ms`) so existing API consumers
  * don't need to change when a graph is added.
  *
+ * In agent mode the run is aborted when the request times out or the client
+ * disconnects first, so it makes no further model or tool call for a caller
+ * that has stopped waiting. A graph run is not cancellable and carries on.
+ *
  * @param app       - Fastify instance.
  * @param runtime   - Pre-built Tutti runtime.
  * @param agentName - Agent key in the score (used only when `graph` is unset).
@@ -45,11 +49,16 @@ export function registerRunRoute(
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const start = Date.now();
+    const controller = new AbortController();
+    // `close` also fires after a reply is sent; only an unfinished one means the client left.
+    reply.raw.on("close", () => {
+      if (!reply.raw.writableFinished) controller.abort("client disconnected");
+    });
 
     try {
       const result = await Promise.race([
         scope.run(() =>
-          runEntry(runtime, graph, agentName, request.body),
+          runEntry(runtime, graph, agentName, { body: request.body, signal: controller.signal }),
         ),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs);
@@ -75,12 +84,19 @@ export function registerRunRoute(
       // here rather than letting the global error handler map it.
       const isTimeout = err instanceof Error && err.message === "TIMEOUT";
       if (isTimeout) {
+        controller.abort("timed out");
         return reply.code(504).send({
           error: "timeout",
           message: `Agent did not complete within ${timeoutMs}ms`,
           partial_output: partialOutput || undefined,
           duration_ms: Date.now() - start,
         });
+      }
+
+      // The client left and the run stopped for it. Nobody reads this reply,
+      // and the global handler would log the abort as a server error.
+      if (controller.signal.aborted) {
+        return reply.code(499).send({ error: "client_closed", duration_ms: Date.now() - start });
       }
 
       // Everything else (TuttiError subclasses, provider failures, etc.)
@@ -101,17 +117,18 @@ interface RunResult {
 /**
  * Dispatch the request to the graph runner or the agent runner. Both
  * paths converge on the same {@link RunResult} shape so the route can
- * reply with one body schema.
+ * reply with one body schema. `signal` reaches only the agent runner.
  */
 async function runEntry(
   runtime: TuttiRuntime,
   graph: TuttiGraph | undefined,
   agentName: string,
-  body: RunBody,
+  call: { body: RunBody; signal: AbortSignal },
 ): Promise<RunResult> {
+  const { body, signal } = call;
   const { input, session_id: sessionId } = body;
   if (!graph) {
-    const result = await runtime.run(agentName, input, sessionId, conversationOf(body));
+    const result = await runtime.run(agentName, input, sessionId, { ...conversationOf(body), signal });
     return {
       output: result.output,
       session_id: result.session_id,

@@ -10,6 +10,8 @@ export interface ClaudeCodeRunResult {
   spawn_error?: NodeJS.ErrnoException;
   /** True when the run was killed for exceeding its timeout. */
   timed_out: boolean;
+  /** True when the invocation's signal stopped the run, or aborted before it started. */
+  aborted?: boolean;
 }
 
 /** One invocation of the Claude Code CLI. */
@@ -20,6 +22,8 @@ export interface ClaudeCodeInvocation {
   stdin: string;
   timeout_ms: number;
   cwd: string;
+  /** Kills the process when aborted. One already aborted means it is never started. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -34,12 +38,19 @@ export type ClaudeCodeRunner = (
  * prompt on stdin and collects both streams. The prompt goes on stdin rather
  * than argv because a conversation can outgrow the per-argument limit.
  *
- * @param invocation - Command, arguments, stdin and limits for the run.
+ * An aborted `signal` kills the process, so a run whose caller has gone away
+ * stops spending the account's usage on a reply nobody will read.
+ *
+ * @param invocation - Command, arguments, stdin, limits and signal for the run.
  * @returns The exit code and captured output. Never rejects.
  */
 export function runClaudeCode(
   invocation: ClaudeCodeInvocation,
 ): Promise<ClaudeCodeRunResult> {
+  const { signal } = invocation;
+  if (signal?.aborted) {
+    return Promise.resolve({ exit_code: null, stdout: "", stderr: "", timed_out: false, aborted: true });
+  }
   return new Promise((resolve) => {
     const child = spawn(invocation.command, invocation.args, {
       cwd: invocation.cwd,
@@ -49,13 +60,20 @@ export function runClaudeCode(
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     let timed_out = false;
+    let aborted = false;
     const timer = setTimeout(() => {
       timed_out = true;
       child.kill("SIGKILL");
     }, invocation.timeout_ms);
+    const onAbort = (): void => {
+      aborted = true;
+      child.kill("SIGKILL");
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     const finish = (extra: Partial<ClaudeCodeRunResult>): void => {
       clearTimeout(timer);
-      resolve({ exit_code: null, stdout: text(out), stderr: text(err), timed_out, ...extra });
+      signal?.removeEventListener("abort", onAbort);
+      resolve({ exit_code: null, stdout: text(out), stderr: text(err), timed_out, ...(aborted && { aborted }), ...extra });
     };
     child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
     child.stderr.on("data", (chunk: Buffer) => err.push(chunk));

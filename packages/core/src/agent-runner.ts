@@ -28,6 +28,7 @@ import type { Checkpoint, CheckpointStore } from "./checkpoint/index.js";
 import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
 import { askForFinalAnswer, stoppedMidWork } from "./final-answer.js";
+import { abortable, abortError, raceAbort, throwIfAborted, withSignal } from "./run-abort.js";
 import { toolInputSchema } from "./tool-schema.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
@@ -72,6 +73,7 @@ import {
   ToolTimeoutError,
   ProviderError,
   RateLimitError,
+  RunAbortedError,
   StructuredOutputError,
   type BudgetScope,
 } from "./errors.js";
@@ -193,11 +195,14 @@ function checkCostBudgetBreach(
   return null;
 }
 
-async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await fn();
     } catch (err) {
+      // A provider cancelled by the run's signal fails like any other call.
+      // Retrying it would only start another call nobody is waiting for.
+      if (signal?.aborted) throw abortError(signal);
       if (attempt >= MAX_PROVIDER_RETRIES || !(err instanceof ProviderError)) {
         throw err;
       }
@@ -462,10 +467,10 @@ export class AgentRunner {
    * is almost certainly a misconfiguration.
    */
   private async awaitApproval(
-    session_id: string,
-    tool_name: string,
-    tool_args: unknown,
+    call: { session_id: string; tool_name: string; tool_args: unknown },
+    signal?: AbortSignal,
   ): Promise<InterruptRequest> {
+    const { session_id, tool_name, tool_args } = call;
     if (!this.interruptStore) {
       throw new Error(
         `Tool "${tool_name}" matches requireApproval but no InterruptStore is configured.\n` +
@@ -479,7 +484,7 @@ export class AgentRunner {
       tool_args,
     });
 
-    return new Promise<InterruptRequest>((resolve, reject) => {
+    const approval = new Promise<InterruptRequest>((resolve, reject) => {
       // Register the resolver BEFORE emitting so a synchronous handler
       // that calls resolveInterrupt() immediately still finds a waiter.
       this.pendingInterrupts.set(request.interrupt_id, { resolve, reject });
@@ -497,6 +502,25 @@ export class AgentRunner {
         "Tool call paused for human approval",
       );
     });
+    if (!signal) return approval;
+    return raceAbort(approval, signal, () => this.withdrawInterrupt(request.interrupt_id));
+  }
+
+  /**
+   * Retire an approval whose run was aborted while it waited. The waiter is
+   * dropped first, so the denial written to the store reaches no run, and a
+   * reviewer is not left a request that nothing would act on.
+   */
+  private withdrawInterrupt(interrupt_id: string): void {
+    this.pendingInterrupts.delete(interrupt_id);
+    void this.resolveInterrupt(interrupt_id, "denied", { denial_reason: "run aborted" }).catch(
+      (err: unknown) => {
+        logger.warn(
+          { interrupt_id, error: err instanceof Error ? err.message : String(err) },
+          "Could not mark an abandoned interrupt as denied",
+        );
+      },
+    );
   }
 
   /**
@@ -626,6 +650,7 @@ export class AgentRunner {
     // options bag (new). Positional wins on conflict for back-compat.
     const resolvedSessionId = session_id ?? options?.session_id;
     const userId = options?.user_id;
+    const signal = options?.signal;
 
     // Resolve or create session
     const session = resolvedSessionId
@@ -923,6 +948,8 @@ export class AgentRunner {
       try {
       // Agentic loop
       while (turns < maxTurns) {
+        // Before each turn: a caller that gave up gets no further model call.
+        throwIfAborted(signal);
         turns++;
 
         // Pre-call hard enforcement on cost budgets. Catches "previous
@@ -1021,11 +1048,12 @@ export class AgentRunner {
         const response = await Tracing.llmCall(
           agent.model ?? "unknown",
           async () => {
-            const r = await withRetry(() =>
+            const call = withSignal(request, signal);
+            const r = await abortable(signal, () => withRetry(() =>
               agent.streaming
-                ? this.streamToResponse(routerScope, request, session.id)
-                : this.callProviderChat(routerScope, request, budget),
-            );
+                ? this.streamToResponse(routerScope, call, session.id)
+                : this.callProviderChat(routerScope, call, budget),
+            signal));
             // For `model: 'auto'`, mirror the SmartProvider's chosen
             // model onto the still-open span and recompute cost at the
             // resolved tier's rate. Without this, the span carries
@@ -1255,6 +1283,7 @@ export class AgentRunner {
               agent.cache,
               agent.requireApproval,
               auditSink,
+              signal,
             ),
           ),
         );
@@ -1311,6 +1340,9 @@ export class AgentRunner {
       }
 
       } catch (err) {
+        if (err instanceof RunAbortedError) {
+          logger.info({ agent: agent.name, session: session.id, turn: turns }, "Agent run aborted by its caller");
+        }
         if (durableEnabled) {
           logger.error(
             {
@@ -1337,12 +1369,12 @@ export class AgentRunner {
       if (output.trim() === "" && stoppedMidWork(messages)) {
         logger.warn({ agent: agent.name, session: session.id, turns }, "Run reached its limit before answering; asking for a final answer");
         askForFinalAnswer(messages);
-        const finalRequest: ChatRequest = { model: agent.model, system: baseSystemPrompt, messages, tools: toolDefs.length > 0 ? toolDefs : undefined };
-        const finalResponse = await withRetry(() =>
+        const finalRequest = withSignal({ model: agent.model, system: baseSystemPrompt, messages, tools: toolDefs.length > 0 ? toolDefs : undefined }, signal);
+        const finalResponse = await abortable(signal, () => withRetry(() =>
           agent.streaming
             ? this.streamToResponse(routerScope, finalRequest, session.id)
             : this.callProviderChat(routerScope, finalRequest, budget),
-        );
+        signal));
         totalUsage.input_tokens += finalResponse.usage.input_tokens;
         totalUsage.output_tokens += finalResponse.usage.output_tokens;
         messages.push({ role: "assistant", content: finalResponse.content });
@@ -1378,17 +1410,17 @@ export class AgentRunner {
 
             turns++;
 
-            const retryRequest: ChatRequest = {
+            const retryRequest = withSignal({
               model: agent.model,
               system: baseSystemPrompt,
               messages,
-            };
+            }, signal);
 
-            const retryResponse = await withRetry(() =>
+            const retryResponse = await abortable(signal, () => withRetry(() =>
               agent.streaming
                 ? this.streamToResponse(routerScope, retryRequest, session.id)
                 : this.callProviderChat(routerScope, retryRequest, budget),
-            );
+            signal));
 
             totalUsage.input_tokens += retryResponse.usage.input_tokens;
             totalUsage.output_tokens += retryResponse.usage.output_tokens;
@@ -1709,7 +1741,10 @@ export class AgentRunner {
     cacheCfg?: { enabled: boolean; ttl_ms?: number; excluded_tools?: string[] },
     requireApproval?: AgentConfig["requireApproval"],
     audit?: TrajectoryToolCall[],
+    signal?: AbortSignal,
   ): Promise<ToolResultBlock> {
+    // An aborted run starts no tool, not even a hook or a lookup.
+    throwIfAborted(signal);
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
       const available = tools.map((t) => t.name).join(", ") || "(none)";
@@ -1799,7 +1834,10 @@ export class AgentRunner {
         // bypass review). Denial throws InterruptDeniedError which
         // propagates up and aborts the run.
         if (needsApproval(requireApproval, block.name, tool.destructive)) {
-          await this.awaitApproval(context.session_id, block.name, parsed);
+          await this.awaitApproval(
+            { session_id: context.session_id, tool_name: block.name, tool_args: parsed },
+            signal,
+          );
         }
 
         // Cache lookup on the parsed input so semantically-equal inputs hit.
@@ -1831,6 +1869,10 @@ export class AgentRunner {
             tool: block.name,
           });
         }
+
+        // The last point before the tool acts. An approval granted after
+        // the caller left, or a sibling call that saw the abort, stops here.
+        throwIfAborted(signal);
 
         let result = await this.executeWithTimeout(
           () => tool.execute(parsed, context),
@@ -1892,7 +1934,8 @@ export class AgentRunner {
         // Approval denials are intentional, operator-driven signals to
         // abort the run — they must propagate rather than be swallowed
         // into a tool_result error that the LLM could silently ignore.
-        if (error instanceof InterruptDeniedError) {
+        // So must a caller's abort, or the model would be asked what next.
+        if (error instanceof InterruptDeniedError || error instanceof RunAbortedError) {
           pushAudit(false);
           throw error;
         }

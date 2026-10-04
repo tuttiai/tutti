@@ -42,6 +42,14 @@ export interface ChatRequest {
   max_tokens?: number;
   temperature?: number;
   stop_sequences?: string[];
+  /**
+   * Cancels the call when aborted. The agent runner sets it from
+   * `AgentRunOptions.signal` so a run whose caller has gone away stops
+   * waiting on the model. A provider that can cancel its request (an SDK's
+   * request options, a child process) should; one that cannot may ignore
+   * it, and the runner still stops at its next step.
+   */
+  signal?: AbortSignal;
 }
 
 export interface ChatResponse {

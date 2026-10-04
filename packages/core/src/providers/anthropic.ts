@@ -49,7 +49,7 @@ export class AnthropicProvider implements LLMProvider {
         })),
         ...(request.temperature != null && { temperature: request.temperature }),
         ...(request.stop_sequences && { stop_sequences: request.stop_sequences }),
-      });
+      }, requestOptions(request));
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "anthropic" }, "Provider request failed");
@@ -112,7 +112,7 @@ export class AnthropicProvider implements LLMProvider {
         ...(request.temperature != null && { temperature: request.temperature }),
         ...(request.stop_sequences && { stop_sequences: request.stop_sequences }),
         stream: true,
-      });
+      }, requestOptions(request));
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error: msg, provider: "anthropic" }, "Provider stream failed");
@@ -176,4 +176,9 @@ export class AnthropicProvider implements LLMProvider {
       stop_reason: stopReason as StreamChunk["stop_reason"],
     };
   }
+}
+
+/** The SDK's per-request options: the run's signal, so an abort cancels the HTTP call. */
+function requestOptions(request: ChatRequest): { signal: AbortSignal } | undefined {
+  return request.signal ? { signal: request.signal } : undefined;
 }

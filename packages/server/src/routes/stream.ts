@@ -93,6 +93,10 @@ export interface StreamRouteOptions {
  * `tool_result` and `run_complete` follow. Denying ends the run, and the
  * stream closes with an `error` frame carrying the denial.
  *
+ * A client that disconnects before the run finishes aborts it: the run makes
+ * no further model call, runs no further tool, and a pending approval is
+ * withdrawn rather than left for a reviewer nobody is waiting on.
+ *
  * A paused run writes nothing, and undici's `fetch` aborts a body after 300 s
  * without a chunk, so the route writes a `: heartbeat` SSE comment every
  * `heartbeat_ms` (15 s by default) for as long as the stream is open. SSE
@@ -127,10 +131,14 @@ export function registerStreamRoute(
     // response, not the request: Node emits the request's `close` as soon as
     // its body has been read, which ended every stream before its first frame.
     // A response that closes after finishing is a normal end, not a departure.
+    // A departed client also aborts the run, which otherwise carries on
+    // calling tools, destructive ones included, for a caller that has gone.
     let clientClosed = false;
+    const controller = new AbortController();
     reply.raw.on("close", () => {
       if (reply.raw.writableFinished) return;
       clientClosed = true;
+      controller.abort("client disconnected");
       stopHeartbeat();
       scope.unsubscribe();
       if (!sse.destroyed) sse.end();
@@ -140,7 +148,10 @@ export function registerStreamRoute(
 
     try {
       const result = await scope.run(() =>
-        runtime.run(options.agent_name, request.body.input, request.body.session_id, conversationOf(request.body)),
+        runtime.run(options.agent_name, request.body.input, request.body.session_id, {
+          ...conversationOf(request.body),
+          signal: controller.signal,
+        }),
       );
 
       if (!clientClosed) {

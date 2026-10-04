@@ -11,7 +11,7 @@ import type { ChatRequest, StreamChunk } from "@tuttiai/types";
 
 import { ClaudeCodeProvider } from "../src/providers/claude-code.js";
 import type { ClaudeCodeInvocation, ClaudeCodeRunResult } from "../src/providers/claude-code-process.js";
-import { AuthenticationError, ProviderError, RateLimitError } from "../src/errors.js";
+import { AuthenticationError, ProviderError, RateLimitError, RunAbortedError } from "../src/errors.js";
 
 const weatherTool = {
   name: "get_weather",
@@ -172,6 +172,28 @@ describe("ClaudeCodeProvider", () => {
       const error: unknown = await provider().chat(baseRequest).catch((e: unknown) => e);
       expect(String(error)).toContain("[REDACTED]");
       expect(String(error)).not.toContain("sk-ant-abcdefghijklmnopqrstuvwxyz0123");
+    });
+  });
+
+  describe("cancellation", () => {
+    it("hands the request's signal to the process runner", async () => {
+      runner.mockResolvedValue(cliResult({ structured_output: { text: "Hi", tool_calls: [] } }));
+      const controller = new AbortController();
+      await provider().chat({ ...baseRequest, signal: controller.signal });
+      expect(lastInvocation().signal).toBe(controller.signal);
+    });
+
+    it("passes no signal when the request has none", async () => {
+      runner.mockResolvedValue(cliResult({ structured_output: { text: "Hi", tool_calls: [] } }));
+      await provider().chat(baseRequest);
+      expect(lastInvocation()).not.toHaveProperty("signal");
+    });
+
+    it("reports a killed process as RunAbortedError, not a retryable ProviderError", async () => {
+      runner.mockResolvedValue({ exit_code: null, stdout: "", stderr: "", timed_out: false, aborted: true });
+      const error: unknown = await provider().chat(baseRequest).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(RunAbortedError);
+      expect(error).not.toBeInstanceOf(ProviderError);
     });
   });
 
