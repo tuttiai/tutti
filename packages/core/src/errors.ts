@@ -282,3 +282,31 @@ export class InterruptDeniedError extends TuttiError {
     );
   }
 }
+
+// ── Cancellation ──────────────────────────────────────────────
+
+/**
+ * Thrown when a run's `AgentRunOptions.signal` is aborted. The runner stops
+ * at its next safe point (before a model call, before a tool call, or while
+ * waiting for approval), so no tool runs after the abort. The session is not
+ * updated with the abandoned turns.
+ *
+ * @example
+ * const controller = new AbortController();
+ * const run = runtime.run("assistant", "Hello", undefined, { signal: controller.signal });
+ * controller.abort("client disconnected");
+ * await run; // rejects with RunAbortedError
+ */
+export class RunAbortedError extends TuttiError {
+  /**
+   * @param reason - Why the run was stopped, from the signal's `reason`.
+   */
+  constructor(public readonly reason: string) {
+    super(
+      "RUN_ABORTED",
+      `Run aborted: ${reason}\n` +
+        `The caller cancelled it, so no further model or tool call was made. Start a new run to continue.`,
+      { reason },
+    );
+  }
+}

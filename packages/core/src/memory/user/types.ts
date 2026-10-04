@@ -203,6 +203,15 @@ export interface AgentRunOptions {
    * conversation's runs. Opaque to the runtime.
    */
   conversation_id?: string;
+  /**
+   * Stops the run when aborted, for a caller that has given up on it (an
+   * HTTP client that disconnected, a timeout). The runner checks it before
+   * every model call and before every tool call, ends a wait for human
+   * approval, and passes it to the provider so an in-flight call can be
+   * cancelled. The run then rejects with `RunAbortedError`, and no tool runs
+   * after the abort.
+   */
+  signal?: AbortSignal;
 }
 
 // Re-export the agent-level config from @tuttiai/types so consumers
