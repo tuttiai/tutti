@@ -53,13 +53,13 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("GitHubVoice", () => {
-  it("implements Voice with 13 tools", () => {
+  it("implements Voice with 15 tools", () => {
     const voice = new GitHubVoice({ token: "fake" });
     expect(voice.name).toBe("github");
-    expect(voice.tools).toHaveLength(13);
+    expect(voice.tools).toHaveLength(15);
   });
 
-  it("lists branch and commit tools between reading a PR and opening one", () => {
+  it("lists CI reads, then branch and commit tools, between reading a PR and opening one", () => {
     const voice = new GitHubVoice({ token: "fake" });
     expect(voice.tools.map((t) => t.name)).toEqual([
       "list_issues",
@@ -68,6 +68,8 @@ describe("GitHubVoice", () => {
       "comment_on_issue",
       "list_pull_requests",
       "get_pull_request",
+      "list_pull_request_checks",
+      "get_check_run_log",
       "create_branch",
       "commit_files",
       "create_pull_request",

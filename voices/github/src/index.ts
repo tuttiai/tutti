@@ -6,6 +6,8 @@ import { createCreateIssueTool } from "./tools/create-issue.js";
 import { createCommentOnIssueTool } from "./tools/comment-on-issue.js";
 import { createListPullRequestsTool } from "./tools/list-pull-requests.js";
 import { createGetPullRequestTool } from "./tools/get-pull-request.js";
+import { createListPullRequestChecksTool } from "./tools/list-pull-request-checks.js";
+import { createGetCheckRunLogTool } from "./tools/get-check-run-log.js";
 import { createCreateBranchTool } from "./tools/create-branch.js";
 import { createCommitFilesTool } from "./tools/commit-files.js";
 import { createCreatePullRequestTool } from "./tools/create-pull-request.js";
@@ -34,6 +36,8 @@ export class GitHubVoice implements Voice {
       createCommentOnIssueTool(octokit),
       createListPullRequestsTool(octokit),
       createGetPullRequestTool(octokit),
+      createListPullRequestChecksTool(octokit),
+      createGetCheckRunLogTool(octokit),
       createCreateBranchTool(octokit),
       createCommitFilesTool(octokit),
       createCreatePullRequestTool(octokit),

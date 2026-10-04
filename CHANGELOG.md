@@ -4,6 +4,13 @@
 
 ### Added
 
+**`list_pull_request_checks` and `get_check_run_log` on the GitHub voice.** An agent could push a branch and open a pull request but had no way to see whether CI passed, so it could not meet a "CI must be green" rule before calling its work done. Both new tools are read-only.
+
+- **`list_pull_request_checks`** resolves a pull request's head commit and lists every check run on it (name, status, conclusion, timings, link, `check_run_id`, and the output title and summary, truncated) and every commit status, opening with one overall line such as `Overall: 3 passed, 1 failed, 0 pending, 0 skipped (verdict: failing)`. The verdict is `green` only when at least one check exists and none failed or is still running, so "no CI" never reads as a pass.
+- **`get_check_run_log`** downloads a GitHub Actions job's log (the check run id is the job id) and returns only its last `tail_lines` lines, 150 by default and at most 1000, capped at 40,000 characters. A check run from another app has no log behind the API and comes back as an error naming its details page; an expired log, a running job and a token without Actions read access are each reported with a hint.
+
+The voice now exposes 15 tools, listed in that order straight after `get_pull_request`, and the counts in the READMEs, the docs and `tutti-ai search`'s built-in list are updated. No public-API change.
+
 **`git` in the server image.** Together with `sandbox`, an agent can now clone the repository it is changing, install it and run its typecheck and tests, instead of reporting work as finished that nothing has executed. Before this the image had Node, npm, bash and python3 but no way to fetch a repository's source.
 
 **`create_branch` and `commit_files` on the GitHub voice.** `create_pull_request` needs a head branch that already exists and carries a commit, and nothing in the voice could make either, so a workflow ending in a pull request still had to shell out to `git` for everything before the last step. The two new tools close that gap through the GitHub API alone: `create_branch`, then `commit_files`, then `create_pull_request`.
