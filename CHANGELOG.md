@@ -113,6 +113,14 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Fixed
 
+**A run stops when its caller goes away.** `POST /run/stream` stopped writing when the client disconnected but left `runtime.run()` going to the end, tools included. tutti-app's control plane gave up on a reply and aborted its fetch, and the agent carried on for another minute and asked for two more destructive approvals (`commit_files`, `create_pull_request`) that nobody was listening for. Nothing in the runner could be cancelled.
+
+- **`AgentRunOptions.signal`** takes an `AbortSignal`. Once it aborts, the runner makes no further model call and runs no further tool: it checks before every turn and before every tool call, including the moment after an approval is granted. A pending approval wait ends at once, and its interrupt is resolved as denied with the reason `run aborted`, so a reviewer is not left a request nothing would act on. The run rejects with the new **`RunAbortedError`** (`code: "RUN_ABORTED"`, `reason`), and the session is not updated with the abandoned turns.
+- **The provider is told too**, through the new optional `ChatRequest.signal`, added only to the request the provider receives, so hooks and `llm:request` events never carry it. `ClaudeCodeProvider` kills its `claude -p` process, and never starts one for a signal already aborted; `AnthropicProvider` and `OpenAIProvider` pass it to the SDK, which cancels the HTTP request. A call cancelled this way is never retried. The runner stops waiting on any provider the moment the signal aborts, so one that ignores the signal (Gemini, OpenRouter, a custom provider) still cannot hold the run open.
+- **`POST /run/stream` and `POST /run` abort their run when the client disconnects**, and `POST /run` also when it answers `504`, which used to leave the run going behind the timeout. A graph run behind `POST /run` is not cancellable yet and carries on as before.
+
+A tool already executing when the signal aborts is not interrupted: `ToolContext` carries no signal, so the guarantee is that nothing new starts. The `request_human_input` tool's wait is not tied to the signal either and ends on its own timeout.
+
 **The sandbox no longer hands an agent an empty directory on every reply.** Its working directory was `/tmp/tutti-sandbox/{session_id}/`, and a caller that gives each reply a session of its own, as a team's run does, started every reply in a new one. A coding agent's files from one reply sat beside the next reply's directory, intact and unreachable, and the agent reported its work as lost: one tutti-app container held 215 such directories, one per reply. A run can now name its conversation:
 
 - **`POST /run` and `POST /run/stream` take an optional `conversation_id`**, 1 to 128 characters of `A-Z a-z 0-9 _ -`, since a voice may build a path from it. Anything else is refused with `400`.
