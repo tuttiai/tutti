@@ -132,7 +132,7 @@ for the latest published version.
 | [`@tuttiai/realtime`](packages/realtime) | OpenAI Realtime API client + tool bridge with `SecretsManager` redaction and `InterruptStore` gating |
 | [`@tuttiai/telemetry`](packages/telemetry) | OpenTelemetry tracer — spans for every run, LLM call, and tool invocation |
 | [`@tuttiai/filesystem`](voices/filesystem) | 7 file tools (read, write, search, etc.) |
-| [`@tuttiai/github`](voices/github) | 13 GitHub tools (issues, PRs, branches, commits, repos, code search) |
+| [`@tuttiai/github`](voices/github) | 15 GitHub tools (issues, PRs, CI checks, branches, commits, repos, code search) |
 | [`@tuttiai/playwright`](voices/playwright) | 12 browser tools (navigate, click, type, screenshot) |
 | [`@tuttiai/web`](voices/web) | 3 web tools (search, fetch URL, sitemap) |
 | [`@tuttiai/sandbox`](voices/sandbox) | 4 code execution tools (TS, Python, Bash + file I/O) |

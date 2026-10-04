@@ -81,7 +81,7 @@ async function fetchRegistry(): Promise<VoiceEntry[]> {
 }
 
 function toolCount(name: string): number {
-  const counts = new Map<string, number>([["filesystem", 7], ["github", 13], ["playwright", 12]]);
+  const counts = new Map<string, number>([["filesystem", 7], ["github", 15], ["playwright", 12]]);
   return counts.get(name) ?? 0;
 }
 
