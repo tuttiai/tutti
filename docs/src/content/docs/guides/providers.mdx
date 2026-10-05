@@ -21,6 +21,8 @@ const provider = new AnthropicProvider({ api_key: "sk-ant-..." });
 | ------ | ------- | ----------- |
 | `api_key` | `ANTHROPIC_API_KEY` env var | API key |
 
+**Prompt caching** is on for every request. The provider marks the end of the system prompt (or the last tool, when there is no system prompt) and the end of the latest message, so each turn of a run reads everything before it from Anthropic's prompt cache at a tenth of the input rate and pays full price only for what it adds. A prompt shorter than the model's caching minimum is simply not cached. `usage.input_tokens` counts every prompt token; `usage.cache_read_input_tokens` and `usage.cache_creation_input_tokens` say how many of them were read from and written to the cache.
+
 **Models:** `claude-sonnet-4-20250514`, `claude-opus-4-20250514`, `claude-haiku-4-20250514`
 
 ## OpenAI (GPT)
@@ -116,14 +118,17 @@ const provider = new ClaudeCodeProvider({
 | `command` | `claude` | The CLI to run |
 | `timeout_ms` | `600000` | Kill a turn that runs longer than this |
 | `cwd` | the OS temp directory | Working directory for the CLI |
+| `reuse_sessions` | `true` | Resume the session that holds a conversation and send only what is new. `false` keeps nothing on disk and sends the whole transcript every turn |
 | `runner` | spawns the CLI | Replace the process runner, for tests |
 
 **Signing in:** Tutti never reads or stores a credential for this provider. Sign the CLI in yourself, either interactively (`claude`, then `/login`) or, in a container, with a long-lived token: run `claude setup-token` once and pass the result as `CLAUDE_CODE_OAUTH_TOKEN`. **If `ANTHROPIC_API_KEY` is set, Claude Code uses it and bills the API**, and the provider logs a warning saying so.
 
 **How tools work:** every Claude Code built-in tool, MCP server, hook, plugin and `CLAUDE.md` is switched off (`--tools "" --safe-mode --strict-mcp-config`), so the CLI behaves as a plain model. The model answers through structured output, either with its final text or with calls to your agent's tools, which Tutti's runner then executes exactly as it does for any other provider. Tool names are constrained to the ones offered.
 
+**Sessions and caching:** Claude Code keys its prompt cache to its own session, so a call that starts a new session and re-sends the conversation is written to the cache in full and reads nothing back, on every turn. Measured on 2026-10-05 with CLI 2.1.263, three turns of a growing conversation each wrote about 8,200 tokens and read none. So the provider starts each conversation as a session with a known id and, on the next turn, resumes it (`--resume`) sending only the messages added since its last reply. The same measurement then read about 8,100 tokens from the cache and wrote about 145. Sessions are kept as files under the CLI's own `~/.claude/projects`, as an interactive session's are. The provider sends the whole transcript to a new session whenever it cannot resume safely: the history was rewritten (by a hook, or by `context` shortening), the tools or system prompt changed, the session is more than an hour old, the CLI no longer has it, or another call is already using it.
+
 **Limits:**
-- Each turn is a fresh process carrying the whole conversation, which adds a second or two of start-up per turn.
+- Each turn is a fresh `claude -p` process, which adds a second or two of start-up per turn.
 - `max_tokens`, `temperature` and `stop_sequences` are not supported by the CLI and are ignored.
 - `stream()` yields the reply once it is complete, not token by token.
 - Usage counts against your plan's rolling limits, shared with your own Claude Code sessions. A reached limit surfaces as `RateLimitError`.

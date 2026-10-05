@@ -56,6 +56,10 @@ export interface TuttiSpanAttributes {
   completion_tokens?: number;
   /** `prompt_tokens + completion_tokens`. Stored for convenience. */
   total_tokens?: number;
+  /** Prompt tokens read from the provider's prompt cache, a part of `prompt_tokens`. */
+  cache_read_tokens?: number;
+  /** Prompt tokens written to the provider's prompt cache, a part of `prompt_tokens`. */
+  cache_creation_tokens?: number;
   /** Estimated cost of the LLM call in USD. */
   cost_usd?: number;
 

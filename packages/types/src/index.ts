@@ -31,6 +31,7 @@ export type {
   AgentUserMemoryConfig,
   AgentUserModelConfig,
   AgentCacheConfig,
+  AgentContextConfig,
   AgentDurableConfig,
   AgentScheduleConfig,
   ScheduleDeliveryTarget,

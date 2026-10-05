@@ -8,6 +8,9 @@
  * | `TUTTI_MAX_TURNS` | positive integer | the runtime default |
  * | `TUTTI_MAX_TOOL_CALLS` | positive integer | the runtime default |
  * | `TUTTI_MAX_COST_USD` | positive decimal | no ceiling |
+ * | `TUTTI_MAX_TOOL_RESULT_CHARS` | positive integer | tool results enter the conversation whole |
+ * | `TUTTI_TRIM_AFTER_TOKENS` | positive integer | older tool results are never shortened |
+ * | `TUTTI_SUMMARISE_AFTER_TOKENS` | positive integer | older conversation is never summarised |
  * | `TUTTI_REQUIRE_APPROVAL` | see below | gate tools marked `destructive` |
  *
  * `TUTTI_REQUIRE_APPROVAL` sets the agent's `requireApproval`:
@@ -25,13 +28,16 @@
  * accepted as a literal, because no tool name holds one and a person writing
  * it expects a wildcard the matcher does not have.
  *
+ * The last three set the agent's `context` (see `AgentContextConfig`), which
+ * decides how much of a long conversation is re-sent to the model each turn.
+ *
  * `TUTTI_VOICES` carries credentials inside `options`, so nothing here ever
  * echoes its content: a JSON syntax error is reported without the snippet
  * Node would quote, and a shape error by path and code only.
  */
 
 import { z } from "zod";
-import type { AgentConfig, Permission } from "@tuttiai/types";
+import type { AgentConfig, AgentContextConfig, Permission } from "@tuttiai/types";
 
 import { VoiceConfigError, VoiceSpecsSchema, type VoiceSpec } from "./voice-loader.js";
 
@@ -45,6 +51,8 @@ export interface StartAgentEnv {
   readonly max_turns: number | undefined;
   readonly max_tool_calls: number | undefined;
   readonly max_cost_usd: number | undefined;
+  /** The agent's `context`, or `undefined` when none of its variables is set. */
+  readonly context: AgentContextConfig | undefined;
   /** The agent's `requireApproval`. `undefined` gates destructive tools only. */
   readonly require_approval: AgentConfig["requireApproval"];
 }
@@ -115,6 +123,18 @@ function readNumber(read: ReadVariable, key: string, schema: z.ZodNumber): numbe
   return parsed.data;
 }
 
+/** Read the context variables. Only those set are carried, so the framework's defaults fill the rest. */
+function readContext(read: ReadVariable): AgentContextConfig | undefined {
+  const context: AgentContextConfig = {};
+  const maxResult = readNumber(read, "TUTTI_MAX_TOOL_RESULT_CHARS", PositiveInt);
+  const trimAfter = readNumber(read, "TUTTI_TRIM_AFTER_TOKENS", PositiveInt);
+  const summariseAfter = readNumber(read, "TUTTI_SUMMARISE_AFTER_TOKENS", PositiveInt);
+  if (maxResult !== undefined) context.max_tool_result_chars = maxResult;
+  if (trimAfter !== undefined) context.trim_after_tokens = trimAfter;
+  if (summariseAfter !== undefined) context.summarise_after_tokens = summariseAfter;
+  return Object.keys(context).length > 0 ? context : undefined;
+}
+
 /**
  * Read the agent-shaping variables.
  *
@@ -132,6 +152,7 @@ export function readStartAgentEnv(read: ReadVariable): StartAgentEnv {
     max_turns: readNumber(read, "TUTTI_MAX_TURNS", PositiveInt),
     max_tool_calls: readNumber(read, "TUTTI_MAX_TOOL_CALLS", PositiveInt),
     max_cost_usd: readNumber(read, "TUTTI_MAX_COST_USD", PositiveAmount),
+    context: readContext(read),
     require_approval: readRequireApproval(read("TUTTI_REQUIRE_APPROVAL")),
   };
 }

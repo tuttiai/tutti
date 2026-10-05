@@ -60,8 +60,25 @@ export interface ChatResponse {
 }
 
 export interface TokenUsage {
+  /**
+   * Every prompt token the call consumed, cached or not. The two cache
+   * fields below are parts of this figure, never additions to it, so a
+   * caller that ignores them still sees the whole prompt.
+   */
   input_tokens: number;
   output_tokens: number;
+  /**
+   * Prompt tokens served from the provider's prompt cache, a subset of
+   * `input_tokens`. Billed well below the normal input rate. Absent when the
+   * provider does not report it.
+   */
+  cache_read_input_tokens?: number;
+  /**
+   * Prompt tokens written to the provider's prompt cache, a subset of
+   * `input_tokens`. Billed above the normal input rate, and repaid by every
+   * later read. Absent when the provider does not report it.
+   */
+  cache_creation_input_tokens?: number;
   /**
    * Estimated USD cost for these tokens. Populated by `@tuttiai/telemetry`
    * on `AgentResult.usage` when the run's model is in the price table.

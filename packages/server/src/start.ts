@@ -74,6 +74,7 @@ logger.info(
     permissions: agentEnv.permissions,
     // Undefined reads as the framework default: destructive tools only.
     require_approval: agentEnv.require_approval ?? "destructive",
+    context: agentEnv.context ?? "off",
   },
   "Tutti server started",
 );

@@ -9,6 +9,8 @@ import type {
 import { SecretsManager } from "../secrets.js";
 import { logger } from "../logger.js";
 import { ProviderError, AuthenticationError } from "../errors.js";
+import { buildAnthropicPrompt, toTokenUsage } from "./anthropic-request.js";
+import type { AnthropicUsage } from "./anthropic-request.js";
 
 export interface AnthropicProviderOptions {
   api_key?: string;
@@ -37,16 +39,7 @@ export class AnthropicProvider implements LLMProvider {
       response = await this.client.messages.create({
         model: request.model,
         max_tokens: request.max_tokens ?? 4096,
-        system: request.system ?? "",
-        messages: request.messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        tools: request.tools?.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          input_schema: tool.input_schema as Anthropic.Tool["input_schema"],
-        })),
+        ...buildAnthropicPrompt(request),
         ...(request.temperature != null && { temperature: request.temperature }),
         ...(request.stop_sequences && { stop_sequences: request.stop_sequences }),
       }, requestOptions(request));
@@ -78,10 +71,7 @@ export class AnthropicProvider implements LLMProvider {
       id: response.id,
       content,
       stop_reason: response.stop_reason as ChatResponse["stop_reason"],
-      usage: {
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
-      },
+      usage: toTokenUsage(response.usage),
     };
   }
 
@@ -99,16 +89,7 @@ export class AnthropicProvider implements LLMProvider {
       raw = await this.client.messages.create({
         model: request.model,
         max_tokens: request.max_tokens ?? 4096,
-        system: request.system ?? "",
-        messages: request.messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        tools: request.tools?.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          input_schema: tool.input_schema as Anthropic.Tool["input_schema"],
-        })),
+        ...buildAnthropicPrompt(request),
         ...(request.temperature != null && { temperature: request.temperature }),
         ...(request.stop_sequences && { stop_sequences: request.stop_sequences }),
         stream: true,
@@ -124,13 +105,13 @@ export class AnthropicProvider implements LLMProvider {
 
     // Track tool_use blocks being streamed (input arrives as partial JSON)
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>();
-    let inputTokens = 0;
+    let startUsage: AnthropicUsage = { input_tokens: 0, output_tokens: 0 };
     let outputTokens = 0;
     let stopReason: string = "end_turn";
 
     for await (const event of raw) {
       if (event.type === "message_start") {
-        inputTokens = event.message.usage.input_tokens;
+        startUsage = event.message.usage;
       }
       if (event.type === "content_block_start") {
         if (event.content_block.type === "tool_use") {
@@ -172,7 +153,7 @@ export class AnthropicProvider implements LLMProvider {
 
     yield {
       type: "usage",
-      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+      usage: toTokenUsage({ ...startUsage, output_tokens: outputTokens }),
       stop_reason: stopReason as StreamChunk["stop_reason"],
     };
   }

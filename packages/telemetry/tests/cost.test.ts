@@ -11,6 +11,16 @@ import { TuttiTracer, getTuttiTracer } from "../src/tracer.js";
 import type { TuttiSpan } from "../src/types.js";
 
 describe("estimateCost", () => {
+  it("prices cache reads at a tenth and cache writes at 1.25x of the input rate", () => {
+    // claude-sonnet-4: $3 / 1M input. 1000 prompt = 100 uncached + 800 read + 100 written.
+    // (100 + 800 × 0.1 + 100 × 1.25) × 3 / 1M = 305 × 3 / 1M
+    expect(estimateCost("claude-sonnet-4", 1000, 0, { read: 800, written: 100 })).toBeCloseTo(0.000915, 9);
+  });
+
+  it("never prices a negative uncached remainder when cache figures exceed the prompt", () => {
+    expect(estimateCost("claude-sonnet-4", 100, 0, { read: 200 })).toBeCloseTo((200 * 0.1 * 3) / 1_000_000, 12);
+  });
+
   it("computes USD cost for built-in models with known token counts", () => {
     // gpt-4o: $5 / 1M input, $15 / 1M output
     // 1000 input × 5/1M = 0.005, 500 output × 15/1M = 0.0075 → 0.0125

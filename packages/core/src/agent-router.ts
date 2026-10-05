@@ -10,6 +10,7 @@ import type {
 } from "@tuttiai/types";
 import { TuttiRuntime } from "./runtime.js";
 import type { EventBus } from "./event-bus.js";
+import { addUsage } from "./usage.js";
 
 /** Safe lookup into score.agents by dynamic key. */
 function getAgent(
@@ -229,8 +230,7 @@ export class AgentRouter {
       if ("result" in outcome) {
         results.set(outcome.agent_id, outcome.result);
         completed.push(outcome.agent_id);
-        total_usage.input_tokens += outcome.result.usage.input_tokens;
-        total_usage.output_tokens += outcome.result.usage.output_tokens;
+        addUsage(total_usage, outcome.result.usage);
         total_cost_usd += estimateCostUsd(outcome.result.usage);
         mergedLines.push(
           `[${outcome.agent_id}] ${outcome.result.output}`,

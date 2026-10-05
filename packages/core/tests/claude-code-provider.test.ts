@@ -74,7 +74,6 @@ describe("ClaudeCodeProvider", () => {
       expect(invocation.args).toContain("-p");
       expect(invocation.args).toContain("--safe-mode");
       expect(invocation.args).toContain("--strict-mcp-config");
-      expect(invocation.args).toContain("--no-session-persistence");
       expect(argAfter("--tools")).toBe("");
       expect(argAfter("--model")).toBe("claude-sonnet-5");
       expect(argAfter("--output-format")).toBe("json");
@@ -116,10 +115,15 @@ describe("ClaudeCodeProvider", () => {
       expect(response.content[0]).toMatchObject({ type: "tool_use", name: "get_weather", input: { city: "Paris" } });
     });
 
-    it("counts cached input tokens as input", async () => {
+    it("counts cached input tokens as input, and reports them apart", async () => {
       runner.mockResolvedValue(cliResult({ structured_output: { text: "Hi", tool_calls: [] } }));
       const response = await provider().chat(baseRequest);
-      expect(response.usage).toEqual({ input_tokens: 135, output_tokens: 20 });
+      expect(response.usage).toEqual({
+        input_tokens: 135,
+        output_tokens: 20,
+        cache_read_input_tokens: 30,
+        cache_creation_input_tokens: 5,
+      });
     });
 
     it("rejects a request without a model", async () => {
@@ -130,6 +134,84 @@ describe("ClaudeCodeProvider", () => {
     it("rejects a reply asking for a tool that was not offered", async () => {
       runner.mockResolvedValue(cliResult({ structured_output: { text: "", tool_calls: [{ name: "rm_rf", input: {} }] } }));
       await expect(provider().chat(baseRequest)).rejects.toThrow(/does not match the tool protocol/);
+    });
+  });
+
+  describe("session reuse", () => {
+    const toolCall = { structured_output: { text: "", tool_calls: [{ name: "get_weather", input: { city: "Paris" } }] } };
+    const finalText = { structured_output: { text: "14°C.", tool_calls: [] } };
+
+    async function secondTurn(p: ClaudeCodeProvider): Promise<ChatRequest> {
+      runner.mockResolvedValueOnce(cliResult(toolCall));
+      const first = await p.chat(baseRequest);
+      const id = first.content.find((block) => block.type === "tool_use")?.id ?? "";
+      return {
+        ...baseRequest,
+        messages: [
+          ...baseRequest.messages,
+          { role: "assistant", content: first.content },
+          { role: "user", content: [{ type: "tool_result", tool_use_id: id, content: "14°C" }] },
+        ],
+      };
+    }
+
+    it("starts a conversation as a new session with a known id", async () => {
+      runner.mockResolvedValue(cliResult(finalText));
+      await provider().chat(baseRequest);
+      expect(argAfter("--session-id")).toMatch(/^[0-9a-f-]{36}$/);
+      expect(lastInvocation().args).not.toContain("--resume");
+    });
+
+    it("resumes the session on the next turn and sends only the new messages", async () => {
+      const p = provider();
+      const next = await secondTurn(p);
+      runner.mockResolvedValueOnce(cliResult(finalText));
+      await p.chat(next);
+      expect(argAfter("--resume")).toBe("sess-1");
+      const stdin = lastInvocation().stdin;
+      expect(stdin).toContain("# Conversation continues");
+      expect(stdin).not.toContain("Weather in Paris?");
+      expect(stdin).toContain('"tool":"get_weather"');
+    });
+
+    it("sends the whole transcript when the history no longer matches the session", async () => {
+      const p = provider();
+      const next = await secondTurn(p);
+      runner.mockResolvedValueOnce(cliResult(finalText));
+      await p.chat({ ...next, messages: [{ role: "user", content: "Rewritten" }, ...next.messages.slice(1)] });
+      expect(lastInvocation().args).not.toContain("--resume");
+      expect(lastInvocation().stdin).toContain("Rewritten");
+    });
+
+    it("starts fresh when the CLI no longer has the session", async () => {
+      const p = provider();
+      const next = await secondTurn(p);
+      runner
+        .mockResolvedValueOnce({ exit_code: 1, stdout: "", stderr: "No conversation found with session ID: sess-1\n", timed_out: false })
+        .mockResolvedValueOnce(cliResult(finalText));
+      const response = await p.chat(next);
+      expect(response.content).toEqual([{ type: "text", text: "14°C." }]);
+      expect(lastInvocation().args).not.toContain("--resume");
+      expect(lastInvocation().stdin).toContain("Weather in Paris?");
+    });
+
+    it("never resumes one session twice, so concurrent turns cannot share it", async () => {
+      const p = provider();
+      const next = await secondTurn(p);
+      runner.mockResolvedValue(cliResult(finalText));
+      await p.chat(next);
+      await p.chat(next);
+      expect(lastInvocation().args).not.toContain("--resume");
+    });
+
+    it("keeps nothing on disk and sends the whole transcript when reuse is off", async () => {
+      const p = new ClaudeCodeProvider({ runner, cwd: "/work", reuse_sessions: false });
+      const next = await secondTurn(p);
+      runner.mockResolvedValueOnce(cliResult(finalText));
+      await p.chat(next);
+      expect(lastInvocation().args).toContain("--no-session-persistence");
+      expect(lastInvocation().args).not.toContain("--resume");
+      expect(lastInvocation().stdin).toContain("Weather in Paris?");
     });
   });
 

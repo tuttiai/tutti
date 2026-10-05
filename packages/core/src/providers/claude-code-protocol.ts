@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { z } from "zod";
-import type { ChatRequest, ContentBlock, ToolDefinition } from "@tuttiai/types";
+import type { ChatMessage, ChatRequest, ContentBlock, ToolDefinition } from "@tuttiai/types";
 
 /*
  * Claude Code runs its own agent loop and owns its own tools, so it cannot be
@@ -44,15 +44,57 @@ export function buildPrompt(request: ChatRequest): string {
   const parts: string[] = [];
   if (hasTools(request)) {
     const tools = (request.tools ?? []).map(describeTool);
-    parts.push(`# Host tools\n${JSON.stringify(tools, null, 2)}`);
+    parts.push(`# Host tools\n${tools.map((tool) => JSON.stringify(tool)).join("\n")}`);
   }
   parts.push(
     "# Conversation\n" +
-      'The conversation so far, oldest first. "tool_use" blocks are host tool calls you made; ' +
+      'The conversation so far, oldest first, one message per line. "tool_use" blocks are host tool calls you made; ' +
       '"tool_result" blocks are what the host returned. Reply to the latest message as the assistant.\n\n' +
-      JSON.stringify(request.messages, null, 2),
+      oneLinePerMessage(request.messages),
   );
   return parts.join("\n\n");
+}
+
+/**
+ * The prompt written to stdin when a session that already holds the
+ * conversation is resumed: only the messages added since its last reply.
+ * The session saw its tool calls as names and inputs, never as the ids Tutti
+ * gave them, so each result is shown beside the call it answers.
+ *
+ * @param messages - Every message of the conversation, oldest first.
+ * @param delta - The new messages at its end, all from the user.
+ * @returns The text written to the CLI's stdin.
+ */
+export function buildDeltaPrompt(messages: ChatMessage[], delta: ChatMessage[]): string {
+  const calls = new Map<string, { name: string; input: unknown }>();
+  for (const message of messages) {
+    if (typeof message.content === "string") continue;
+    for (const block of message.content) {
+      if (block.type === "tool_use") calls.set(block.id, { name: block.name, input: block.input });
+    }
+  }
+  const shown = delta.map((message) =>
+    typeof message.content === "string"
+      ? message
+      : { ...message, content: message.content.map((block) => withCall(block, calls)) },
+  );
+  return (
+    "# Conversation continues\n" +
+    "The messages since your last reply, oldest first, one per line. Each tool_result names the call it answers. " +
+    "Reply to the latest message as the assistant.\n\n" +
+    oneLinePerMessage(shown)
+  );
+}
+
+function withCall(block: ContentBlock, calls: Map<string, { name: string; input: unknown }>): unknown {
+  if (block.type !== "tool_result") return block;
+  const call = calls.get(block.tool_use_id);
+  return call ? { ...block, tool: call.name, tool_input: call.input } : block;
+}
+
+// Compact JSON: indentation is paid for in tokens on every turn and tells the model nothing.
+function oneLinePerMessage(messages: readonly unknown[]): string {
+  return messages.map((message) => JSON.stringify(message)).join("\n");
 }
 
 /**

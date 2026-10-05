@@ -16,11 +16,14 @@ export {
 } from "./tracer.js";
 
 export {
+  CACHE_READ_RATE,
+  CACHE_WRITE_RATE,
   MODEL_PRICES,
   buildTraceSummaries,
   estimateCost,
   getRunCost,
   registerModelPrice,
+  type CachedPromptTokens,
   type ModelPrice,
   type RunCost,
   type TraceSummary,
