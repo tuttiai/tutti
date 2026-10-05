@@ -34,6 +34,20 @@ const CacheSchema = z
   })
   .strict();
 
+const positiveInt = (field: string): z.ZodNumber =>
+  z.number().int().positive(`context.${field} must be a positive number`);
+
+const ContextSchema = z
+  .object({
+    max_tool_result_chars: positiveInt("max_tool_result_chars").optional(),
+    trim_after_tokens: positiveInt("trim_after_tokens").optional(),
+    keep_recent_tool_results: positiveInt("keep_recent_tool_results").optional(),
+    trimmed_tool_result_chars: positiveInt("trimmed_tool_result_chars").optional(),
+    summarise_after_tokens: positiveInt("summarise_after_tokens").optional(),
+    keep_recent_messages: positiveInt("keep_recent_messages").optional(),
+  })
+  .strict();
+
 const ScheduleDeliverySchema = z.discriminatedUnion("platform", [
   z
     .object({
@@ -105,6 +119,7 @@ const AgentSchema = z
     delegates: z.array(z.string()).optional(),
     role: z.enum(["orchestrator", "specialist"]).optional(),
     cache: CacheSchema.optional(),
+    context: ContextSchema.optional(),
     schedule: AgentScheduleSchema.optional(),
   })
   .passthrough();

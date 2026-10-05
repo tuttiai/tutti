@@ -105,7 +105,7 @@ Semantic memory lets agents remember facts across sessions. When a user tells th
 
 ### How it works
 
-1. Before each LLM call, the runner searches semantic memory using the user's input as a query
+1. Once per run, before the first LLM call, the runner searches semantic memory using the user's input as a query. The result stays the same for every turn of the run, so the system prompt does too, and a provider's prompt cache can serve it
 2. The top N relevant memories are appended to the system prompt:
    ```
    Relevant context from previous sessions:
@@ -268,6 +268,38 @@ result.usage.output_tokens  // tokens received
 result.turns                // agentic loop iterations
 ```
 
+When the provider reports prompt caching, `result.usage.cache_read_input_tokens` and `result.usage.cache_creation_input_tokens` say how much of `input_tokens` was read from and written to its cache.
+
 :::tip
 Long sessions accumulate large message histories, increasing input token counts. Start fresh sessions for unrelated tasks, and use semantic memory for facts that should persist.
 :::
+
+## Keeping long runs small
+
+Every turn re-sends the whole conversation, so a tool result is paid for again on every turn after it arrives, and a run's cost grows with the square of its length. `context` on an agent limits that. Every field is optional and off when absent.
+
+```ts
+const agent = {
+  name: "developer",
+  system_prompt: "...",
+  voices: [new GitHubVoice()],
+  context: {
+    max_tool_result_chars: 8_000,   // cap each tool result as it arrives
+    trim_after_tokens: 40_000,      // then shorten older tool results
+    summarise_after_tokens: 120_000 // then summarise the older conversation
+  },
+};
+```
+
+| Field | Default | What it does |
+| ----- | ------- | ------------ |
+| `max_tool_result_chars` | off | Caps each tool result as it enters the conversation. The start and the end are kept, the middle replaced by a note of how much was left out. |
+| `trim_after_tokens` | off | Once the conversation is estimated past this many tokens, every tool result but the most recent is cut to its first `trimmed_tool_result_chars` characters, with a note telling the model to call the tool again if it needs the rest. |
+| `keep_recent_tool_results` | `4` | Tool results never shortened. |
+| `trimmed_tool_result_chars` | `400` | What a shortened result keeps. |
+| `summarise_after_tokens` | off | Once the conversation is still past this many tokens after shortening, the messages between the first and the most recent are replaced by a summary the agent's own model writes. The first message is kept as it was. The summary call counts against the run's usage and budget, and a failed summary leaves the conversation as it was. |
+| `keep_recent_messages` | `8` | Messages never summarised. |
+
+Shortening happens in steps, not a little every turn. A provider's prompt cache serves only a prefix that has not changed, so the history is rewritten once a threshold is crossed and then left alone until it is crossed again. Token figures are estimated at four characters per token. They decide when to shorten, not what you are billed.
+
+The server image sets these from `TUTTI_MAX_TOOL_RESULT_CHARS`, `TUTTI_TRIM_AFTER_TOKENS` and `TUTTI_SUMMARISE_AFTER_TOKENS`.

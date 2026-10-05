@@ -254,6 +254,18 @@ export {
 } from "./cache/in-memory-cache.js";
 export type { InMemoryToolCacheOptions } from "./cache/in-memory-cache.js";
 export { DEFAULT_WRITE_TOOLS } from "./cache/index.js";
+export {
+  compactContext,
+  capText,
+  capToolResults,
+  estimateTokens,
+  trimToolResults,
+  summariseHistory,
+  summaryCut,
+  SUMMARY_HEADING,
+} from "./context/index.js";
+export type { CompactDeps } from "./context/index.js";
+export { addUsage } from "./usage.js";
 
 // Scheduler
 export {

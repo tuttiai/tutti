@@ -1,20 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 
 import type { ChatRequest, ChatResponse, LLMProvider, StreamChunk } from "@tuttiai/types";
 
-import { AuthenticationError, ProviderError, RateLimitError, RunAbortedError } from "../errors.js";
+import { ProviderError } from "../errors.js";
 import { logger } from "../logger.js";
 import { SecretsManager } from "../secrets.js";
 import { runClaudeCode } from "./claude-code-process.js";
 import type { ClaudeCodeRunner, ClaudeCodeRunResult } from "./claude-code-process.js";
-import {
-  buildPrompt,
-  buildReplySchema,
-  buildSystemPrompt,
-  ClaudeCodeResultSchema,
-  parseReply,
-} from "./claude-code-protocol.js";
+import { buildDeltaPrompt, buildPrompt, buildReplySchema, buildSystemPrompt } from "./claude-code-protocol.js";
 import type { ClaudeCodeResult } from "./claude-code-protocol.js";
+import { isMissingSession, parseResult, toResponse } from "./claude-code-result.js";
+import { ClaudeCodeSessions } from "./claude-code-sessions.js";
+import type { SessionResume } from "./claude-code-sessions.js";
 
 const PROVIDER = "claude-code";
 const DEFAULT_TIMEOUT_MS = 600_000;
@@ -29,6 +27,14 @@ export interface ClaudeCodeProviderOptions {
   timeout_ms?: number;
   /** Working directory for the CLI. Default the OS temp directory. */
   cwd?: string;
+  /**
+   * Resume the Claude Code session that already holds a conversation, sending
+   * only the messages added since, so its prompt cache is read rather than
+   * rewritten every turn. Default true. Sessions are then kept as files under
+   * the CLI's own `~/.claude/projects`, as an interactive session's are; set
+   * false to keep nothing on disk and send the whole transcript every call.
+   */
+  reuse_sessions?: boolean;
   /** Replaces the process runner. For tests. */
   runner?: ClaudeCodeRunner;
 }
@@ -47,8 +53,11 @@ export interface ClaudeCodeProviderOptions {
  * Anthropic's terms; use {@link AnthropicProvider} with an API key for that.
  *
  * Every Claude Code tool, MCP server, hook and CLAUDE.md is switched off, so
- * the CLI acts as a plain model and only the agent's own voices run. Each
- * call is stateless and carries the whole conversation. `max_tokens`,
+ * the CLI acts as a plain model and only the agent's own voices run. A
+ * conversation's first call carries the whole transcript; each later call
+ * resumes that session with only the new messages (see `reuse_sessions`),
+ * falling back to the whole transcript whenever the history no longer matches
+ * what the session holds. `max_tokens`,
  * `temperature` and `stop_sequences` are not supported by the CLI and are
  * ignored, and `stream()` yields the reply once it is complete.
  *
@@ -64,6 +73,7 @@ export class ClaudeCodeProvider implements LLMProvider {
   private readonly timeoutMs: number;
   private readonly cwd: string;
   private readonly runner: ClaudeCodeRunner;
+  private readonly sessions: ClaudeCodeSessions | undefined;
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     this.command = options.command ?? "claude";
@@ -71,6 +81,7 @@ export class ClaudeCodeProvider implements LLMProvider {
     // Outside any project, so no project settings or CLAUDE.md apply.
     this.cwd = options.cwd ?? tmpdir();
     this.runner = options.runner ?? runClaudeCode;
+    this.sessions = options.reuse_sessions === false ? undefined : new ClaudeCodeSessions();
     if (SecretsManager.optional("ANTHROPIC_API_KEY") !== undefined) {
       logger.warn(
         { provider: PROVIDER },
@@ -97,15 +108,34 @@ export class ClaudeCodeProvider implements LLMProvider {
         { provider: PROVIDER },
       );
     }
-    const run = await this.runner({
+    const resume = this.sessions?.take(request);
+    const result = resume ? await this.resumed(request, resume) : await this.fresh(request);
+    const response = toResponse(result, request);
+    if (result.session_id) this.sessions?.keep(request, response.content, result.session_id);
+    return response;
+  }
+
+  private async resumed(request: ChatRequest, resume: SessionResume): Promise<ClaudeCodeResult> {
+    const run = await this.invoke(request, ["--resume", resume.session_id], buildDeltaPrompt(request.messages, resume.delta));
+    if (!isMissingSession(run)) return parseResult(run, this.command);
+    logger.info({ provider: PROVIDER }, "Claude Code session no longer exists; sending the whole conversation");
+    return this.fresh(request);
+  }
+
+  private async fresh(request: ChatRequest): Promise<ClaudeCodeResult> {
+    const session = this.sessions ? ["--session-id", randomUUID()] : ["--no-session-persistence"];
+    return parseResult(await this.invoke(request, session, buildPrompt(request)), this.command);
+  }
+
+  private invoke(request: ChatRequest, session: string[], stdin: string): Promise<ClaudeCodeRunResult> {
+    return this.runner({
       command: this.command,
-      args: buildArgs(request, request.model),
-      stdin: buildPrompt(request),
+      args: [...buildArgs(request), ...session],
+      stdin,
       timeout_ms: this.timeoutMs,
       cwd: this.cwd,
       ...(request.signal !== undefined && { signal: request.signal }),
     });
-    return toResponse(parseResult(run, this.command), request);
   }
 
   /**
@@ -127,76 +157,16 @@ export class ClaudeCodeProvider implements LLMProvider {
   }
 }
 
-function buildArgs(request: ChatRequest, model: string): string[] {
+function buildArgs(request: ChatRequest): string[] {
   return [
     "-p",
     "--output-format", "json",
-    "--model", model,
+    "--model", request.model ?? "",
     "--system-prompt", buildSystemPrompt(request),
     "--json-schema", buildReplySchema(request),
     "--tools", "",
     "--strict-mcp-config",
     "--safe-mode",
-    "--no-session-persistence",
     "--max-turns", MAX_TURNS,
   ];
-}
-
-function parseResult(run: ClaudeCodeRunResult, command: string): ClaudeCodeResult {
-  if (run.spawn_error) {
-    const hint = run.spawn_error.code === "ENOENT"
-      ? `"${command}" was not found. Install Claude Code (npm install -g @anthropic-ai/claude-code) or set the command option.`
-      : run.spawn_error.message;
-    throw new ProviderError(`Could not start Claude Code: ${hint}`, { provider: PROVIDER });
-  }
-  if (run.aborted === true) throw new RunAbortedError("the Claude Code process was stopped by the run's signal"); // not retried: not a ProviderError
-  if (run.timed_out) {
-    throw new ProviderError("Claude Code did not answer in time. Raise timeout_ms, or check the CLI runs.", { provider: PROVIDER });
-  }
-  const parsed = ClaudeCodeResultSchema.safeParse(safeJson(run.stdout));
-  if (!parsed.success) {
-    const detail = SecretsManager.redact(run.stderr.trim() || run.stdout.trim()).slice(0, 500);
-    throw new ProviderError(`Claude Code exited ${String(run.exit_code)} without a result: ${detail}`, { provider: PROVIDER });
-  }
-  if (parsed.data.is_error) throw mapError(parsed.data);
-  return parsed.data;
-}
-
-function mapError(result: ClaudeCodeResult): Error {
-  const status = result.api_error_status ?? undefined;
-  const message = SecretsManager.redact(result.result ?? "unknown error");
-  logger.error({ provider: PROVIDER, status, error: message }, "Provider request failed");
-  if (status === 401 || status === 403) return new AuthenticationError(PROVIDER);
-  if (status === 429 || /usage limit/i.test(message)) return new RateLimitError(PROVIDER);
-  return new ProviderError(
-    `Claude Code error: ${message}\nIf it is not signed in, run \`claude setup-token\` and set CLAUDE_CODE_OAUTH_TOKEN.`,
-    { provider: PROVIDER, ...(status !== undefined && { status }) },
-  );
-}
-
-function toResponse(result: ClaudeCodeResult, request: ChatRequest): ChatResponse {
-  const content = parseReply(result.structured_output, request.tools);
-  if (content === undefined) {
-    throw new ProviderError("Claude Code returned a reply that does not match the tool protocol.", { provider: PROVIDER });
-  }
-  const usage = result.usage;
-  return {
-    id: result.session_id ?? "",
-    content,
-    stop_reason: content.some((block) => block.type === "tool_use") ? "tool_use" : "end_turn",
-    usage: {
-      input_tokens: usage
-        ? usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens
-        : 0,
-      output_tokens: usage?.output_tokens ?? 0,
-    },
-  };
-}
-
-function safeJson(text: string): unknown {
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return undefined;
-  }
 }

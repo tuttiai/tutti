@@ -18,6 +18,7 @@ import type {
 import { END } from "./types.js";
 import { GraphCycleError, GraphStateError } from "./errors.js";
 import { logger } from "../logger.js";
+import { addUsage } from "../usage.js";
 
 /** Default per-node visit cap. */
 const DEFAULT_MAX_NODE_VISITS = 5;
@@ -262,8 +263,7 @@ export async function executeGraph(
     }
     const nodeDuration = Date.now() - nodeStartedAt;
 
-    totalUsage.input_tokens += usage.input_tokens;
-    totalUsage.output_tokens += usage.output_tokens;
+    addUsage(totalUsage, usage);
     outputs.set(currentNodeId, nodeResult);
     path.push(currentNodeId);
 
@@ -323,8 +323,7 @@ export async function executeGraph(
           }
           const branchDuration = Date.now() - branchStartedAt;
 
-          totalUsage.input_tokens += branch.usage.input_tokens;
-          totalUsage.output_tokens += branch.usage.output_tokens;
+          addUsage(totalUsage, branch.usage);
           outputs.set(targetId, branch.nodeResult);
           path.push(targetId);
 

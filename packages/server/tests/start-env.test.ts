@@ -17,8 +17,27 @@ describe("readStartAgentEnv", () => {
       max_turns: undefined,
       max_tool_calls: undefined,
       max_cost_usd: undefined,
+      context: undefined,
       require_approval: undefined,
     });
+  });
+
+  it("reads the context variables that are set, and only those", () => {
+    const env = readStartAgentEnv(reader({ TUTTI_MAX_TOOL_RESULT_CHARS: "8000", TUTTI_SUMMARISE_AFTER_TOKENS: "120000" }));
+    expect(env.context).toEqual({ max_tool_result_chars: 8000, summarise_after_tokens: 120000 });
+  });
+
+  it("reads all three context variables", () => {
+    const env = readStartAgentEnv(reader({
+      TUTTI_MAX_TOOL_RESULT_CHARS: "8000",
+      TUTTI_TRIM_AFTER_TOKENS: "40000",
+      TUTTI_SUMMARISE_AFTER_TOKENS: "120000",
+    }));
+    expect(env.context).toEqual({ max_tool_result_chars: 8000, trim_after_tokens: 40000, summarise_after_tokens: 120000 });
+  });
+
+  it("refuses a context variable that is not a positive integer", () => {
+    expect(() => readStartAgentEnv(reader({ TUTTI_TRIM_AFTER_TOKENS: "-5" }))).toThrow(/TUTTI_TRIM_AFTER_TOKENS/);
   });
 
   it("reads voices, permissions and limits", () => {

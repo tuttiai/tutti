@@ -62,24 +62,54 @@ export function registerModelPrice(
 }
 
 /**
+ * The parts of a call's prompt that went through the provider's prompt
+ * cache. Both are parts of the prompt token count, not additions to it.
+ */
+export interface CachedPromptTokens {
+  /** Prompt tokens read from the cache. */
+  read?: number;
+  /** Prompt tokens written to the cache. */
+  written?: number;
+}
+
+/** What a cache read costs, as a share of the input rate. */
+export const CACHE_READ_RATE = 0.1;
+/**
+ * What a cache write costs, as a share of the input rate. This is the
+ * five-minute rate; a one-hour write costs twice the input rate, so an
+ * estimate for a provider writing one-hour entries runs low on writes.
+ */
+export const CACHE_WRITE_RATE = 1.25;
+
+/**
  * Estimate the USD cost of a single LLM call for a known model. Returns
  * `null` when the model is not in the price table — callers can fall back
  * to a heuristic or surface "unknown" rather than silently zero-cost.
  *
+ * @param model - The model the call ran on.
+ * @param promptTokens - Every prompt token, cached or not.
+ * @param completionTokens - Tokens generated.
+ * @param cached - The cached parts of the prompt, priced at the cache rates.
+ * @returns The estimated cost in USD, or `null` for an unknown model.
+ *
  * @example
  * estimateCost("gpt-4o", 1000, 500); // 0.0125
+ * estimateCost("claude-sonnet-4", 1000, 0, { read: 900 }); // 0.000573
  * estimateCost("unknown-model", 1000, 500); // null
  */
 export function estimateCost(
   model: string,
   promptTokens: number,
   completionTokens: number,
+  cached: CachedPromptTokens = {},
 ): number | null {
   const price = PRICES.get(model);
   if (!price) return null;
-  return (
-    (promptTokens * price.input + completionTokens * price.output) / 1_000_000
-  );
+  const read = cached.read ?? 0;
+  const written = cached.written ?? 0;
+  const uncached = Math.max(0, promptTokens - read - written);
+  const promptUnits = uncached + read * CACHE_READ_RATE + written * CACHE_WRITE_RATE;
+  return (promptUnits * price.input + completionTokens * price.output) / 1_000_000;
 }
 
 /**

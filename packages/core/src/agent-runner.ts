@@ -67,6 +67,8 @@ import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { needsApproval } from "./interrupt/index.js";
+import { addUsage } from "./usage.js";
+import { compactContext, capToolResults } from "./context/index.js";
 import {
   BudgetExceededError,
   InterruptDeniedError,
@@ -942,6 +944,41 @@ export class AgentRunner {
         }
       }
 
+      // Inject semantic memories ONCE before the first turn, as user
+      // memories are above. The search is keyed on the run's input, which
+      // does not change between turns, and a system prompt that stays the
+      // same from turn to turn is what lets the provider's prompt cache
+      // serve it. Uses the per-agent-resolved store so a custom
+      // `agent.memory.semantic.store` is honoured here too.
+      const memCfg = semanticCfg;
+      if (memCfg?.enabled && semanticStore) {
+        const maxMemories = memCfg.max_memories ?? 5;
+        const injectSystem = memCfg.inject_system !== false;
+        if (injectSystem) {
+          const memories = await semanticStore.search(
+            input,
+            agent.name,
+            maxMemories,
+          );
+          if (memories.length > 0) {
+            const memoryBlock = memories
+              .map((m) => `- ${m.content}`)
+              .join("\n");
+            baseSystemPrompt +=
+              "\n\nRelevant context from previous sessions:\n" +
+              memoryBlock;
+            // When the curated tools are also active, hint that the
+            // model may call them to extend or correct this context.
+            if (memCfg.curated_tools !== false) {
+              baseSystemPrompt +=
+                "\n\nUse the `remember` tool when the user shares something worth keeping. " +
+                "Use `recall` to look things up. " +
+                "Use `forget` to remove an entry the user retracts.";
+            }
+          }
+        }
+      }
+
       // Agentic loop. The try/catch around it only exists to surface the
       // last durable checkpoint on crash — the error itself still
       // propagates so callers see the real failure.
@@ -990,42 +1027,28 @@ export class AgentRunner {
           turn: turns,
         });
 
-        // Inject semantic memories into system prompt if enabled.
-        // Uses the per-agent-resolved store so a custom
-        // `agent.memory.semantic.store` is honoured here too.
-        let systemPrompt = baseSystemPrompt;
-        const memCfg = semanticCfg;
-        if (memCfg?.enabled && semanticStore) {
-          const maxMemories = memCfg.max_memories ?? 5;
-          const injectSystem = memCfg.inject_system !== false;
-          if (injectSystem) {
-            const memories = await semanticStore.search(
-              input,
-              agent.name,
-              maxMemories,
-            );
-            if (memories.length > 0) {
-              const memoryBlock = memories
-                .map((m) => `- ${m.content}`)
-                .join("\n");
-              systemPrompt +=
-                "\n\nRelevant context from previous sessions:\n" +
-                memoryBlock;
-              // When the curated tools are also active, hint that the
-              // model may call them to extend or correct this context.
-              if (memCfg.curated_tools !== false) {
-                systemPrompt +=
-                  "\n\nUse the `remember` tool when the user shares something worth keeping. " +
-                  "Use `recall` to look things up. " +
-                  "Use `forget` to remove an entry the user retracts.";
-              }
-            }
+        // Shorten the history per the agent's context settings before it
+        // is sent. A summary costs a model call of its own, which counts
+        // against the run's usage and budget like any other.
+        if (agent.context) {
+          const summary = await compactContext(messages, agent.context, {
+            agent_name: agent.name,
+            chat: (req) =>
+              Tracing.llmCall(agent.model ?? "unknown", () =>
+                abortable(signal, () =>
+                  withRetry(() => this.callProviderChat(routerScope, withSignal({ ...req, model: agent.model }, signal), budget), signal),
+                ),
+              ),
+          });
+          if (summary) {
+            addUsage(totalUsage, summary.usage);
+            budget?.add(summary.usage.input_tokens, summary.usage.output_tokens);
           }
         }
 
         let request: ChatRequest = {
           model: agent.model,
-          system: systemPrompt,
+          system: baseSystemPrompt,
           messages,
           tools: toolDefs.length > 0 ? toolDefs : undefined,
         };
@@ -1096,8 +1119,7 @@ export class AgentRunner {
         await this.safeHook(() => this.globalHooks?.afterLLMCall?.(hookCtx, response));
         await this.safeHook(() => agentHooks?.afterLLMCall?.(hookCtx, response));
 
-        totalUsage.input_tokens += response.usage.input_tokens;
-        totalUsage.output_tokens += response.usage.output_tokens;
+        addUsage(totalUsage, response.usage);
 
         // For `model: 'auto'` runs, price this call at the SmartProvider's
         // chosen tier rather than the 'auto' sentinel (which has no
@@ -1289,7 +1311,11 @@ export class AgentRunner {
         );
 
         // Add tool results as a user message (Anthropic API format)
-        messages.push({ role: "user", content: toolResults });
+        const maxResultChars = agent.context?.max_tool_result_chars;
+        messages.push({
+          role: "user",
+          content: maxResultChars === undefined ? toolResults : capToolResults(toolResults, maxResultChars),
+        });
 
         // Durable checkpoint at the bottom of the tool-use branch: the
         // turn is fully processed (assistant message + tool_results both
@@ -1375,8 +1401,7 @@ export class AgentRunner {
             ? this.streamToResponse(routerScope, finalRequest, session.id)
             : this.callProviderChat(routerScope, finalRequest, budget),
         signal));
-        totalUsage.input_tokens += finalResponse.usage.input_tokens;
-        totalUsage.output_tokens += finalResponse.usage.output_tokens;
+        addUsage(totalUsage, finalResponse.usage);
         messages.push({ role: "assistant", content: finalResponse.content });
         output = extractText(finalResponse.content);
       }
@@ -1422,8 +1447,7 @@ export class AgentRunner {
                 : this.callProviderChat(routerScope, retryRequest, budget),
             signal));
 
-            totalUsage.input_tokens += retryResponse.usage.input_tokens;
-            totalUsage.output_tokens += retryResponse.usage.output_tokens;
+            addUsage(totalUsage, retryResponse.usage);
             messages.push({ role: "assistant", content: retryResponse.content });
 
             output = extractText(retryResponse.content);

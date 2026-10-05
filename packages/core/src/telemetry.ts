@@ -209,13 +209,19 @@ export const Tracing = {
       },
       fn,
       (response) => {
-        const prompt_tokens = response.usage.input_tokens;
-        const completion_tokens = response.usage.output_tokens;
-        const cost = estimateCost(model, prompt_tokens, completion_tokens);
+        const { input_tokens: prompt_tokens, output_tokens: completion_tokens } = response.usage;
+        const read = response.usage.cache_read_input_tokens;
+        const written = response.usage.cache_creation_input_tokens;
+        const cost = estimateCost(model, prompt_tokens, completion_tokens, {
+          ...(read !== undefined && { read }),
+          ...(written !== undefined && { written }),
+        });
         return {
           prompt_tokens,
           completion_tokens,
           total_tokens: prompt_tokens + completion_tokens,
+          ...(read !== undefined && { cache_read_tokens: read }),
+          ...(written !== undefined && { cache_creation_tokens: written }),
           ...(cost !== null ? { cost_usd: cost } : {}),
         };
       },

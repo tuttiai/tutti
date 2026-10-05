@@ -179,6 +179,45 @@ export interface AgentCacheConfig {
 }
 
 /**
+ * Per-agent control of how much conversation is re-sent to the model.
+ *
+ * An agent loop sends the whole conversation on every turn, so every tool
+ * result is paid for again on each turn after it arrives. Every field is
+ * optional and off when absent; an agent without `context` behaves exactly
+ * as before.
+ *
+ * Shortening happens in steps rather than a little every turn: a provider's
+ * prompt cache serves only a prefix that has not changed, so history is
+ * rewritten once a threshold is crossed and then left alone until it is
+ * crossed again.
+ */
+export interface AgentContextConfig {
+  /**
+   * Cap on one tool result as it enters the conversation, in characters.
+   * The start and end are kept and the middle is replaced with a note of
+   * how much was left out.
+   */
+  max_tool_result_chars?: number;
+  /**
+   * Once the conversation is estimated past this many tokens, shorten every
+   * tool result except the most recent ones to `trimmed_tool_result_chars`.
+   */
+  trim_after_tokens?: number;
+  /** Tool results at the end of the conversation never shortened. Default 4. */
+  keep_recent_tool_results?: number;
+  /** Characters kept from the start of a shortened tool result. Default 400. */
+  trimmed_tool_result_chars?: number;
+  /**
+   * Once the conversation is still estimated past this many tokens after
+   * shortening, replace its older part with a summary written by the agent's
+   * own model. The first message is always kept as it was.
+   */
+  summarise_after_tokens?: number;
+  /** Messages at the end of the conversation never summarised. Default 8. */
+  keep_recent_messages?: number;
+}
+
+/**
  * Context passed to {@link AgentConfig.beforeRun} and {@link AgentConfig.afterRun}
  * guardrail hooks, giving them access to the agent name and session.
  */
@@ -419,6 +458,8 @@ export interface AgentConfig {
   hooks?: TuttiHooks;
   /** Tool result cache — serves repeated identical tool calls from memory. */
   cache?: AgentCacheConfig;
+  /** How much of a long conversation is re-sent to the model each turn. Off when absent. */
+  context?: AgentContextConfig;
   /**
    * Persist a checkpoint at every turn boundary so crashed or restarted
    * processes can resume without losing progress. `true` accepts defaults
