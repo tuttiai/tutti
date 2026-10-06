@@ -15,6 +15,13 @@ import { createGetFileContentsTool } from "./tools/get-file-contents.js";
 import { createSearchCodeTool } from "./tools/search-code.js";
 import { createListRepositoriesTool } from "./tools/list-repositories.js";
 import { createGetRepositoryTool } from "./tools/get-repository.js";
+import { createGetCommitTool } from "./tools/get-commit.js";
+import { createRerunWorkflowJobTool } from "./tools/rerun-workflow-job.js";
+import { createEditFileTool } from "./tools/edit-file.js";
+import { createUpdatePullRequestTool } from "./tools/update-pull-request.js";
+import { createUpdatePullRequestBranchTool } from "./tools/update-pull-request-branch.js";
+import { createMarkReadyForReviewTool } from "./tools/mark-ready-for-review.js";
+import { createCreateReviewTool } from "./tools/create-review.js";
 
 export interface GitHubVoiceOptions {
   /** GitHub personal access token. Defaults to GITHUB_TOKEN env var. */
@@ -36,11 +43,18 @@ export class GitHubVoice implements Voice {
       createCommentOnIssueTool(octokit),
       createListPullRequestsTool(octokit),
       createGetPullRequestTool(octokit),
+      createGetCommitTool(octokit),
       createListPullRequestChecksTool(octokit),
       createGetCheckRunLogTool(octokit),
+      createRerunWorkflowJobTool(octokit),
       createCreateBranchTool(octokit),
       createCommitFilesTool(octokit),
+      createEditFileTool(octokit),
       createCreatePullRequestTool(octokit),
+      createUpdatePullRequestTool(octokit),
+      createUpdatePullRequestBranchTool(octokit),
+      createMarkReadyForReviewTool(octokit),
+      createCreateReviewTool(octokit),
       createGetFileContentsTool(octokit),
       createSearchCodeTool(octokit),
       createListRepositoriesTool(octokit),
