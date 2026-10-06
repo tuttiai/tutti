@@ -3,6 +3,8 @@ import type { Octokit } from "@octokit/rest";
 import type { Tool } from "@tuttiai/types";
 import { ghErrorMessage, httpStatus } from "../utils/format.js";
 import { changeSetProblem, MAX_COMMIT_ENTRIES } from "../utils/repo-paths.js";
+import { branchHead, commitOnto, defaultBranchRefusal } from "../utils/branch-commit.js";
+import type { CommitOutcome, CommitStep, TreeEntry } from "../utils/branch-commit.js";
 
 const parameters = z.object({
   owner: z.string().describe("Repo owner or org"),
@@ -34,16 +36,7 @@ const parameters = z.object({
 
 type Input = z.infer<typeof parameters>;
 
-/** Which request was in flight when a failure happened. */
-type Step = "repo" | "ref" | "write" | "update";
-
-/** What a successful commit reports back. */
-interface CommitOutcome {
-  sha: string;
-  url: string;
-}
-
-function describeFailure(error: unknown, input: Input, step: Step): string {
+function describeFailure(error: unknown, input: Input, step: CommitStep): string {
   const where = input.owner + "/" + input.repo;
   const status = httpStatus(error);
   if (step === "ref" && status === 404) {
@@ -61,30 +54,16 @@ function describeFailure(error: unknown, input: Input, step: Step): string {
   return ghErrorMessage(error, where);
 }
 
-function treeEntries(input: Input): Array<{ path: string; mode: "100644"; type: "blob"; content?: string; sha?: null }> {
+function treeEntries(input: Input): TreeEntry[] {
   return [
     ...input.files.map((f) => ({ path: f.path, mode: "100644" as const, type: "blob" as const, content: f.content })),
     ...input.deletions.map((path) => ({ path, mode: "100644" as const, type: "blob" as const, sha: null })),
   ];
 }
 
-async function writeCommit(octokit: Octokit, input: Input, track: (step: Step) => void): Promise<CommitOutcome> {
-  const repo = { owner: input.owner, repo: input.repo };
-  track("ref");
-  const { data: ref } = await octokit.git.getRef({ ...repo, ref: `heads/${input.branch}` });
-  track("write");
-  const head = ref.object.sha;
-  const { data: parent } = await octokit.git.getCommit({ ...repo, commit_sha: head });
-  const { data: tree } = await octokit.git.createTree({ ...repo, base_tree: parent.tree.sha, tree: treeEntries(input) });
-  const { data: commit } = await octokit.git.createCommit({
-    ...repo,
-    message: input.message,
-    tree: tree.sha,
-    parents: [head],
-  });
-  track("update");
-  await octokit.git.updateRef({ ...repo, ref: `heads/${input.branch}`, sha: commit.sha, force: false });
-  return { sha: commit.sha, url: commit.html_url };
+async function writeCommit(octokit: Octokit, input: Input, track: (step: CommitStep) => void): Promise<CommitOutcome> {
+  const base = await branchHead(octokit, input, track);
+  return commitOnto(octokit, { ...input, base, entries: treeEntries(input) }, track);
 }
 
 function summarise(input: Input, outcome: CommitOutcome): string {
@@ -131,16 +110,11 @@ export function createCommitFilesTool(octokit: Octokit): Tool<Input> {
     execute: async (input) => {
       const problem = changeSetProblem(input.files, input.deletions);
       if (problem !== null) return { content: problem, is_error: true };
-      let step: Step = "repo";
+      let step: CommitStep = "repo";
       try {
         const { data: repo } = await octokit.repos.get({ owner: input.owner, repo: input.repo });
         if (input.branch === repo.default_branch) {
-          return {
-            content:
-              `Refusing to commit to "${input.branch}", the default branch of ${input.owner}/${input.repo}.\n` +
-              `Call create_branch to make a branch for this change, commit onto it, then open a pull request.`,
-            is_error: true,
-          };
+          return { content: defaultBranchRefusal(input), is_error: true };
         }
         const outcome = await writeCommit(octokit, input, (next) => (step = next));
         return { content: summarise(input, outcome) };
