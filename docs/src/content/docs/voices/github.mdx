@@ -56,7 +56,7 @@ new GitHubVoice({ token: "ghp_..." })
 | `create_issue` | Create a new issue | `owner`, `repo`, `title`, `body`, `labels` |
 | `comment_on_issue` | Add a comment | `owner`, `repo`, `issue_number`, `body` |
 | `list_pull_requests` | List PRs | `owner`, `repo`, `state`, `limit` |
-| `get_pull_request` | Get PR details | `owner`, `repo`, `pr_number` |
+| `get_pull_request` | Get PR details, head commit and every review | `owner`, `repo`, `pr_number` |
 | `get_commit` | Read one commit and its patches | `owner`, `repo`, `sha` |
 | `list_pull_request_checks` | List CI check runs and commit statuses on a PR | `owner`, `repo`, `pr_number` |
 | `get_check_run_log` | Get the tail of a GitHub Actions job log | `owner`, `repo`, `check_run_id`, `tail_lines` |

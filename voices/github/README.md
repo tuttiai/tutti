@@ -52,7 +52,7 @@ Without a token, tools still work for public repos but are limited to 60 request
 | `create_issue` | Create a new issue |
 | `comment_on_issue` | Comment on an issue or PR |
 | `list_pull_requests` | List PRs with state filtering |
-| `get_pull_request` | Get full PR details with diff stats |
+| `get_pull_request` | Get full PR details with diff stats, head commit, and every review with its state and author |
 | `get_commit` | Read one commit: message, parents and each changed file's patch, capped at 40,000 characters. Read-only. |
 | `list_pull_request_checks` | List the check runs and commit statuses on a PR's head commit, with an overall passed/failed/pending count and verdict. Read-only. |
 | `get_check_run_log` | Get the last lines (default 150, max 1000, at most 40,000 characters) of a GitHub Actions job's log. Read-only. |
