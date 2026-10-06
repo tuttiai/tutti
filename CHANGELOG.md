@@ -133,6 +133,8 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Fixed
 
+**`get_pull_request` lists reviews instead of miscounting them.** Its `Reviews:` figure was GitHub's `review_comments`, the count of inline review comments, so a review with only a body counted as none, and a QA agent stopped a run to ask the owner whether a review it could not see had been posted. It now lists every review with its state, author, commit and submission time, names the old figure "Inline review comments", and shows the head commit.
+
 **A run stops when its caller goes away.** `POST /run/stream` stopped writing when the client disconnected but left `runtime.run()` going to the end, tools included. tutti-app's control plane gave up on a reply and aborted its fetch, and the agent carried on for another minute and asked for two more destructive approvals (`commit_files`, `create_pull_request`) that nobody was listening for. Nothing in the runner could be cancelled.
 
 - **`AgentRunOptions.signal`** takes an `AbortSignal`. Once it aborts, the runner makes no further model call and runs no further tool: it checks before every turn and before every tool call, including the moment after an approval is granted. A pending approval wait ends at once, and its interrupt is resolved as denied with the reason `run aborted`, so a reviewer is not left a request nothing would act on. The run rejects with the new **`RunAbortedError`** (`code: "RUN_ABORTED"`, `reason`), and the session is not updated with the abandoned turns.

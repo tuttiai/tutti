@@ -29,6 +29,7 @@ function createMockOctokit() {
       list: vi.fn(),
       get: vi.fn(),
       create: vi.fn(),
+      listReviews: vi.fn(),
     },
     repos: {
       getContent: vi.fn(),
@@ -348,36 +349,82 @@ describe("list_pull_requests", () => {
 // ---------------------------------------------------------------------------
 
 describe("get_pull_request", () => {
-  it("returns full PR details", async () => {
-    octokit.pulls.get.mockResolvedValue({
-      data: {
-        number: 10,
-        title: "Big PR",
-        state: "open",
-        merged: false,
-        user: { login: "dev" },
-        head: { ref: "feat" },
-        base: { ref: "main" },
-        changed_files: 5,
-        additions: 100,
-        deletions: 20,
-        comments: 2,
-        review_comments: 3,
-        html_url: "https://github.com/o/r/pull/10",
-        body: "PR description",
-      },
+  const PR = {
+    number: 10,
+    title: "Big PR",
+    state: "open",
+    merged: false,
+    draft: false,
+    user: { login: "dev" },
+    head: { ref: "feat", sha: "0d3d1b7aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    base: { ref: "main" },
+    changed_files: 5,
+    additions: 100,
+    deletions: 20,
+    comments: 2,
+    review_comments: 0,
+    html_url: "https://github.com/o/r/pull/10",
+    body: "PR description",
+  };
+
+  async function read(): Promise<string> {
+    const tool = createGetPullRequestTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", pr_number: 10 }), ctx);
+    return result.content;
+  }
+
+  it("returns full PR details with its head commit", async () => {
+    octokit.pulls.get.mockResolvedValue({ data: PR });
+    octokit.pulls.listReviews.mockResolvedValue({ data: [] });
+
+    const content = await read();
+
+    expect(content).toContain("#10: Big PR");
+    expect(content).toContain("Head: 0d3d1b7aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(content).toContain("+100");
+    expect(content).toContain("-20");
+    expect(content).toContain("PR description");
+    expect(content).toContain("Reviews: none");
+  });
+
+  it("lists a review that has only a body, which GitHub's review_comments count leaves out", async () => {
+    octokit.pulls.get.mockResolvedValue({ data: PR });
+    octokit.pulls.listReviews.mockResolvedValue({
+      data: [
+        { id: 5425236748, state: "COMMENTED", user: { login: "chihab-a" }, commit_id: "0d3d1b7aaaa", submitted_at: "2026-10-06T07:58:00Z" },
+        { id: 5425338817, state: "CHANGES_REQUESTED", user: { login: "bot" }, commit_id: "0d3d1b7aaaa", submitted_at: null },
+      ],
     });
 
-    const tool = createGetPullRequestTool(octokit);
-    const result = await tool.execute(
-      tool.parameters.parse({ owner: "o", repo: "r", pr_number: 10 }),
-      ctx,
-    );
+    const content = await read();
 
-    expect(result.content).toContain("#10: Big PR");
-    expect(result.content).toContain("+100");
-    expect(result.content).toContain("-20");
-    expect(result.content).toContain("PR description");
+    expect(octokit.pulls.listReviews).toHaveBeenCalledWith({ owner: "o", repo: "r", pull_number: 10, per_page: 100 });
+    expect(content).toContain("Inline review comments: 0");
+    expect(content).toContain("Reviews: 2");
+    expect(content).toContain("  - commented by chihab-a on 0d3d1b7 at 2026-10-06T07:58:00Z (review 5425236748)");
+    expect(content).toContain("  - changes requested by bot on 0d3d1b7 (pending, not submitted) (review 5425338817)");
+  });
+
+  it("still returns the pull request when its reviews cannot be read", async () => {
+    octokit.pulls.get.mockResolvedValue({ data: PR });
+    octokit.pulls.listReviews.mockRejectedValue(Object.assign(new Error("Forbidden"), { status: 403 }));
+
+    const content = await read();
+
+    expect(content).toContain("#10: Big PR");
+    expect(content).toContain("Reviews: could not be read [403]");
+  });
+
+  it("says when it shows only the first hundred reviews", async () => {
+    octokit.pulls.get.mockResolvedValue({ data: { ...PR, draft: true } });
+    const many = Array.from({ length: 100 }, (_, id) => ({ id, state: "COMMENTED", user: null, commit_id: null, submitted_at: "2026-10-06T08:00:00Z" }));
+    octokit.pulls.listReviews.mockResolvedValue({ data: many });
+
+    const content = await read();
+
+    expect(content).toContain("State: open (draft)");
+    expect(content).toContain("Reviews: 100 (showing the first 100)");
+    expect(content).toContain("  - commented by unknown at 2026-10-06T08:00:00Z (review 0)");
   });
 });
 
