@@ -53,12 +53,19 @@ Without a token, tools still work for public repos but are limited to 60 request
 | `comment_on_issue` | Comment on an issue or PR |
 | `list_pull_requests` | List PRs with state filtering |
 | `get_pull_request` | Get full PR details with diff stats |
+| `get_commit` | Read one commit: message, parents and each changed file's patch, capped at 40,000 characters. Read-only. |
 | `list_pull_request_checks` | List the check runs and commit statuses on a PR's head commit, with an overall passed/failed/pending count and verdict. Read-only. |
 | `get_check_run_log` | Get the last lines (default 150, max 1000, at most 40,000 characters) of a GitHub Actions job's log. Read-only. |
+| `rerun_workflow_job` | Re-run one failed, cancelled or timed-out GitHub Actions job. Refuses a job still running or one that passed. Destructive, gated behind HITL. |
 | `create_branch` | Create a branch from the default branch or a named one. Destructive, gated behind HITL. |
 | `commit_files` | Commit full-content file writes and deletions onto a branch in one commit. Refuses the default branch; at most 100 entries, 1 MB per file. Destructive, gated behind HITL. |
-| `create_pull_request` | Open a PR from an existing branch. Destructive — gated behind HITL. Does not merge. |
-| `get_file_contents` | Read a file from a repo |
+| `edit_file` | Change part of a file on a branch by exact-text replacement, applied to the whole file on the server, and commit it. Each `old_text` must occur exactly once. Refuses the default branch. Destructive, gated behind HITL. |
+| `create_pull_request` | Open a PR from an existing branch. Destructive, gated behind HITL. Does not merge. |
+| `update_pull_request` | Change a PR's title and/or description. Destructive, gated behind HITL. |
+| `update_pull_request_branch` | GitHub's "Update branch": merge the base into the PR's branch. Destructive, gated behind HITL. |
+| `mark_ready_for_review` | Take a draft PR out of draft. Destructive, gated behind HITL. |
+| `create_review` | Submit a review: `APPROVE`, `REQUEST_CHANGES` or `COMMENT`, with a body. Destructive, gated behind HITL. |
+| `get_file_contents` | Read a file one page at a time (`offset`, `limit`, at most 40,000 characters a page). The first line gives the lines returned, the file's total lines and bytes, and whether the read is partial. |
 | `search_code` | Search code across repos |
 | `list_repositories` | List repos for a user or org |
 | `get_repository` | Get full repo details |

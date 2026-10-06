@@ -11,6 +11,8 @@ It can also take a change all the way to a pull request with no git binary or sh
 
 It can read CI on a pull request too: `list_pull_request_checks` reports every check run and commit status with an overall verdict, and `get_check_run_log` returns the tail of a failed GitHub Actions job's log. Both are read-only.
 
+And it can keep a pull request moving without a person: `edit_file` changes part of a file without the agent holding all of it, `update_pull_request` and `mark_ready_for_review` tidy the PR, `update_pull_request_branch` brings it up to date with its base, `rerun_workflow_job` retries a failed or cancelled CI job, `get_commit` shows what one commit did, and `create_review` records a reviewer's verdict on GitHub. Every one that writes is marked `destructive: true`.
+
 ## Installation
 
 ```bash
@@ -55,12 +57,19 @@ new GitHubVoice({ token: "ghp_..." })
 | `comment_on_issue` | Add a comment | `owner`, `repo`, `issue_number`, `body` |
 | `list_pull_requests` | List PRs | `owner`, `repo`, `state`, `limit` |
 | `get_pull_request` | Get PR details | `owner`, `repo`, `pr_number` |
+| `get_commit` | Read one commit and its patches | `owner`, `repo`, `sha` |
 | `list_pull_request_checks` | List CI check runs and commit statuses on a PR | `owner`, `repo`, `pr_number` |
 | `get_check_run_log` | Get the tail of a GitHub Actions job log | `owner`, `repo`, `check_run_id`, `tail_lines` |
+| `rerun_workflow_job` | Re-run a failed or cancelled Actions job (destructive) | `owner`, `repo`, `check_run_id` |
 | `create_branch` | Create a branch (destructive) | `owner`, `repo`, `branch`, `from` |
 | `commit_files` | Commit files and deletions to a branch (destructive) | `owner`, `repo`, `branch`, `message`, `files`, `deletions` |
+| `edit_file` | Replace exact text in one file on a branch (destructive) | `owner`, `repo`, `branch`, `path`, `message`, `edits` |
 | `create_pull_request` | Open a PR from an existing branch (destructive) | `owner`, `repo`, `title`, `head`, `base`, `body`, `draft` |
-| `get_file_contents` | Get a file from a repo | `owner`, `repo`, `path`, `ref` |
+| `update_pull_request` | Change a PR's title or description (destructive) | `owner`, `repo`, `pr_number`, `title`, `body` |
+| `update_pull_request_branch` | Merge the base into a PR's branch (destructive) | `owner`, `repo`, `pr_number`, `expected_head_sha` |
+| `mark_ready_for_review` | Take a draft PR out of draft (destructive) | `owner`, `repo`, `pr_number` |
+| `create_review` | Approve, request changes or comment (destructive) | `owner`, `repo`, `pr_number`, `event`, `body`, `commit_id` |
+| `get_file_contents` | Get a file, one page at a time | `owner`, `repo`, `path`, `ref`, `offset`, `limit` |
 | `search_code` | Search code across GitHub | `query`, `limit` |
 | `list_repositories` | List repos for a user/org | `owner`, `type`, `limit` |
 | `get_repository` | Get repo details | `owner`, `repo` |
@@ -131,6 +140,40 @@ A branch that already exists comes back as an error pointing at `commit_files`.
 Writes one commit through the Git Data API and fast-forwards the branch; it never force-pushes, so a branch that moved in the meantime is reported and left alone. At least one entry and at most 100 across `files` and `deletions`. Every path is checked before any request: absolute paths, `..`, backslashes, empty segments, anything inside `.git`, and a path listed twice are all refused.
 
 **It refuses the repository's default branch.** Call `create_branch` first, commit onto that, then `create_pull_request`, so an agent's change always reaches the default branch through a reviewed pull request.
+
+### edit_file
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `owner` | `string` | — | Repository owner |
+| `repo` | `string` | — | Repository name |
+| `branch` | `string` | — | Existing branch to commit onto |
+| `path` | `string` | — | Existing file to change |
+| `message` | `string` | — | Commit message |
+| `edits` | `{ old_text, new_text }[]` | — | Replacements applied in order, 1 to 50 |
+
+Reads the whole file at the branch head, applies each replacement to the result of the one before, and commits the file onto the branch, fast-forwarding it as `commit_files` does. Each `old_text` must occur exactly once: text that is missing or appears more than once refuses the whole call and nothing is committed. Because the file is edited whole on the server, an agent can change a file it has read only part of. Refuses the default branch and the same paths `commit_files` refuses.
+
+### get_file_contents
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `owner` | `string` | — | Repository owner |
+| `repo` | `string` | — | Repository name |
+| `path` | `string` | — | File or directory path |
+| `ref` | `string?` | default branch | Branch, tag or SHA |
+| `offset` | `number` | `1` | First line to return, 1-based |
+| `limit` | `number?` | — | Most lines to return, at most `5000` |
+
+A page also stops at 40,000 characters. Every file read opens with a line such as `[src/a.ts @ main: lines 1-400 of 1,212 (48,310 bytes), PARTIAL: next offset=401. …]`, or `complete` when the page is the whole file, so a caller always knows when it holds only part. Files over 1 MB are read as blobs and paged rather than refused.
+
+### rerun_workflow_job
+
+Takes the `check_run_id` from `list_pull_request_checks`, which for GitHub Actions is the job id, and re-runs that job and the jobs depending on it. Only a job that finished as failed, cancelled or timed out is re-run; one still queued or in progress is refused with the advice to wait, because a slow job is not a stuck one. The token needs write access to Actions.
+
+### create_review
+
+`event` is `APPROVE`, `REQUEST_CHANGES` or `COMMENT`, and `body` is required. An approval counts towards a repository's required reviews wherever the connection's account is not the pull request's author; GitHub refuses an account approving or requesting changes on its own pull request, and the tool then points at `COMMENT`.
 
 ### search_code
 

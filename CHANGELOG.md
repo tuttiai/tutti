@@ -14,6 +14,16 @@
 
 New exports from `@tuttiai/core`: `compactContext`, `capText`, `capToolResults`, `estimateTokens`, `trimToolResults`, `summariseHistory`, `summaryCut`, `SUMMARY_HEADING`, `addUsage`, and the type `CompactDeps`. From `@tuttiai/types`: `AgentContextConfig`. From `@tuttiai/telemetry`: `CACHE_READ_RATE`, `CACHE_WRITE_RATE` and the type `CachedPromptTokens`. Every interface change is an added optional field.
 
+**Seven more GitHub tools, and `get_file_contents` reads in pages.** Multi-agent runs kept stopping to ask a person for things the voice could not do: edit a pull request's title or body, mark a draft ready, re-run a cancelled CI job, see what one commit changed, or add a line to a file too large to read. And because `commit_files` replaces a whole file, a developer agent that had read a large file only as far as the tool result was cut wrote the cut version back, losing the rest.
+
+- **`edit_file`** changes part of a file by exact-text replacement. The tool reads the whole file at the branch head on the server, applies the edits in order and commits the result, so the agent never has to hold the whole file. It refuses, committing nothing, when any `old_text` is missing or occurs more than once. Like `commit_files` it refuses the default branch and never force-updates.
+- **`update_pull_request`** (title and description), **`mark_ready_for_review`** (through GraphQL, as REST has no endpoint for it), **`update_pull_request_branch`** (GitHub's "Update branch") and **`create_review`** (`APPROVE`, `REQUEST_CHANGES` or `COMMENT`, with a body).
+- **`rerun_workflow_job`** re-runs one GitHub Actions job that failed, was cancelled or timed out. A job still running is refused with the advice to wait, because a slow job is not a stuck one.
+- **`get_commit`** shows one commit's message, parents and per-file patches, capped at 40,000 characters, naming every file it left out.
+- **`get_file_contents` takes `offset` and `limit`** (lines, at most 5,000, and at most 40,000 characters a page) and **every file read now opens with one line** giving the lines returned, the file's total lines and bytes, and whether the read is complete or `PARTIAL` with the offset to read on from. Files over 1 MB are now read as blobs instead of coming back empty. This changes the output of every file read: the content starts on the second line.
+
+Every new tool that writes is marked `destructive: true`. `GitHubVoice` now exposes 22 tools; its constructor and options are unchanged. `tutti-ai search`'s count for `github` moves from 15 to 22.
+
 **`list_pull_request_checks` and `get_check_run_log` on the GitHub voice.** An agent could push a branch and open a pull request but had no way to see whether CI passed, so it could not meet a "CI must be green" rule before calling its work done. Both new tools are read-only.
 
 - **`list_pull_request_checks`** resolves a pull request's head commit and lists every check run on it (name, status, conclusion, timings, link, `check_run_id`, and the output title and summary, truncated) and every commit status, opening with one overall line such as `Overall: 3 passed, 1 failed, 0 pending, 0 skipped (verdict: failing)`. The verdict is `green` only when at least one check exists and none failed or is still running, so "no CI" never reads as a pass.

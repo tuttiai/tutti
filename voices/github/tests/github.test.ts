@@ -53,13 +53,13 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("GitHubVoice", () => {
-  it("implements Voice with 15 tools", () => {
+  it("implements Voice with 22 tools", () => {
     const voice = new GitHubVoice({ token: "fake" });
     expect(voice.name).toBe("github");
-    expect(voice.tools).toHaveLength(15);
+    expect(voice.tools).toHaveLength(22);
   });
 
-  it("lists CI reads, then branch and commit tools, between reading a PR and opening one", () => {
+  it("lists commit and CI reads, then branch and commit tools, then pull request writes", () => {
     const voice = new GitHubVoice({ token: "fake" });
     expect(voice.tools.map((t) => t.name)).toEqual([
       "list_issues",
@@ -68,11 +68,18 @@ describe("GitHubVoice", () => {
       "comment_on_issue",
       "list_pull_requests",
       "get_pull_request",
+      "get_commit",
       "list_pull_request_checks",
       "get_check_run_log",
+      "rerun_workflow_job",
       "create_branch",
       "commit_files",
+      "edit_file",
       "create_pull_request",
+      "update_pull_request",
+      "update_pull_request_branch",
+      "mark_ready_for_review",
+      "create_review",
       "get_file_contents",
       "search_code",
       "list_repositories",
@@ -83,7 +90,17 @@ describe("GitHubVoice", () => {
   it("marks exactly the outward-facing writes that must not run unattended as destructive", () => {
     const voice = new GitHubVoice({ token: "fake" });
     const destructive = voice.tools.filter((t) => t.destructive === true).map((t) => t.name);
-    expect(destructive).toEqual(["create_branch", "commit_files", "create_pull_request"]);
+    expect(destructive).toEqual([
+      "rerun_workflow_job",
+      "create_branch",
+      "commit_files",
+      "edit_file",
+      "create_pull_request",
+      "update_pull_request",
+      "update_pull_request_branch",
+      "mark_ready_for_review",
+      "create_review",
+    ]);
   });
 });
 
@@ -493,7 +510,50 @@ describe("get_file_contents", () => {
       ctx,
     );
 
-    expect(result.content).toBe("hello world");
+    expect(result.content).toBe("[README.md @ default branch: lines 1-1 of 1 (11 bytes), complete]\nhello world");
+  });
+
+  it("pages from offset and says where to read on", async () => {
+    const text = Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join("\n") + "\n";
+    octokit.repos.getContent.mockResolvedValue({
+      data: { type: "file", content: Buffer.from(text).toString("base64"), encoding: "base64", size: text.length, sha: "s" },
+    });
+
+    const tool = createGetFileContentsTool(octokit);
+    const result = await tool.execute(
+      tool.parameters.parse({ owner: "o", repo: "r", path: "a.txt", ref: "feat/x", offset: 3, limit: 2 }),
+      ctx,
+    );
+
+    expect(result.content).toBe(
+      "[a.txt @ feat/x: lines 3-4 of 10 (71 bytes), PARTIAL: next offset=5. Do not write this page back as the whole file; use edit_file.]\nline 3\nline 4",
+    );
+  });
+
+  it("reads a file over 1 MB as a blob instead of returning nothing", async () => {
+    octokit.repos.getContent.mockResolvedValue({
+      data: { type: "file", content: "", encoding: "none", size: 2_000_000, sha: "blob1" },
+    });
+    octokit.git = { getBlob: vi.fn().mockResolvedValue({ data: { content: Buffer.from("big\n").toString("base64") } }) };
+
+    const tool = createGetFileContentsTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", path: "big.json" }), ctx);
+
+    expect(octokit.git.getBlob).toHaveBeenCalledWith({ owner: "o", repo: "r", file_sha: "blob1" });
+    expect(result.content).toContain("lines 1-1 of 1 (4 bytes), complete]\nbig");
+  });
+
+  it("rejects a limit above the most lines one page may carry", () => {
+    const tool = createGetFileContentsTool(octokit);
+    expect(() => tool.parameters.parse({ owner: "o", repo: "r", path: "a", limit: 5001 })).toThrow();
+  });
+
+  it("reports a path that is neither a file nor a directory", async () => {
+    octokit.repos.getContent.mockResolvedValue({ data: { type: "submodule" } });
+    const tool = createGetFileContentsTool(octokit);
+    const result = await tool.execute(tool.parameters.parse({ owner: "o", repo: "r", path: "vendor/x" }), ctx);
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("not a file (type: submodule)");
   });
 
   it("handles directory listing", async () => {
