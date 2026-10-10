@@ -130,6 +130,7 @@ The image runs one agent configured entirely by environment:
 | `TUTTI_VOICES` | none | JSON array of `{ "voice", "options", "only"? }` |
 | `TUTTI_PERMISSIONS` | none | Comma-separated: `network`, `filesystem`, `shell`, `browser` |
 | `TUTTI_MAX_TURNS`, `TUTTI_MAX_TOOL_CALLS` | runtime defaults | Loop limits |
+| `TUTTI_TOOL_TIMEOUT_MS` | 30000 | How long one tool call may run before it fails |
 | `TUTTI_MAX_COST_USD` | none | Hard cost ceiling per run |
 | `TUTTI_REQUIRE_APPROVAL` | `destructive` | Which tool calls wait for a person, below |
 

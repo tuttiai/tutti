@@ -8,6 +8,7 @@
  * | `TUTTI_MAX_TURNS` | positive integer | the runtime default |
  * | `TUTTI_MAX_TOOL_CALLS` | positive integer | the runtime default |
  * | `TUTTI_MAX_COST_USD` | positive decimal | no ceiling |
+ * | `TUTTI_TOOL_TIMEOUT_MS` | positive integer | the runtime default, 30 seconds |
  * | `TUTTI_MAX_TOOL_RESULT_CHARS` | positive integer | tool results enter the conversation whole |
  * | `TUTTI_TRIM_AFTER_TOKENS` | positive integer | older tool results are never shortened |
  * | `TUTTI_SUMMARISE_AFTER_TOKENS` | positive integer | older conversation is never summarised |
@@ -51,6 +52,8 @@ export interface StartAgentEnv {
   readonly max_turns: number | undefined;
   readonly max_tool_calls: number | undefined;
   readonly max_cost_usd: number | undefined;
+  /** How long one tool call may run, in milliseconds. A sandbox that builds a repository needs minutes. */
+  readonly tool_timeout_ms: number | undefined;
   /** The agent's `context`, or `undefined` when none of its variables is set. */
   readonly context: AgentContextConfig | undefined;
   /** The agent's `requireApproval`. `undefined` gates destructive tools only. */
@@ -152,6 +155,7 @@ export function readStartAgentEnv(read: ReadVariable): StartAgentEnv {
     max_turns: readNumber(read, "TUTTI_MAX_TURNS", PositiveInt),
     max_tool_calls: readNumber(read, "TUTTI_MAX_TOOL_CALLS", PositiveInt),
     max_cost_usd: readNumber(read, "TUTTI_MAX_COST_USD", PositiveAmount),
+    tool_timeout_ms: readNumber(read, "TUTTI_TOOL_TIMEOUT_MS", PositiveInt),
     context: readContext(read),
     require_approval: readRequireApproval(read("TUTTI_REQUIRE_APPROVAL")),
   };

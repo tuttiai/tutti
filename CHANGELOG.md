@@ -4,6 +4,8 @@
 
 ### Added
 
+**The server image reads `TUTTI_TOOL_TIMEOUT_MS`**, a positive integer it sets as the agent's `tool_timeout_ms`. Without it every tool call failed after the runtime's 30-second default, which no sandbox command that clones, installs or builds a repository can meet: on 2026-10-10 a tutti-app developer agent spent twenty minutes retrying `execute_code` calls that each died at 30 seconds, although its sandbox allowed ten minutes. Absent, the runtime default holds as before.
+
 **Fewer tokens per run: prompt caching that works, and shorter history.** An agent loop re-sends the whole conversation every turn, so a run's cost grows with the square of its length, and nothing was reducing it.
 
 - **`ClaudeCodeProvider` resumes its session instead of starting a new one each turn.** Claude Code keys its prompt cache to its session, so a stateless call that re-sent a longer transcript was written to the cache in full every turn and read nothing back. Measured on 2026-10-05 with CLI 2.1.263: three turns of a growing conversation each wrote about 8,200 tokens and read none. The provider now starts a conversation as a session with a known id and resumes it with only the messages added since its last reply; the same measurement then read about 8,100 tokens and wrote about 145. Whenever it cannot resume safely (history rewritten, tools or system prompt changed, session gone or over an hour old, or already in use) it sends the whole transcript to a new session, as before. Sessions are now kept as files under the CLI's `~/.claude/projects`; `reuse_sessions: false` restores the old keep-nothing behaviour. The transcript it sends is compact JSON, one message per line, instead of indented.
