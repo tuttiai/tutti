@@ -41,6 +41,7 @@ export function buildStartAgent(
   if (env.max_turns !== undefined) agent.max_turns = env.max_turns;
   if (env.max_tool_calls !== undefined) agent.max_tool_calls = env.max_tool_calls;
   if (env.max_cost_usd !== undefined) agent.budget = { max_cost_usd: env.max_cost_usd };
+  if (env.tool_timeout_ms !== undefined) agent.tool_timeout_ms = env.tool_timeout_ms;
   if (env.require_approval !== undefined) agent.requireApproval = env.require_approval;
   if (env.context !== undefined) agent.context = env.context;
   return agent;

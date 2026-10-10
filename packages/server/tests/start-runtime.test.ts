@@ -14,6 +14,7 @@ const NOTHING_SET: StartAgentEnv = {
   max_turns: undefined,
   max_tool_calls: undefined,
   max_cost_usd: undefined,
+  tool_timeout_ms: undefined,
   context: undefined,
   require_approval: undefined,
 };
@@ -34,6 +35,7 @@ describe("buildStartAgent", () => {
         max_turns: 4,
         max_tool_calls: 9,
         max_cost_usd: 0.5,
+        tool_timeout_ms: 600_000,
         require_approval: ["send_*"],
       },
       [],
@@ -42,6 +44,7 @@ describe("buildStartAgent", () => {
     expect(agent.max_turns).toBe(4);
     expect(agent.max_tool_calls).toBe(9);
     expect(agent.budget).toEqual({ max_cost_usd: 0.5 });
+    expect(agent.tool_timeout_ms).toBe(600_000);
     expect(agent.requireApproval).toEqual(["send_*"]);
   });
 

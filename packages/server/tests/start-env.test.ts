@@ -17,6 +17,7 @@ describe("readStartAgentEnv", () => {
       max_turns: undefined,
       max_tool_calls: undefined,
       max_cost_usd: undefined,
+      tool_timeout_ms: undefined,
       context: undefined,
       require_approval: undefined,
     });
@@ -51,6 +52,7 @@ describe("readStartAgentEnv", () => {
         TUTTI_MAX_TURNS: "12",
         TUTTI_MAX_TOOL_CALLS: "40",
         TUTTI_MAX_COST_USD: "0.75",
+        TUTTI_TOOL_TIMEOUT_MS: "600000",
       }),
     );
     expect(env.voices).toEqual([
@@ -60,6 +62,7 @@ describe("readStartAgentEnv", () => {
     expect(env.permissions).toEqual(["network", "browser"]);
     expect(env.max_turns).toBe(12);
     expect(env.max_tool_calls).toBe(40);
+    expect(env.tool_timeout_ms).toBe(600000);
     expect(env.max_cost_usd).toBe(0.75);
   });
 
@@ -103,6 +106,7 @@ describe("readStartAgentEnv", () => {
     ["TUTTI_MAX_TURNS", "2.5"],
     ["TUTTI_MAX_TOOL_CALLS", "many"],
     ["TUTTI_MAX_COST_USD", "-1"],
+    ["TUTTI_TOOL_TIMEOUT_MS", "0"],
   ])("refuses %s=%s", (key, value) => {
     expect(() => readStartAgentEnv(reader({ [key]: value }))).toThrow(`${key} must be a positive number.`);
   });
