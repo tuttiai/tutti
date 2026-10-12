@@ -66,14 +66,42 @@ ending in one. Anything else is refused before a request is made.
 
 ### Text in and out
 
-`get_page_body` renders paragraphs, `#`/`##`/`###` headings, bulleted and numbered lists,
-to-dos, code, quotes and dividers as their markdown equivalents, and any other block by its type
-name in brackets. Nested blocks are not fetched; a block that has some says so, with the id to
-read them by.
+`create_page` and `append_to_page` take markdown and turn it into Notion blocks:
 
-`create_page` and `append_to_page` take the same markdown-like text back: one block per non-blank
-line, fenced code as one code block. Inline markdown such as `**bold**` stays literal. Notion takes
-at most 100 blocks per request, so longer content is refused with a hint to split it.
+| Write | Becomes |
+|---|---|
+| `#`, `##`, `###` | Headings |
+| `- item`, `1. item`, `- [ ] task`, `- [x] done` | Bulleted, numbered and to-do items |
+| An item indented two or more spaces under another | A nested item, one level deep |
+| `**bold**`, `*italic*` or `_italic_`, `~~strike~~`, `` `code` ``, `[label](https://...)` | Bold, italic, strikethrough, inline code and links, in any block's text |
+| `\| a \| b \|`, then `\|---\|---\|`, then rows | A table with a header row |
+| `> text` on one or more lines | One quote |
+| `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`, then `> text` | A callout with a matching icon and colour |
+| ```` ```lang ```` fences | A code block; ```` ```mermaid ```` draws a diagram |
+| `![caption](https://...)` alone on a line | An image |
+| An `https://` URL alone on a line | A bookmark |
+| `---` | A divider |
+
+Anything else is a paragraph. A marker that never closes, such as a lone `**`, stays as literal
+text, and a backslash makes the next marker character literal. Table rows shorter than the header
+are padded with empty cells and longer ones cut. A table over Notion's 100-row limit is split into
+several tables of at most 99 rows each, each repeating the header, rather than refused.
+
+Images and bookmarks are fetched by Notion's own servers, so their URL must be `https://` and
+name a public host: `localhost`, loopback, private, link-local and carrier-grade NAT addresses are
+refused, and the line stays a paragraph. Links take `http://` or `https://` under the same host
+rule; any other link stays as written. The host is checked as written, not resolved.
+
+Notion takes at most 100 top-level blocks per request, so longer content is refused with a hint
+to split it and send the rest with `append_to_page`.
+
+`get_page_body` writes the same syntax back: headings, lists, to-dos, quotes, callouts (as
+`> [!NOTE]` alerts, the kind read from the icon), code, dividers, images, bookmarks and tables,
+with bold, italic, strikethrough, code and links kept. So an agent can read one page and write
+its content into another without losing the formatting. It reads one level of children for up to
+20 tables, list items and toggles per call, so a table's rows (up to 1,000) and a list's nested
+items appear in place. Any other nested content, and anything past those limits, is pointed at
+with the id to read it by. Other block types are named in brackets.
 
 ## Errors
 

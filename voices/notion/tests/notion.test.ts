@@ -128,6 +128,31 @@ describe("NotionVoice", () => {
       expect(result.content).toBe(`Page ${PAGE_UUID} has no content.`);
     });
 
+    it("reads a table's rows and a list item's children and renders them in place", async () => {
+      const table = block("table", { table_width: 2, has_column_header: true }, { id: "t1", has_children: true });
+      const item = block("bulleted_list_item", { rich_text: rich("parent") }, { id: "l1", has_children: true });
+      const rows = list([
+        block("table_row", { cells: [rich("A"), rich("B")] }),
+        block("table_row", { cells: [rich("1"), rich("2")] }),
+      ]);
+      const fetchImpl = fakeFetch(json(200, list([table, item])), json(200, rows), json(200, list([block("bulleted_list_item", { rich_text: rich("child") })])));
+      const result = await run(voiceWith(fetchImpl), "get_page_body", { page_id: PAGE_ID });
+      expect(result.content).toBe("| A | B |\n| --- | --- |\n| 1 | 2 |\n- parent\n  - child");
+      expect(callOf(fetchImpl, 1).url).toBe(`${NOTION_API_BASE}/blocks/t1/children?page_size=100`);
+      expect(callOf(fetchImpl, 2).url).toBe(`${NOTION_API_BASE}/blocks/l1/children?page_size=100`);
+    });
+
+    it("keeps the pointer when a block's children cannot be read, and expands at most twenty", async () => {
+      const items = Array.from({ length: 22 }, (_, i) => block("toggle", { rich_text: rich(`t${i}`) }, { id: `x${i}`, has_children: true }));
+      const answers = [json(200, list(items)), json(500, {}), ...Array.from({ length: 19 }, () => json(200, list([])))];
+      const fetchImpl = fakeFetch(...answers);
+      const result = await run(voiceWith(fetchImpl), "get_page_body", { page_id: PAGE_ID });
+      expect(fetchImpl).toHaveBeenCalledTimes(21);
+      expect(result.content).toContain("- t0\n  (nested content: read it with get_page_body on block x0)");
+      expect(result.content).toContain("- t21\n  (nested content: read it with get_page_body on block x21)");
+      expect(result.content).not.toContain("block x1)");
+    });
+
     it("stops at the first failed page", async () => {
       const fetchImpl = fakeFetch(json(200, list([block("paragraph", { rich_text: rich("a") })], "c2")), json(500, {}));
       const result = await run(voiceWith(fetchImpl), "get_page_body", { page_id: PAGE_ID });

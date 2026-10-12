@@ -4,6 +4,17 @@
 
 ### Added
 
+**The Notion voice writes formatted pages.** `create_page` and `append_to_page` turned each line into one block and kept inline markdown as literal text, so an agent's report arrived in Notion with its asterisks showing, its tables as rows of pipes and no way to place an image. They now read markdown:
+
+- `**bold**`, `*italic*` and `_italic_`, `~~strikethrough~~`, `` `code` `` and `[links](https://...)` become rich-text annotations and links in every block's text. An unclosed marker stays literal; a backslash escapes one; each run still stays within Notion's 2,000 characters, and text that would need over 100 runs is sent unformatted.
+- GitHub-style tables become `table` blocks with a column header, rows padded or cut to the header's width. A table over Notion's 100 children per block is split into tables of at most 99 rows, each repeating the header, rather than refused.
+- `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` and `[!CAUTION]` become callouts with a matching emoji and colour. Consecutive `>` lines now make one quote rather than one quote per line.
+- A line that is only `![caption](https://...)` becomes an external `image` block, and a line that is only an `https://` URL a `bookmark`. Both are refused, staying a paragraph, unless the URL is `https://` on a public host: localhost, loopback, private, link-local, carrier-grade NAT and IPv6 private addresses are rejected, because Notion's servers fetch these URLs. Links take `http://` too, under the same host rule.
+- ```` ```mermaid ```` fences become Notion mermaid diagrams, and common short language names (`ts`, `js`, `py`, `sh`, `yml`) map to Notion's.
+- List items indented two or more spaces nest under the item above, one level deep.
+
+The 100-top-level-blocks-per-request refusal is unchanged. `get_page_body` renders all of these back in the same syntax, including tables (it now reads the rows of up to 20 tables, list items and toggles per call) and inline formatting, so an agent compiling a document from other pages keeps their formatting. Bookmarks now render as the bare URL and callouts as `> [!KIND]` alerts, where they were `[bookmark] url` and `> text`.
+
 **Sessions can survive a restart, and the in-memory store is bounded.** Every session lived in process memory, so a server container that restarted lost every conversation, and a caller reusing a `session_id` across turns got "Session not found". The in-memory store also never evicted anything, although the documentation said it capped at 1,000 sessions and dropped any over 24 hours old.
 
 - **`SessionStore.load?(id): Promise<Session | undefined>`**, optional. A run given a `session_id` that `get` misses awaits `load` before reporting the session as not found, and the new **`TuttiRuntime.loadSession(id)`** resolves a session the same way. `GET /sessions/:id`, `GET /sessions/:id/turns` and `POST /sessions/:id/replay-from` use it, so a session a durable store kept across a restart answers 200.
