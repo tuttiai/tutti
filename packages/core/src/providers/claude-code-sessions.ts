@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import type { ChatMessage, ChatRequest, ContentBlock } from "@tuttiai/types";
 
+import { readResumeEntries, writeResumeEntries, type ResumeEntry } from "./claude-code-sessions-file.js";
+
 /*
  * Why sessions are resumed. Claude Code's prompt cache only ever paid off for
  * a request identical to an earlier one: a stateless call that re-sends a
@@ -25,11 +27,6 @@ export interface SessionResume {
   delta: ChatMessage[];
 }
 
-interface Entry {
-  session_id: string;
-  stored_at: number;
-}
-
 /** Options for {@link ClaudeCodeSessions}. */
 export interface ClaudeCodeSessionsOptions {
   /** Most conversations remembered at once; the oldest is forgotten first. Default 256. */
@@ -38,6 +35,12 @@ export interface ClaudeCodeSessionsOptions {
   ttl_ms?: number;
   /** Clock, for tests. */
   now?: () => number;
+  /**
+   * Keep the registry in this file too, so a restarted process can still
+   * resume the conversations it served. Read at construction, rewritten
+   * atomically after every change. Absent, the registry lives in memory only.
+   */
+  file?: string;
 }
 
 /**
@@ -45,15 +48,21 @@ export interface ClaudeCodeSessionsOptions {
  * turn of that conversation can resume it.
  */
 export class ClaudeCodeSessions {
-  private readonly entries = new Map<string, Entry>();
+  private readonly entries: Map<string, ResumeEntry>;
   private readonly maxEntries: number;
   private readonly ttlMs: number;
   private readonly now: () => number;
+  private readonly file: string | undefined;
 
   constructor(options: ClaudeCodeSessionsOptions = {}) {
     this.maxEntries = options.max_entries ?? 256;
     this.ttlMs = options.ttl_ms ?? 3_600_000;
     this.now = options.now ?? Date.now;
+    this.file = options.file;
+    this.entries =
+      this.file === undefined
+        ? new Map<string, ResumeEntry>()
+        : readResumeEntries(this.file, { max_entries: this.maxEntries, ttl_ms: this.ttlMs, now: this.now() });
   }
 
   /**
@@ -71,6 +80,7 @@ export class ClaudeCodeSessions {
     const entry = this.entries.get(key);
     if (!entry) return undefined;
     this.entries.delete(key);
+    this.persist();
     if (this.now() - entry.stored_at > this.ttlMs) return undefined;
     return { session_id: entry.session_id, delta: request.messages.slice(split) };
   }
@@ -90,6 +100,11 @@ export class ClaudeCodeSessions {
       if (this.entries.size <= this.maxEntries) break;
       this.entries.delete(oldest);
     }
+    this.persist();
+  }
+
+  private persist(): void {
+    if (this.file !== undefined) writeResumeEntries(this.file, this.entries);
   }
 }
 

@@ -3,7 +3,7 @@
  * start `node` itself in place of the CLI, so no Claude Code is needed.
  */
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { runClaudeCode } from "../src/providers/claude-code-process.js";
 
@@ -18,6 +18,29 @@ function run(script: string, extra: { stdin?: string; timeout_ms?: number; comma
 }
 
 describe("runClaudeCode", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("adds the invocation's variables on top of the server's environment", async () => {
+    vi.stubEnv("TUTTI_TEST_INHERITED", "kept");
+    const result = await runClaudeCode({
+      command: process.execPath,
+      args: ["-e", "process.stdout.write(process.env.CLAUDE_CONFIG_DIR + ' ' + process.env.TUTTI_TEST_INHERITED)"],
+      stdin: "",
+      timeout_ms: 5_000,
+      cwd: process.cwd(),
+      env: { CLAUDE_CONFIG_DIR: "/state/claude" },
+    });
+    expect(result.stdout).toBe("/state/claude kept");
+  });
+
+  it("passes the server's environment to the CLI, so CLAUDE_CONFIG_DIR reaches it", async () => {
+    vi.stubEnv("CLAUDE_CONFIG_DIR", "/state/claude");
+    const result = await run("process.stdout.write(process.env.CLAUDE_CONFIG_DIR ?? 'unset')");
+    expect(result.stdout).toBe("/state/claude");
+  });
+
   it("feeds stdin and captures stdout, stderr and the exit code", async () => {
     const result = await run(
       "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{process.stdout.write(s.toUpperCase());process.stderr.write('warn');process.exit(3)})",

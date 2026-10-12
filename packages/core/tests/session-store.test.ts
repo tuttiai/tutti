@@ -75,3 +75,67 @@ describe("InMemorySessionStore", () => {
     expect(store.get(s2.id)!.messages[0].content).toBe("for b");
   });
 });
+
+describe("InMemorySessionStore bounds", () => {
+  it("evicts the least recently used session over the cap", () => {
+    const store = new InMemorySessionStore({ max_sessions: 2 });
+    const a = store.create("agent");
+    const b = store.create("agent");
+    store.get(a.id);
+    const c = store.create("agent");
+
+    expect(store.get(b.id)).toBeUndefined();
+    expect(store.get(a.id)).toBe(a);
+    expect(store.get(c.id)).toBe(c);
+  });
+
+  it("evicts a session idle past its time to live", () => {
+    let now = 0;
+    const store = new InMemorySessionStore({ idle_ttl_ms: 1_000, now: () => now });
+    const session = store.create("agent");
+
+    now = 1_000;
+    expect(store.get(session.id)).toBe(session);
+    now = 2_001;
+    expect(store.get(session.id)).toBeUndefined();
+    expect(() => store.update(session.id, [])).toThrow("Session not found");
+  });
+
+  it("keeps a session alive while it is used", () => {
+    let now = 0;
+    const store = new InMemorySessionStore({ idle_ttl_ms: 1_000, now: () => now });
+    const session = store.create("agent");
+    for (now = 900; now <= 4_500; now += 900) store.update(session.id, []);
+
+    expect(store.get(session.id)).toBe(session);
+  });
+
+  it("sweeps idle sessions when another is created", () => {
+    let now = 0;
+    const store = new InMemorySessionStore({ idle_ttl_ms: 1_000, now: () => now });
+    const old = store.create("agent");
+    now = 5_000;
+    store.create("agent");
+    now = 0;
+
+    expect(store.get(old.id)).toBeUndefined();
+  });
+
+  it("defaults to 1000 sessions", () => {
+    const store = new InMemorySessionStore();
+    const first = store.create("agent");
+    for (let i = 0; i < 1_000; i++) store.create("agent");
+
+    expect(store.get(first.id)).toBeUndefined();
+  });
+
+  it("counts a saved session against the cap", () => {
+    const store = new InMemorySessionStore({ max_sessions: 1 });
+    const created = store.create("agent");
+    const now = new Date();
+    store.save({ id: "restored", agent_name: "agent", messages: [], created_at: now, updated_at: now });
+
+    expect(store.get(created.id)).toBeUndefined();
+    expect(store.get("restored")?.id).toBe("restored");
+  });
+});

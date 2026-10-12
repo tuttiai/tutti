@@ -124,7 +124,17 @@ export { TuttiRuntime, type TuttiRuntimeOptions } from "./runtime.js";
 export { AgentRunner } from "./agent-runner.js";
 export { AgentRouter } from "./agent-router.js";
 export { EventBus } from "./event-bus.js";
-export { InMemorySessionStore } from "./session-store.js";
+export { InMemorySessionStore, type InMemorySessionStoreOptions } from "./session-store.js";
+export {
+  FileSessionStore,
+  SESSION_ID_PATTERN,
+  type FileSessionStoreOptions,
+} from "./file-session-store.js";
+export {
+  DEFAULT_MAX_SESSIONS,
+  DEFAULT_SESSION_IDLE_TTL_MS,
+  type SessionStoreBounds,
+} from "./session-lru.js";
 export { PostgresSessionStore } from "./memory/postgres.js";
 export { InMemorySemanticStore } from "./memory/in-memory-semantic.js";
 export type {
