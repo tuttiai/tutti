@@ -37,6 +37,42 @@ const tutti = new TuttiRuntime(score);
 // sessions are in-memory by default
 ```
 
+The store is bounded, so a long-lived process that keeps reusing sessions does not grow without
+limit: a session unused for 24 hours is evicted, and over 1,000 sessions the least recently used
+goes first. Both are options:
+
+```ts
+import { InMemorySessionStore } from "@tuttiai/core";
+
+const tutti = new TuttiRuntime(score, {
+  sessionStore: new InMemorySessionStore({ max_sessions: 200, idle_ttl_ms: 3_600_000 }),
+});
+```
+
+### File store
+
+`FileSessionStore` keeps each session as a JSON file in a directory, so sessions survive a
+restart without a database. Every change is written at once, through a temporary file renamed
+into place. It takes the same bounds, and evicting a session deletes its file. Session ids may
+hold only letters, digits, `_` and `-`; anything else is refused, so an id can never name a
+path outside the directory. Use one process per directory.
+
+```ts
+import { FileSessionStore } from "@tuttiai/core";
+
+const tutti = new TuttiRuntime(score, {
+  sessionStore: new FileSessionStore("/var/lib/tutti/sessions"),
+});
+```
+
+The server image does this when `TUTTI_STATE_DIR` is set.
+
+### Continuing a session after a restart
+
+A `SessionStore` may implement an optional `load(id)`, which the runtime awaits when `get`
+misses and before it reports a session as not found. `PostgresSessionStore` uses it to read a
+session from its table; `runtime.loadSession(id)` resolves a session the same way.
+
 ### PostgreSQL store
 
 Sessions persist across process restarts:
