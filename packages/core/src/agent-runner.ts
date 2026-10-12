@@ -654,9 +654,10 @@ export class AgentRunner {
     const userId = options?.user_id;
     const signal = options?.signal;
 
-    // Resolve or create session
+    // Resolve or create session. A store with durable storage beyond what
+    // `get` sees (a database, a restarted process's disk) offers `load`.
     const session = resolvedSessionId
-      ? this.sessions.get(resolvedSessionId)
+      ? (this.sessions.get(resolvedSessionId) ?? (await this.sessions.load?.(resolvedSessionId)))
       : this.sessions.create(agent.name);
 
     if (!session) {

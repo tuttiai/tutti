@@ -2,14 +2,29 @@ import pg from "pg";
 import { randomUUID } from "node:crypto";
 import type { Session, SessionStore, ChatMessage } from "@tuttiai/types";
 import { logger } from "../logger.js";
+import { SessionLru, type SessionStoreBounds } from "../session-lru.js";
 
 const { Pool } = pg;
 
+/**
+ * Keeps sessions in a `tutti_sessions` table. Writes are fire-and-forget,
+ * because the {@link SessionStore} interface is synchronous; every session
+ * this store creates, updates or loads is also held in a bounded in-memory
+ * cache, so `get` answers for those, and `load` reads any other from the
+ * database.
+ */
 export class PostgresSessionStore implements SessionStore {
   private pool: InstanceType<typeof Pool>;
+  private readonly cache = new Map<string, Session>();
+  private readonly lru: SessionLru;
 
-  constructor(connectionString: string) {
+  /**
+   * @param connectionString - The Postgres connection URL.
+   * @param cache - Bounds for the in-memory cache. Evicting from it never touches the table.
+   */
+  constructor(connectionString: string, cache: SessionStoreBounds = {}) {
     this.pool = new Pool({ connectionString });
+    this.lru = new SessionLru(cache, (id) => this.cache.delete(id));
   }
 
   /**
@@ -36,6 +51,7 @@ export class PostgresSessionStore implements SessionStore {
       created_at: new Date(),
       updated_at: new Date(),
     };
+    this.remember(session);
 
     // Fire-and-forget INSERT — the session object is returned synchronously
     // to satisfy the SessionStore interface
@@ -61,11 +77,30 @@ export class PostgresSessionStore implements SessionStore {
     return session;
   }
 
-  get(_id: string): Session | undefined {
-    // The synchronous interface returns from an in-memory cache.
-    // For Postgres, use getAsync() instead for reliable reads.
-    // This returns undefined — the runtime creates a new session on miss.
-    return undefined;
+  /**
+   * A session this store created, updated or loaded, from its cache. Use
+   * {@link load} for one only the database holds.
+   */
+  get(id: string): Session | undefined {
+    if (!this.lru.isLive(id)) return undefined;
+    const session = this.cache.get(id);
+    if (session) this.lru.touch(id);
+    return session;
+  }
+
+  /**
+   * Read a session from the cache, or else from the database, caching it so
+   * `get` and `update` see it afterwards.
+   *
+   * @param id - The session id.
+   * @returns The session, or `undefined` when the table holds none by that id.
+   */
+  async load(id: string): Promise<Session | undefined> {
+    const cached = this.get(id);
+    if (cached) return cached;
+    const session = await this.getAsync(id);
+    if (session) this.remember(session);
+    return session;
   }
 
   /**
@@ -98,6 +133,11 @@ export class PostgresSessionStore implements SessionStore {
   }
 
   update(id: string, messages: ChatMessage[]): void {
+    const cached = this.get(id);
+    if (cached) {
+      cached.messages = messages;
+      cached.updated_at = new Date();
+    }
     // Fire-and-forget UPDATE
     this.pool
       .query(
@@ -112,6 +152,11 @@ export class PostgresSessionStore implements SessionStore {
           "Failed to update session in Postgres",
         );
       });
+  }
+
+  private remember(session: Session): void {
+    this.cache.set(session.id, session);
+    this.lru.touch(session.id);
   }
 
   /** Close the connection pool. Call on shutdown. */

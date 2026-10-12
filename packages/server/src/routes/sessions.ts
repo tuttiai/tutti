@@ -31,7 +31,7 @@ export function registerSessionsRoute(
   });
 
   app.get<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {
-    const session = runtime.getSession(request.params.id);
+    const session = await runtime.loadSession(request.params.id);
 
     if (!session) {
       return reply.code(404).send({
@@ -51,7 +51,7 @@ export function registerSessionsRoute(
   app.get<{ Params: { id: string } }>(
     "/sessions/:id/turns",
     async (request, reply) => {
-      const session = runtime.getSession(request.params.id);
+      const session = await runtime.loadSession(request.params.id);
       if (!session) {
         return reply.code(404).send({
           error: "session_not_found",
@@ -85,7 +85,7 @@ export function registerSessionsRoute(
       },
     },
     async (request, reply) => {
-      const session = runtime.getSession(request.params.id);
+      const session = await runtime.loadSession(request.params.id);
       if (!session) {
         return reply.code(404).send({
           error: "session_not_found",

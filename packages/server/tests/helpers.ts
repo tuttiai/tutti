@@ -15,6 +15,7 @@ import type {
   LLMProvider,
   ScoreConfig,
   StreamChunk,
+  SessionStore,
 } from "@tuttiai/types";
 
 import { createServer } from "../src/index.js";
@@ -103,6 +104,8 @@ export interface BuildTestServerOptions {
    * two concurrent runs that must stay distinguishable.
    */
   provider?: LLMProvider;
+  /** Replace the runtime's default in-memory session store. */
+  sessionStore?: SessionStore;
 }
 
 /**
@@ -149,6 +152,7 @@ export async function buildTestServer(
   const runtime = new TuttiRuntime(score, {
     ...(interruptStore !== undefined ? { interruptStore } : {}),
     ...(runCostStore !== undefined ? { runCostStore } : {}),
+    ...(options.sessionStore !== undefined ? { sessionStore: options.sessionStore } : {}),
   });
 
   const app = await createServer({
@@ -171,7 +175,8 @@ function isBuildOptions(v: unknown): v is BuildTestServerOptions {
     "interruptStore" in v ||
     "agent" in v ||
     "runCostStore" in v ||
-    "provider" in v
+    "provider" in v ||
+    "sessionStore" in v
   );
 }
 

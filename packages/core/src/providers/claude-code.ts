@@ -35,6 +35,21 @@ export interface ClaudeCodeProviderOptions {
    * false to keep nothing on disk and send the whole transcript every call.
    */
   reuse_sessions?: boolean;
+  /**
+   * Keep the map from each conversation to its Claude Code session in this
+   * file, so a restarted process still resumes the conversations it served.
+   * Pair it with a `CLAUDE_CONFIG_DIR` that also survives the restart, since
+   * that is where the CLI keeps the sessions themselves. Ignored when
+   * `reuse_sessions` is false. Absent, the map lives in memory only.
+   */
+  sessions_file?: string;
+  /**
+   * Run the CLI with `CLAUDE_CONFIG_DIR` set to this directory, which is
+   * where it keeps its login state, settings and session files. Absent, the
+   * CLI inherits the server's environment unchanged and uses whatever
+   * `CLAUDE_CONFIG_DIR` says there, or `~/.claude`.
+   */
+  config_dir?: string;
   /** Replaces the process runner. For tests. */
   runner?: ClaudeCodeRunner;
 }
@@ -74,6 +89,7 @@ export class ClaudeCodeProvider implements LLMProvider {
   private readonly cwd: string;
   private readonly runner: ClaudeCodeRunner;
   private readonly sessions: ClaudeCodeSessions | undefined;
+  private readonly configDir: string | undefined;
 
   constructor(options: ClaudeCodeProviderOptions = {}) {
     this.command = options.command ?? "claude";
@@ -81,7 +97,11 @@ export class ClaudeCodeProvider implements LLMProvider {
     // Outside any project, so no project settings or CLAUDE.md apply.
     this.cwd = options.cwd ?? tmpdir();
     this.runner = options.runner ?? runClaudeCode;
-    this.sessions = options.reuse_sessions === false ? undefined : new ClaudeCodeSessions();
+    this.configDir = options.config_dir;
+    this.sessions =
+      options.reuse_sessions === false
+        ? undefined
+        : new ClaudeCodeSessions(options.sessions_file === undefined ? {} : { file: options.sessions_file });
     if (SecretsManager.optional("ANTHROPIC_API_KEY") !== undefined) {
       logger.warn(
         { provider: PROVIDER },
@@ -135,6 +155,7 @@ export class ClaudeCodeProvider implements LLMProvider {
       timeout_ms: this.timeoutMs,
       cwd: this.cwd,
       ...(request.signal !== undefined && { signal: request.signal }),
+      ...(this.configDir !== undefined && { env: { CLAUDE_CONFIG_DIR: this.configDir } }),
     });
   }
 

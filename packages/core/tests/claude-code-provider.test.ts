@@ -64,6 +64,20 @@ beforeEach(() => {
 });
 
 describe("ClaudeCodeProvider", () => {
+  describe("config_dir", () => {
+    it("runs the CLI with CLAUDE_CONFIG_DIR set to it", async () => {
+      runner.mockResolvedValue(cliResult({ structured_output: { text: "Hi", tool_calls: [] } }));
+      await new ClaudeCodeProvider({ runner, cwd: "/work", config_dir: "/state/claude" }).chat(baseRequest);
+      expect(lastInvocation().env).toEqual({ CLAUDE_CONFIG_DIR: "/state/claude" });
+    });
+
+    it("leaves the CLI's environment alone without it", async () => {
+      runner.mockResolvedValue(cliResult({ structured_output: { text: "Hi", tool_calls: [] } }));
+      await provider().chat(baseRequest);
+      expect(lastInvocation().env).toBeUndefined();
+    });
+  });
+
   describe("chat", () => {
     it("runs claude -p as a plain model with every built-in tool off", async () => {
       runner.mockResolvedValue(cliResult({ structured_output: { text: "Hi", tool_calls: [] } }));

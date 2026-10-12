@@ -428,4 +428,19 @@ export class TuttiRuntime {
   getSession(id: string): Session | undefined {
     return this._sessions.get(id);
   }
+
+  /**
+   * Retrieve an existing session the way a run resolves one: from the
+   * store's `get`, or else from its `load` when it has one, so a session a
+   * durable store kept across a restart is found.
+   *
+   * @param id - The session id.
+   * @returns The session, or `undefined` when the store holds none by that id.
+   *
+   * @example
+   * const session = await runtime.loadSession(session_id);
+   */
+  async loadSession(id: string): Promise<Session | undefined> {
+    return this._sessions.get(id) ?? (await this._sessions.load?.(id));
+  }
 }

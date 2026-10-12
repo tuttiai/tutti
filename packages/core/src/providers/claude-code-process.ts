@@ -24,6 +24,8 @@ export interface ClaudeCodeInvocation {
   cwd: string;
   /** Kills the process when aborted. One already aborted means it is never started. */
   signal?: AbortSignal;
+  /** Variables set on top of the server's own environment. Absent, the CLI inherits that environment unchanged. */
+  env?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -56,6 +58,9 @@ export function runClaudeCode(
       cwd: invocation.cwd,
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
+      // The CLI reads its login and config from the environment, so it gets the
+      // whole of the server's, as a spawn without `env` would, plus the additions.
+      ...(invocation.env && { env: { ...process.env, ...invocation.env } }),
     });
     const out: Buffer[] = [];
     const err: Buffer[] = [];

@@ -133,6 +133,24 @@ The image runs one agent configured entirely by environment:
 | `TUTTI_TOOL_TIMEOUT_MS` | 30000 | How long one tool call may run before it fails |
 | `TUTTI_MAX_COST_USD` | none | Hard cost ceiling per run |
 | `TUTTI_REQUIRE_APPROVAL` | `destructive` | Which tool calls wait for a person, below |
+| `TUTTI_STATE_DIR` | none | Absolute directory to keep sessions in across restarts, below |
+
+Without `TUTTI_STATE_DIR`, sessions live in memory (at most 1,000, each dropped after 24 hours
+unused) and a restart loses them. With it, each session is a file under `<dir>/sessions/`, so a
+run given an earlier `session_id` continues it after a restart, and `GET /sessions/:id` still
+finds it. The same bounds apply, and an evicted session's file is deleted. For
+`TUTTI_PROVIDER=claude-code`, the map from each conversation to its Claude Code session is kept
+in `<dir>/claude-code-sessions.json`, and the CLI runs with `CLAUDE_CONFIG_DIR=<dir>/claude`
+unless that variable is already set, because the CLI keeps the sessions themselves there. The
+image creates `/state` owned by `tutti`, so a named volume mounted there needs no further setup.
+A directory the server cannot create or write is logged and set aside: sessions stay in memory
+and the CLI's environment is left as it was.
+
+```bash
+docker run -p 3847:3847 -v tutti-state:/state \
+  -e TUTTI_STATE_DIR=/state \
+  -e TUTTI_PROVIDER=claude-code -e CLAUDE_CODE_OAUTH_TOKEN=... tutti-server:claude-code
+```
 
 The image carries every voice the framework ships, and each entry's `options` is validated by
 that voice's own `.strict()` config schema, credentials included:
