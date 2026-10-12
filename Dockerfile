@@ -254,6 +254,10 @@ COPY --from=builder /app/voices/whatsapp/dist           voices/whatsapp/dist
 # voice lands, and the only place under its control besides /tmp.
 RUN mkdir /work && chown tutti:tutti /work
 
+# Where TUTTI_STATE_DIR points when sessions should survive a restart. Made
+# here so an empty named volume mounted at /state inherits the ownership.
+RUN mkdir /state && chown tutti:tutti /state
+
 ENV NODE_ENV=production
 ENV TUTTI_CHROMIUM_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1

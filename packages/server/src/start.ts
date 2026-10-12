@@ -9,6 +9,10 @@
  * The runtime always carries an in-memory interrupt store, so a gated tool
  * call pauses for a person (`POST /interrupts/:id/approve` or `/deny`)
  * instead of failing the run. Pending approvals do not survive a restart.
+ *
+ * With a usable `TUTTI_STATE_DIR`, sessions (and, for `claude-code`, the
+ * provider's session registry and the CLI's own `CLAUDE_CONFIG_DIR`) are
+ * kept on disk there and do survive one; see `start-state.ts`.
  */
 
 import { PermissionGuard, SecretsManager, createLogger } from "@tuttiai/core";
@@ -18,6 +22,7 @@ import { createServer, DEFAULT_PORT } from "./index.js";
 import { readStartAgentEnv } from "./start-env.js";
 import { buildStartProvider } from "./start-provider.js";
 import { buildStartAgent, buildStartRuntime } from "./start-runtime.js";
+import { readStartState, usableStartState } from "./start-state.js";
 import { loadVoices } from "./voice-loader.js";
 
 const logger = createLogger("tutti-server");
@@ -35,6 +40,11 @@ const HOST = SecretsManager.optional("TUTTI_HOST") ?? "0.0.0.0";
 // Malformed voice configuration stops the process before it listens, so a
 // deployment reports a failed start rather than an agent missing its tools.
 const agentEnv = readStartAgentEnv((key) => SecretsManager.optional(key));
+// An unusable state directory is reported and set aside, never fatal.
+const state = usableStartState(
+  readStartState((key) => SecretsManager.optional(key)),
+  (context, message) => logger.warn(context, message),
+);
 const voices = await loadVoices(agentEnv.voices);
 for (const voice of voices) PermissionGuard.check(voice, [...agentEnv.permissions]);
 
@@ -45,13 +55,13 @@ const agent = buildStartAgent(
 );
 const score: ScoreConfig = {
   name: "tutti-server",
-  provider: buildStartProvider(PROVIDER),
+  provider: buildStartProvider(PROVIDER, state, (key) => SecretsManager.optional(key)),
   default_model: MODEL,
   agents: { [AGENT_NAME]: agent },
 };
 
 // Carries an interrupt store, so a gated tool call waits for a person.
-const runtime = buildStartRuntime(score);
+const runtime = buildStartRuntime(score, state);
 
 const app = await createServer({
   port: PORT,
@@ -75,6 +85,7 @@ logger.info(
     // Undefined reads as the framework default: destructive tools only.
     require_approval: agentEnv.require_approval ?? "destructive",
     context: agentEnv.context ?? "off",
+    sessions: state ? state.sessions : "memory",
   },
   "Tutti server started",
 );

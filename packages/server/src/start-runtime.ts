@@ -4,10 +4,18 @@
  * without starting a process.
  */
 
-import { MemoryInterruptStore, TuttiRuntime } from "@tuttiai/core";
+import {
+  FileSessionStore,
+  InMemorySessionStore,
+  MemoryInterruptStore,
+  TuttiRuntime,
+  createLogger,
+} from "@tuttiai/core";
+import type { SessionStore } from "@tuttiai/types";
 import type { AgentConfig, ScoreConfig, Voice } from "@tuttiai/types";
 
 import type { StartAgentEnv } from "./start-env.js";
+import type { StartStatePaths } from "./start-state.js";
 
 /** The agent fields `start.ts` reads from its own variables. */
 export interface StartAgentBase {
@@ -56,12 +64,34 @@ export function buildStartAgent(
  * and the approve and deny routes answer 503. Pending approvals live in
  * memory, so a restart forgets them and the runs waiting on them.
  *
+ * Given `TUTTI_STATE_DIR`'s paths, sessions are kept in a
+ * {@link FileSessionStore} there and survive a restart. Without them they
+ * live in a bounded in-memory store, as they do too when the file store
+ * cannot open its directory: that is logged, never fatal.
+ *
  * @param score - The one-agent score.
+ * @param state - The paths `readStartState` read, or `undefined` to keep sessions in memory.
  * @returns A runtime whose gated tool calls pause for a person.
  *
  * @example
- * const runtime = buildStartRuntime(score);
+ * const runtime = buildStartRuntime(score, readStartState(read));
  */
-export function buildStartRuntime(score: ScoreConfig): TuttiRuntime {
-  return new TuttiRuntime(score, { interruptStore: new MemoryInterruptStore() });
+export function buildStartRuntime(score: ScoreConfig, state?: StartStatePaths): TuttiRuntime {
+  return new TuttiRuntime(score, {
+    interruptStore: new MemoryInterruptStore(),
+    sessionStore: buildSessionStore(state),
+  });
+}
+
+function buildSessionStore(state: StartStatePaths | undefined): SessionStore {
+  if (state === undefined) return new InMemorySessionStore();
+  try {
+    return new FileSessionStore(state.sessions);
+  } catch (error) {
+    createLogger("tutti-server").warn(
+      { dir: state.sessions, error: error instanceof Error ? error.message : String(error) },
+      "Cannot keep sessions on disk; keeping them in memory, so a restart loses them",
+    );
+    return new InMemorySessionStore();
+  }
 }
