@@ -22,7 +22,9 @@ const parameters = z
       .string()
       .max(100_000)
       .optional()
-      .describe("Optional body as markdown-like text: # headings, - bullets, 1. numbered items, - [ ] to-dos, > quotes, --- dividers, ``` code fences, paragraphs."),
+      .describe(
+        "Optional body. Markdown: # to ### headings; - bullets, 1. numbered items and - [ ] / - [x] to-dos, indented two spaces to nest under the item above; **bold**, *italic*, ~~strike~~, `code`, [link](https://...); GitHub tables (| a | b | then |---|---| then rows); > quotes; > [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION] for a callout; ```lang fences, ```mermaid for a diagram; ![caption](https://...) alone on a line for an image; an https URL alone on a line for a bookmark; --- for a divider. At most 100 top-level blocks.",
+      ),
   })
   .strict();
 

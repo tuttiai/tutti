@@ -33,7 +33,7 @@ describe("renderBlocks", () => {
     ].join("\n"));
   });
 
-  it("names other blocks by type, with their text or link", () => {
+  it("names blocks it has no markdown for by type, and writes the rest as the write tools read them", () => {
     const text = renderBlocks(blocks(
       block("child_page", { title: "Sub" }, { id: "p1", has_children: true }),
       block("child_database", {}, { id: "d1" }),
@@ -42,7 +42,7 @@ describe("renderBlocks", () => {
       block("callout", { rich_text: rich("Note") }),
       { object: "block", id: "odd", type: "table" },
     ));
-    expect(text).toBe("[child_page: Sub (p1)]\n[child_database: (untitled) (d1)]\n[bookmark] https://example.com\n[image]\n> Note\n[table]");
+    expect(text).toBe("[child_page: Sub (p1)]\n[child_database: (untitled) (d1)]\nhttps://example.com\n[image]\n> [!NOTE]\n> Note\n[table]");
   });
 
   it("points at nested content by id", () => {

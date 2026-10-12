@@ -62,3 +62,49 @@ new NotionVoice({
 
 Ids accept 32 hex characters with or without dashes, or a `notion.so` link ending in one. A 404
 from Notion comes back telling the agent the page must be shared with the integration.
+
+## Writing formatted pages
+
+`create_page` and `append_to_page` read markdown, so an agent can write a page that looks like
+one rather than a column of plain lines:
+
+````md
+# Q3 report
+
+Revenue rose **12%**, see [the dashboard](https://example.com/q3).
+
+| Metric | Q2 | Q3 |
+| --- | --- | --- |
+| Users | 1,050 | 1,200 |
+
+> [!WARNING]
+> Churn is up in the EU.
+
+- Next steps
+  - Hire two engineers
+
+![Funnel](https://example.com/funnel.png)
+
+```mermaid
+graph LR
+  Visit --> Signup --> Paid
+```
+````
+
+That becomes a heading, a paragraph with bold text and a link, a table with a header row, a
+yellow warning callout, a nested list, an image and a Notion-drawn diagram. The full syntax:
+
+- `#` to `###` headings; `-`, `1.` and `- [ ]` list items, indented two spaces to nest one level.
+- `**bold**`, `*italic*`, `~~strike~~`, `` `code` `` and `[label](https://...)` inside any text.
+- GitHub tables. Short rows are padded, long ones cut, and a table over 100 rows is split into
+  several, each repeating the header.
+- `>` quotes, and `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]` callouts.
+- Code fences; `mermaid` draws a diagram.
+- `![caption](https://...)` alone on a line for an image, an `https://` URL alone on a line for a
+  bookmark, `---` for a divider.
+
+Image and bookmark URLs must be `https://` on a public host, because Notion's servers fetch them;
+a loopback or private address leaves the line as a paragraph. An unclosed marker stays literal.
+
+`get_page_body` renders pages back in the same syntax, tables and callouts included, so content
+read from one page can be written to another without losing its formatting.
