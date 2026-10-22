@@ -3,6 +3,7 @@ import { createExecuteCodeTool } from "./tools/run-code.js";
 import { createReadFileTool } from "./tools/read-file.js";
 import { createWriteFileTool } from "./tools/write-file.js";
 import { createInstallPackageTool } from "./tools/install-package.js";
+import { createRepoMapTool } from "./tools/repo-map.js";
 import type { Language } from "./executor.js";
 import { SessionSandbox } from "./sandbox.js";
 
@@ -11,7 +12,10 @@ export { execute } from "./executor.js";
 export { SessionSandbox, SandboxEscapeError } from "./sandbox.js";
 export { createExecuteCodeTool } from "./tools/run-code.js";
 export type { ExecuteCodeOptions } from "./tools/run-code.js";
-export { createReadFileTool } from "./tools/read-file.js";
+export { createReadFileTool, sliceLines } from "./tools/read-file.js";
+export { createRepoMapTool, REPO_MAP_CACHE_DIR } from "./tools/repo-map.js";
+export { buildRepoMap } from "./repo-map/repo-map.js";
+export type { RepoMapOptions, RepoMapResult } from "./repo-map/repo-map.js";
 export { createWriteFileTool } from "./tools/write-file.js";
 export { createInstallPackageTool } from "./tools/install-package.js";
 export type { InstallPackageOptions } from "./tools/install-package.js";
@@ -60,7 +64,7 @@ export interface SandboxConfig {
  * on every reply, and the files it wrote on the last one would sit
  * unreachable beside it.
  *
- * Tools: `execute_code`, `read_file`, `write_file`, `install_package`.
+ * Tools: `repo_map`, `execute_code`, `read_file`, `write_file`, `install_package`.
  *
  * Required permission: `"shell"`.
  *
@@ -85,7 +89,7 @@ export interface SandboxConfig {
 export class SandboxVoice implements Voice {
   readonly name = "sandbox";
   readonly description =
-    "Execute code, read/write files, and install packages in an isolated sandbox";
+    "Map a repository, execute code, read/write files, and install packages in an isolated sandbox";
   readonly required_permissions: Permission[] = ["shell"];
   tools: Tool[] = [];
 
@@ -106,6 +110,7 @@ export class SandboxVoice implements Voice {
     await this.sandbox.init();
 
     this.tools = [
+      createRepoMapTool(this.sandbox),
       createExecuteCodeTool({
         defaults: {
           timeout_ms: this.config.timeout_ms,

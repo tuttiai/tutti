@@ -30,12 +30,13 @@ describe("SandboxVoice", () => {
     expect(voice.tools).toHaveLength(0);
   });
 
-  it("creates 4 tools after setup", async () => {
+  it("creates 5 tools after setup", async () => {
     voice = new SandboxVoice();
     await voice.setup(voiceCtx);
 
-    expect(voice.tools).toHaveLength(4);
+    expect(voice.tools).toHaveLength(5);
     const names = voice.tools.map((t) => t.name);
+    expect(names).toContain("repo_map");
     expect(names).toContain("execute_code");
     expect(names).toContain("read_file");
     expect(names).toContain("write_file");

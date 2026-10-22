@@ -1,7 +1,8 @@
 # @tuttiai/sandbox
 
 Sandbox voice for [Tutti](https://tutti-ai.com) — secure code execution
-with per-session filesystem isolation for TypeScript, Python 3, and Bash.
+with per-session filesystem isolation for TypeScript, Python 3, and Bash,
+and a ranked map of any repository cloned into the sandbox.
 
 ## Install
 
@@ -67,6 +68,52 @@ new SandboxVoice(config?: SandboxConfig)
 
 ## Tools
 
+### `repo_map`
+
+**Call this first when working in a repository.** Returns a ranked map of the
+files that matter most and, under each, the one-line signatures of its key
+functions, classes, types and methods with their line numbers, within a token
+budget. Then read only the line ranges you need with `read_file`'s
+`start_line` and `end_line`, instead of whole files.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | `string` | sandbox root | Directory to map, such as the folder a repository was cloned into |
+| `focus` | `string[]` | none | File paths (relative to `path`) and/or identifiers the task is about; the map centres on them |
+| `max_tokens` | `number` | `1500` | Size of the map, at most 6000 (estimated at 4 characters a token) |
+
+```text
+src/core/widget-registry.ts
+  1: export interface WidgetDefinition {
+  5: export function registerWidget(definition: WidgetDefinition): void {
+  9: export function lookupWidget(widgetName: string): WidgetDefinition | undefined {
+src/features/alpha.ts
+  4: export function alphaFeature(): WidgetDefinition | undefined {
+[4 files and 4 definitions left out. Pass focus (file paths or names) or a larger max_tokens to see others.]
+```
+
+How it works, after [Aider's repo map](https://aider.chat/2023/10/22/repomap.html):
+
+1. Files come from `git ls-files` (tracked and untracked, honouring `.gitignore`) in a
+   git work tree, otherwise from a bounded walk. Dependency, build, cache and vendored
+   directories, generated and minified files, lock files, binaries, symbolic links and
+   files over 200 KB are skipped. At most 5,000 files are read.
+2. Each file is tagged with its definitions and the identifiers it uses: with
+   tree-sitter (WebAssembly, no native build) for TypeScript, TSX, JavaScript, Python,
+   Go and PHP, and with line patterns for Swift and Kotlin, or for any file a grammar
+   cannot read.
+3. Files are linked by the names they share, an edge from A to B for each name A uses
+   that B defines, weighted up for long camelCase or snake_case names and focused names
+   and down for short, common, private-looking or many-times-defined ones.
+4. Files are ranked by personalised PageRank (damping 0.85), centred on the focused
+   files and the files defining focused names. Each definition scores its file's rank
+   times the weight of the edges reaching it, and the most that fit the budget are shown.
+
+Parsed tags are cached in `.tutti-cache/repo-map/` inside the sandbox, keyed by path,
+modification time and size, so a second call on an unchanged repository reads no file.
+The directory carries a `*` `.gitignore`, so it never shows in `git status`. After 20
+seconds the map is rendered from the files read so far and says so.
+
 ### `execute_code`
 
 Execute a code snippet and return stdout, stderr, and exit code.
@@ -96,6 +143,11 @@ Read a file from the sandbox directory.
 |-----------|------|---------|-------------|
 | `path` | `string` | — | Path relative to sandbox root |
 | `encoding` | `"utf-8" \| "base64"` | `"utf-8"` | File encoding |
+| `start_line` | `number` | none | First line to return, 1-based (utf-8 only) |
+| `end_line` | `number` | end of file | Last line to return, inclusive (utf-8 only) |
+
+With a line range, the result opens with `[lines a-b of N]`. Without one, the
+whole file is returned as before.
 
 ### `install_package`
 
@@ -123,6 +175,7 @@ Required permission: `"shell"` (must be explicitly granted in `AgentConfig.permi
 | Measure | Detail |
 |---------|--------|
 | Filesystem isolation | Every path validated by `SessionSandbox.resolve()` — throws `SandboxEscapeError` for `../../` traversal |
+| Repository map | `repo_map` refuses a directory whose real path leaves the sandbox, skips symbolic links, and stops git searching above the sandbox for a repository |
 | Process timeout | `SIGKILL` after `timeout_ms`; exit code 137 |
 | Output size | stdout and stderr kept to 10 KB each: about the first 3 KB and the last 7 KB, with a `[… N characters left out …]` line between, because errors and test summaries come at the end |
 | ANSI codes | Stripped from all output |
