@@ -124,7 +124,7 @@ Required permission: `"shell"` (must be explicitly granted in `AgentConfig.permi
 |---------|--------|
 | Filesystem isolation | Every path validated by `SessionSandbox.resolve()` — throws `SandboxEscapeError` for `../../` traversal |
 | Process timeout | `SIGKILL` after `timeout_ms`; exit code 137 |
-| Output size | stdout/stderr truncated to 10 KB each |
+| Output size | stdout and stderr kept to 10 KB each: about the first 3 KB and the last 7 KB, with a `[… N characters left out …]` line between, because errors and test summaries come at the end |
 | ANSI codes | Stripped from all output |
 | Path leaks | Host temp path replaced with `<workdir>` |
 | File size | `write_file` rejects content exceeding `max_file_size_bytes` |

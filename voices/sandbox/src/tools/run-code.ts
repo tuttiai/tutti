@@ -89,7 +89,9 @@ export function createExecuteCodeTool(
         parts.push("exit_code: " + result.exit_code);
         parts.push("duration_ms: " + result.duration_ms);
         if (result.truncated) {
-          parts.push("(output was truncated to 10 KB)");
+          parts.push(
+            "(output over 10 KB: its start and end are kept, the middle is left out)",
+          );
         }
 
         return {

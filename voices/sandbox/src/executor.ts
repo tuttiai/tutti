@@ -60,7 +60,10 @@ export interface ExecResult {
   stderr: string;
   exit_code: number;
   duration_ms: number;
-  /** `true` if stdout or stderr was truncated to 10 KB. */
+  /**
+   * `true` if stdout or stderr was over 10 KB, so its middle was left out
+   * and only its start and end kept.
+   */
   truncated: boolean;
 }
 

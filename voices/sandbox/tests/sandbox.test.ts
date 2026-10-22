@@ -166,7 +166,8 @@ describe("execute_code tool", () => {
       language: "bash",
     });
     const result = await tool.execute(input, ctx);
-    expect(result.content).toContain("truncated to 10 KB");
+    expect(result.content).toContain("its start and end are kept");
+    expect(result.content).toContain("characters left out");
   });
 
   it("validates language parameter", () => {
