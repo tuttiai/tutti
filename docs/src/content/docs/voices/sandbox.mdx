@@ -45,10 +45,21 @@ new SandboxVoice({
 
 | Tool | Destructive | Description |
 | ---- | :---------: | ----------- |
+| `repo_map` | no | A ranked map of a repository's key files and definitions with line numbers, within a token budget. Call it first, then read only the lines you need. |
 | `execute_code` | yes | Execute a snippet in `typescript` / `python` / `bash`. Returns stdout, stderr, exit code. |
 | `write_file` | yes | Write a file to the per-session sandbox dir. |
-| `read_file` | no | Read a previously written file from the sandbox dir. |
+| `read_file` | no | Read a file from the sandbox dir, whole or by `start_line` / `end_line`. |
 | `install_package` | yes | Install a package from the configured allowlist (npm or pip). |
+
+### `repo_map`
+
+| Input | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `path` | `string` | sandbox root | Directory to map |
+| `focus` | `string[]` | — | File paths and/or identifiers to centre the map on |
+| `max_tokens` | `number` | `1500` | Size of the map (max 6000) |
+
+Modelled on Aider's repo map: definitions and references are extracted with tree-sitter (TypeScript, TSX, JavaScript, Python, Go, PHP) or line patterns (Swift, Kotlin), files are ranked by personalised PageRank over the names they share, and tags are cached in the sandbox by path, modification time and size.
 
 ### `execute_code`
 
