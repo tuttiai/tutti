@@ -160,6 +160,8 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Fixed
 
+**`execute_code` keeps the end of long output, not just the start.** The sandbox voice cut stdout and stderr to their first 10 KB each, so a build or test run that printed more lost exactly what the agent needed: the error, the stack trace and the test summary all come last, and the agent re-ran the command piped through `tail` to see them. `truncateOutput` now keeps about the first 30% and the last 70% of the 10 KB budget, each cut moved to a nearby line break and never inside a UTF-8 character, with a `[… N characters left out …]` line where the middle was. The tool's closing note now reads "(output over 10 KB: its start and end are kept, the middle is left out)". `truncateOutput`'s signature is unchanged; `HEAD_FRACTION` is exported from its module.
+
 **`PostgresSessionStore.get()` always returned `undefined`**, so a Postgres-backed runtime could never continue a session: every run given a `session_id` threw "Session not found". It now keeps a bounded write-through cache of the sessions it created, updated or loaded, and implements `load` by reading the table. The table is unchanged.
 
 **`get_pull_request` lists reviews instead of miscounting them.** Its `Reviews:` figure was GitHub's `review_comments`, the count of inline review comments, so a review with only a body counted as none, and a QA agent stopped a run to ask the owner whether a review it could not see had been posted. It now lists every review with its state, author, commit and submission time, names the old figure "Inline review comments", and shows the head commit.

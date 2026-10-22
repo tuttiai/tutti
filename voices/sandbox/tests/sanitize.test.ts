@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { stripAnsi, truncateOutput, redactPaths, MAX_OUTPUT_BYTES } from "../src/utils/sanitize.js";
+import {
+  stripAnsi,
+  truncateOutput,
+  redactPaths,
+  MAX_OUTPUT_BYTES,
+  HEAD_FRACTION,
+} from "../src/utils/sanitize.js";
 
 describe("stripAnsi", () => {
   it("removes SGR color codes", () => {
@@ -20,31 +26,69 @@ describe("stripAnsi", () => {
 });
 
 describe("truncateOutput", () => {
+  const MARKER = /\[… (\d+) characters left out …\]/;
+
   it("returns the original text when under the limit", () => {
     const [text, truncated] = truncateOutput("short");
     expect(text).toBe("short");
     expect(truncated).toBe(false);
   });
 
-  it("truncates text exceeding the byte limit", () => {
-    const long = "x".repeat(MAX_OUTPUT_BYTES + 100);
+  it("returns text exactly at the limit unchanged", () => {
+    const exact = "y".repeat(MAX_OUTPUT_BYTES);
+    expect(truncateOutput(exact)).toEqual([exact, false]);
+  });
+
+  it("keeps the start and the end of text exceeding the byte limit", () => {
+    const long = "START" + "x".repeat(MAX_OUTPUT_BYTES * 3) + "END";
     const [text, truncated] = truncateOutput(long);
     expect(truncated).toBe(true);
-    expect(text).toContain("[…output truncated to 10 KB]");
-    expect(Buffer.from(text, "utf-8").length).toBeLessThan(
-      MAX_OUTPUT_BYTES + 100,
-    );
+    expect(text.startsWith("START")).toBe(true);
+    expect(text.endsWith("END")).toBe(true);
+    expect(text).toMatch(MARKER);
+    expect(Buffer.byteLength(text, "utf-8")).toBeLessThan(MAX_OUTPUT_BYTES + 100);
   });
 
-  it("accepts a custom byte limit and reflects it in the message", () => {
+  it("keeps about 30% from the start and 70% from the end", () => {
+    const long = "a".repeat(5000) + "b".repeat(5000);
+    const [text] = truncateOutput(long, 1000);
+    const [head = "", tail = ""] = text.split(MARKER).filter((_, i) => i !== 1);
+    expect(head.trim()).toBe("a".repeat(300));
+    expect(tail.trim()).toBe("b".repeat(700));
+  });
+
+  it("reports how many characters were left out", () => {
+    const long = "z".repeat(10_000);
+    const [text] = truncateOutput(long, 1000);
+    const match = MARKER.exec(text);
+    expect(Number(match?.[1])).toBe(9000);
+  });
+
+  it("cuts on a line break when one is close to the cut", () => {
+    const lines = Array.from({ length: 400 }, (_, i) => `line ${String(i).padStart(3, "0")}`);
+    const [text] = truncateOutput(lines.join("\n"), 1000);
+    const kept = text.split("\n").filter((l) => !MARKER.test(l));
+    for (const line of kept) expect(line).toMatch(/^line \d{3}$/);
+    expect(kept.at(-1)).toBe("line 399");
+    expect(kept[0]).toBe("line 000");
+  });
+
+  it("never splits a multi-byte character", () => {
+    const long = "é".repeat(3000) + "€".repeat(3000);
+    const [text] = truncateOutput(long, 1001);
+    expect(text).not.toContain("\uFFFD");
+    expect(text).toMatch(MARKER);
+  });
+
+  it("handles a budget too small to keep any of the start", () => {
     const [text, truncated] = truncateOutput("abcdef", 3);
     expect(truncated).toBe(true);
-    expect(text).toContain("[…output truncated to 3 bytes]");
+    expect(text.endsWith("def")).toBe(true);
+    expect(text).toMatch(MARKER);
   });
 
-  it("shows KB in the truncation message for limits >= 1024", () => {
-    const [text] = truncateOutput("x".repeat(3000), 2048);
-    expect(text).toContain("[…output truncated to 2 KB]");
+  it("exports the share of the budget kept from the start", () => {
+    expect(HEAD_FRACTION).toBe(0.3);
   });
 });
 

@@ -100,14 +100,16 @@ describe("execute — timeout", () => {
 // ── Output truncation ────────────────────────────────────────
 
 describe("execute — truncation", () => {
-  it("truncates stdout exceeding 10 KB", async () => {
-    // Generate ~20 KB of output.
+  it("keeps the start and end of stdout exceeding 10 KB", async () => {
+    // ~20 KB of output that ends with the line an agent needs.
     const r = await execute(
-      "python3 -c \"print('x' * 20480)\"",
+      "python3 -c \"print('first'); print('x' * 20480); print('FAILED 3 tests')\"",
       "bash",
     );
     expect(r.truncated).toBe(true);
-    expect(r.stdout).toContain("[…output truncated to 10 KB]");
+    expect(r.stdout.startsWith("first\n")).toBe(true);
+    expect(r.stdout).toContain("FAILED 3 tests");
+    expect(r.stdout).toMatch(/\[… \d+ characters left out …\]/);
   });
 });
 
