@@ -79,7 +79,7 @@ budget. Then read only the line ranges you need with `read_file`'s
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `path` | `string` | sandbox root | Directory to map, such as the folder a repository was cloned into |
-| `focus` | `string[]` | — | File paths (relative to `path`) and/or identifiers the task is about; the map centres on them |
+| `focus` | `string[]` | none | File paths (relative to `path`) and/or identifiers the task is about; the map centres on them |
 | `max_tokens` | `number` | `1500` | Size of the map, at most 6000 (estimated at 4 characters a token) |
 
 ```text
@@ -143,7 +143,7 @@ Read a file from the sandbox directory.
 |-----------|------|---------|-------------|
 | `path` | `string` | — | Path relative to sandbox root |
 | `encoding` | `"utf-8" \| "base64"` | `"utf-8"` | File encoding |
-| `start_line` | `number` | — | First line to return, 1-based (utf-8 only) |
+| `start_line` | `number` | none | First line to return, 1-based (utf-8 only) |
 | `end_line` | `number` | end of file | Last line to return, inclusive (utf-8 only) |
 
 With a line range, the result opens with `[lines a-b of N]`. Without one, the
