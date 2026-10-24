@@ -5,13 +5,14 @@ import { createUpdatePullRequestTool } from "../src/tools/update-pull-request.js
 import { createMarkReadyForReviewTool } from "../src/tools/mark-ready-for-review.js";
 import { createUpdatePullRequestBranchTool } from "../src/tools/update-pull-request-branch.js";
 import { createCreateReviewTool } from "../src/tools/create-review.js";
+import { createMergePullRequestTool } from "../src/tools/merge-pull-request.js";
 
 const ctx: ToolContext = { session_id: "test", agent_name: "test" };
 
-// Mock Octokit: only the methods these four tools call.
+// Mock Octokit: only the methods these five tools call.
 function createMockOctokit() {
   return {
-    pulls: { get: vi.fn(), update: vi.fn(), updateBranch: vi.fn(), createReview: vi.fn() },
+    pulls: { get: vi.fn(), update: vi.fn(), updateBranch: vi.fn(), createReview: vi.fn(), merge: vi.fn() },
     graphql: vi.fn(),
   };
 }
@@ -94,6 +95,55 @@ describe("mark_ready_for_review", () => {
 
   it("is marked destructive", () => {
     expect(createMarkReadyForReviewTool(asOctokit()).destructive).toBe(true);
+  });
+});
+
+describe("merge_pull_request", () => {
+  const run = (input: Record<string, unknown> = {}) => {
+    const t = createMergePullRequestTool(asOctokit());
+    return t.execute(t.parameters.parse({ owner: "o", repo: "r", pr_number: 7, expected_head_sha: "abc", ...input }), ctx);
+  };
+
+  it("merges at the checked head with a merge commit by default", async () => {
+    octokit.pulls.merge.mockResolvedValue({ data: { merged: true, sha: "def", message: "Pull Request successfully merged" } });
+    const result = await run();
+    expect(octokit.pulls.merge).toHaveBeenCalledWith({ owner: "o", repo: "r", pull_number: 7, sha: "abc", merge_method: "merge" });
+    expect(result.content).toContain("Merged pull request #7");
+    expect(result.content).toContain("def");
+  });
+
+  it("passes the merge method given", async () => {
+    octokit.pulls.merge.mockResolvedValue({ data: { merged: true, sha: "def", message: "ok" } });
+    await run({ merge_method: "squash" });
+    expect(octokit.pulls.merge).toHaveBeenCalledWith(expect.objectContaining({ merge_method: "squash" }));
+  });
+
+  it("requires the head SHA that was checked", () => {
+    const t = createMergePullRequestTool(asOctokit());
+    expect(() => t.parameters.parse({ owner: "o", repo: "r", pr_number: 7 })).toThrow();
+  });
+
+  it("explains a moved head", async () => {
+    octokit.pulls.merge.mockRejectedValue(Object.assign(new Error("Head branch was modified"), { status: 409 }));
+    const result = await run();
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("no longer abc");
+  });
+
+  it("explains a pull request GitHub will not merge", async () => {
+    octokit.pulls.merge.mockRejectedValue(Object.assign(new Error("Pull Request is not mergeable"), { status: 405 }));
+    const result = await run();
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Pull Request is not mergeable");
+  });
+
+  it("passes other failures to the shared formatter", async () => {
+    octokit.pulls.merge.mockRejectedValue(Object.assign(new Error("Bad credentials"), { status: 401 }));
+    expect((await run()).content).toContain("authentication failed");
+  });
+
+  it("is marked destructive", () => {
+    expect(createMergePullRequestTool(asOctokit()).destructive).toBe(true);
   });
 });
 

@@ -50,7 +50,7 @@ export function createCreatePullRequestTool(
     description:
       "Open a pull request from an existing branch. The head branch must " +
       "already exist and have at least one commit not on the base branch. " +
-      "Does not merge — merging is not available as a tool.",
+      "Does not merge; merge_pull_request does that.",
     parameters,
     destructive: true,
     execute: async (input) => {
