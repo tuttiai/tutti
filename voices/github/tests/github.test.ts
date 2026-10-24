@@ -54,10 +54,10 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("GitHubVoice", () => {
-  it("implements Voice with 22 tools", () => {
+  it("implements Voice with 23 tools", () => {
     const voice = new GitHubVoice({ token: "fake" });
     expect(voice.name).toBe("github");
-    expect(voice.tools).toHaveLength(22);
+    expect(voice.tools).toHaveLength(23);
   });
 
   it("lists commit and CI reads, then branch and commit tools, then pull request writes", () => {
@@ -79,6 +79,7 @@ describe("GitHubVoice", () => {
       "create_pull_request",
       "update_pull_request",
       "update_pull_request_branch",
+      "merge_pull_request",
       "mark_ready_for_review",
       "create_review",
       "get_file_contents",
@@ -99,6 +100,7 @@ describe("GitHubVoice", () => {
       "create_pull_request",
       "update_pull_request",
       "update_pull_request_branch",
+      "merge_pull_request",
       "mark_ready_for_review",
       "create_review",
     ]);

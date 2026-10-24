@@ -20,6 +20,7 @@ import { createRerunWorkflowJobTool } from "./tools/rerun-workflow-job.js";
 import { createEditFileTool } from "./tools/edit-file.js";
 import { createUpdatePullRequestTool } from "./tools/update-pull-request.js";
 import { createUpdatePullRequestBranchTool } from "./tools/update-pull-request-branch.js";
+import { createMergePullRequestTool } from "./tools/merge-pull-request.js";
 import { createMarkReadyForReviewTool } from "./tools/mark-ready-for-review.js";
 import { createCreateReviewTool } from "./tools/create-review.js";
 
@@ -53,6 +54,7 @@ export class GitHubVoice implements Voice {
       createCreatePullRequestTool(octokit),
       createUpdatePullRequestTool(octokit),
       createUpdatePullRequestBranchTool(octokit),
+      createMergePullRequestTool(octokit),
       createMarkReadyForReviewTool(octokit),
       createCreateReviewTool(octokit),
       createGetFileContentsTool(octokit),
