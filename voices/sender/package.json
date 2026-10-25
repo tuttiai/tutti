@@ -1,0 +1,37 @@
+{
+  "name": "@tuttiai/sender",
+  "version": "0.1.0",
+  "description": "Tutti voice — manage Sender (sender.net) email marketing from agents: subscribers, groups and campaigns",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "3.25.76"
+  },
+  "peerDependencies": {
+    "@tuttiai/core": ">=0.11.0",
+    "@tuttiai/types": ">=0.9.0"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuttiai/tutti",
+    "directory": "voices/sender"
+  },
+  "homepage": "https://tutti-ai.com",
+  "keywords": ["tutti", "ai", "agents", "sender", "email", "marketing", "newsletter", "voice"]
+}

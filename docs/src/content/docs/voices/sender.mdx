@@ -1,0 +1,57 @@
+---
+title: "Sender Voice"
+description: "@tuttiai/sender — manage Sender email marketing: subscribers, groups and campaigns, with HITL gates on sending"
+sidebar:
+  order: 9
+---
+
+The Sender voice lets agents manage a [Sender](https://www.sender.net) email marketing account: subscribers, groups and campaigns.
+
+`create_campaign` only ever creates a draft. `send_campaign`, `schedule_campaign` and `delete_subscriber` are marked `destructive: true`, so HITL-enabled runtimes pause for human approval first. **This matters here**: a sent campaign emails real people and cannot be recalled.
+
+## Installation
+
+```bash
+npx tutti-ai add sender
+```
+
+## Required permissions
+
+```ts
+permissions: ["network"]
+```
+
+## Required environment variables
+
+| Var | Description |
+| --- | ----------- |
+| `SENDER_API_KEY` | Sender API access token (Settings > API access tokens) |
+
+## Configuration
+
+```ts
+// Default: reads SENDER_API_KEY from env
+new SenderVoice()
+
+// Explicit key
+new SenderVoice({ api_key: "..." })
+```
+
+## Tool reference (14 tools)
+
+| Tool | Destructive | Description |
+| ---- | :---------: | ----------- |
+| `list_groups` | no | List subscriber groups. |
+| `list_subscribers` | no | List subscribers, optionally one group's; paginate. |
+| `get_subscriber` | no | One subscriber by email or id. |
+| `list_campaigns` | no | List campaigns, filter by status. |
+| `get_campaign` | no | One campaign with status and counts. |
+| `create_subscriber` | no | Add a subscriber with optional groups and custom fields. |
+| `update_subscriber` | no | Change name, groups, fields or email status. |
+| `create_group` | no | Create an empty group. |
+| `add_subscriber_to_group` | no | Add an existing subscriber to a group. |
+| `remove_subscriber_from_group` | no | Remove a subscriber from a group. |
+| `create_campaign` | no | Create a draft HTML campaign. Never sends. |
+| `send_campaign` | yes | **Send now. Emails real people, irreversible.** |
+| `schedule_campaign` | yes | **Schedule a send. Emails real people when it fires.** |
+| `delete_subscriber` | yes | Permanently delete a subscriber. |

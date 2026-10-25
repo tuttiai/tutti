@@ -596,6 +596,28 @@
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
     },
+    "sender": {
+      "package": "@tuttiai/sender",
+      "version": "0.1.0",
+      "description": "Tutti voice — manage Sender (sender.net) email marketing from agents: subscribers, groups and campaigns",
+      "required_permissions": [
+        "network"
+      ],
+      "lossy": false,
+      "unexpressed_rules": [],
+      "config": {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sender API access token (Settings > API access tokens). Falls back to the SENDER_API_KEY environment variable. send_campaign emails real subscribers and cannot be undone."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
     "slack": {
       "package": "@tuttiai/slack",
       "version": "0.1.1",

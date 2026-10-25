@@ -45,6 +45,7 @@
     "@tuttiai/postgres": ">=0.1.1",
     "@tuttiai/rag": ">=0.1.1",
     "@tuttiai/sandbox": ">=0.1.1",
+    "@tuttiai/sender": ">=0.1.0",
     "@tuttiai/slack": ">=0.1.1",
     "@tuttiai/stripe": ">=0.1.0",
     "@tuttiai/telegram": ">=0.1.0",
@@ -86,6 +87,9 @@
     "@tuttiai/sandbox": {
       "optional": true
     },
+    "@tuttiai/sender": {
+      "optional": true
+    },
     "@tuttiai/slack": {
       "optional": true
     },
@@ -119,6 +123,7 @@
     "@tuttiai/postgres": "0.1.1",
     "@tuttiai/rag": "0.1.1",
     "@tuttiai/sandbox": "0.1.1",
+    "@tuttiai/sender": "0.1.0",
     "@tuttiai/slack": "0.1.1",
     "@tuttiai/stripe": "0.1.0",
     "@tuttiai/telegram": "0.1.0",
