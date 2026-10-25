@@ -27,6 +27,7 @@ COPY voices/playwright/package.json   voices/playwright/
 COPY voices/postgres/package.json     voices/postgres/
 COPY voices/rag/package.json          voices/rag/
 COPY voices/sandbox/package.json      voices/sandbox/
+COPY voices/sender/package.json       voices/sender/
 COPY voices/slack/package.json        voices/slack/
 COPY voices/stripe/package.json       voices/stripe/
 COPY voices/telegram/package.json     voices/telegram/
@@ -111,6 +112,10 @@ COPY voices/sandbox/src/               voices/sandbox/src/
 COPY voices/sandbox/tsconfig.json      voices/sandbox/
 COPY voices/sandbox/tsup.config.ts     voices/sandbox/
 
+COPY voices/sender/src/               voices/sender/src/
+COPY voices/sender/tsconfig.json      voices/sender/
+COPY voices/sender/tsup.config.ts     voices/sender/
+
 COPY voices/slack/src/                 voices/slack/src/
 COPY voices/slack/tsconfig.json        voices/slack/
 COPY voices/slack/tsup.config.ts       voices/slack/
@@ -166,6 +171,7 @@ COPY voices/playwright/package.json   voices/playwright/
 COPY voices/postgres/package.json     voices/postgres/
 COPY voices/rag/package.json          voices/rag/
 COPY voices/sandbox/package.json      voices/sandbox/
+COPY voices/sender/package.json       voices/sender/
 COPY voices/slack/package.json        voices/slack/
 COPY voices/stripe/package.json       voices/stripe/
 COPY voices/telegram/package.json     voices/telegram/
@@ -237,6 +243,8 @@ COPY --from=deps    /app/voices/rag/package.json        voices/rag/
 COPY --from=builder /app/voices/rag/dist                voices/rag/dist
 COPY --from=deps    /app/voices/sandbox/package.json    voices/sandbox/
 COPY --from=builder /app/voices/sandbox/dist            voices/sandbox/dist
+COPY --from=deps    /app/voices/sender/package.json     voices/sender/
+COPY --from=builder /app/voices/sender/dist             voices/sender/dist
 COPY --from=deps    /app/voices/slack/package.json      voices/slack/
 COPY --from=builder /app/voices/slack/dist              voices/slack/dist
 COPY --from=deps    /app/voices/stripe/package.json     voices/stripe/

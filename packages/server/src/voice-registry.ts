@@ -163,4 +163,8 @@ export const VOICE_LOADERS: ReadonlyMap<string, VoiceLoader> = new Map<string, V
     const m = await import("@tuttiai/notion");
     return fromSchema(m.NotionVoiceConfigSchema, (options) => new m.NotionVoice(options));
   }],
+  ["sender", async () => {
+    const m = await import("@tuttiai/sender");
+    return fromSchema(m.SenderVoiceConfigSchema, (options) => new m.SenderVoice(options));
+  }],
 ]);

@@ -70,6 +70,7 @@ export default defineConfig({
             { label: "WhatsApp", slug: "voices/whatsapp" },
             { label: "Postgres", slug: "voices/postgres" },
             { label: "Stripe", slug: "voices/stripe" },
+            { label: "Sender", slug: "voices/sender" },
             { label: "Twitter / X", slug: "voices/twitter" },
             { label: "Web", slug: "voices/web" },
             { label: "Sandbox", slug: "voices/sandbox" },
