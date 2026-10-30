@@ -65,7 +65,7 @@ Without a token, tools still work for public repos but are limited to 60 request
 | `update_pull_request_branch` | GitHub's "Update branch": merge the base into the PR's branch. Destructive, gated behind HITL. |
 | `merge_pull_request` | Merge a PR into its base, only at the `expected_head_sha` the caller checked. Does not read CI or reviews itself. Destructive, gated behind HITL. |
 | `mark_ready_for_review` | Take a draft PR out of draft. Destructive, gated behind HITL. |
-| `create_review` | Submit a review: `APPROVE`, `REQUEST_CHANGES` or `COMMENT`, with a body. Destructive, gated behind HITL. |
+| `create_review` | Submit a review: `APPROVE`, `REQUEST_CHANGES` or `COMMENT`, with a body and optional comments on lines of the diff. Destructive, gated behind HITL. |
 | `get_file_contents` | Read a file one page at a time (`offset`, `limit`, at most 40,000 characters a page). The first line gives the lines returned, the file's total lines and bytes, and whether the read is partial. |
 | `search_code` | Search code across repos |
 | `list_repositories` | List repos for a user or org |
