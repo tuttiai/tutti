@@ -68,7 +68,7 @@ new GitHubVoice({ token: "ghp_..." })
 | `update_pull_request` | Change a PR's title or description (destructive) | `owner`, `repo`, `pr_number`, `title`, `body` |
 | `update_pull_request_branch` | Merge the base into a PR's branch (destructive) | `owner`, `repo`, `pr_number`, `expected_head_sha` |
 | `mark_ready_for_review` | Take a draft PR out of draft (destructive) | `owner`, `repo`, `pr_number` |
-| `create_review` | Approve, request changes or comment (destructive) | `owner`, `repo`, `pr_number`, `event`, `body`, `commit_id` |
+| `create_review` | Approve, request changes or comment, with optional line comments (destructive) | `owner`, `repo`, `pr_number`, `event`, `body`, `commit_id`, `comments` |
 | `get_file_contents` | Get a file, one page at a time | `owner`, `repo`, `path`, `ref`, `offset`, `limit` |
 | `search_code` | Search code across GitHub | `query`, `limit` |
 | `list_repositories` | List repos for a user/org | `owner`, `type`, `limit` |
@@ -174,6 +174,8 @@ Takes the `check_run_id` from `list_pull_request_checks`, which for GitHub Actio
 ### create_review
 
 `event` is `APPROVE`, `REQUEST_CHANGES` or `COMMENT`, and `body` is required. An approval counts towards a repository's required reviews wherever the connection's account is not the pull request's author; GitHub refuses an account approving or requesting changes on its own pull request, and the tool then points at `COMMENT`.
+
+`comments` (up to 50) puts each finding on the line it is about instead of in the body. Each takes `path`, `line` (the file's own line number, not a position in the diff), an optional `start_line` for a range, `side` (`RIGHT`, the default, for the new version of the file; `LEFT` for a removed line) and `body`. GitHub refuses a whole review over one comment on a line the pull request did not change, so the tool first checks every comment against the pull request's diff and moves any that would not land into the body, under a heading and with its file and line. If GitHub still refuses a line, it posts once more with every comment in the body. The result says how many went on the diff and how many were moved.
 
 ### search_code
 

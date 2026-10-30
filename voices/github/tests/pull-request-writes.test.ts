@@ -9,10 +9,18 @@ import { createMergePullRequestTool } from "../src/tools/merge-pull-request.js";
 
 const ctx: ToolContext = { session_id: "test", agent_name: "test" };
 
-// Mock Octokit: only the methods these five tools call.
+// Mock Octokit: only the methods these five tools call, plus the file list create_review reads.
 function createMockOctokit() {
   return {
-    pulls: { get: vi.fn(), update: vi.fn(), updateBranch: vi.fn(), createReview: vi.fn(), merge: vi.fn() },
+    pulls: {
+      get: vi.fn(),
+      update: vi.fn(),
+      updateBranch: vi.fn(),
+      createReview: vi.fn(),
+      merge: vi.fn(),
+      listFiles: vi.fn(),
+    },
+    paginate: vi.fn(),
     graphql: vi.fn(),
   };
 }
@@ -216,6 +224,111 @@ describe("create_review", () => {
   it("passes other failures to the shared formatter", async () => {
     octokit.pulls.createReview.mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 }));
     expect((await run({ event: "COMMENT" })).content).toContain("[404]");
+  });
+
+  describe("line comments", () => {
+    // One hunk: new lines 10-14 of src/a.ts, old lines 10-12.
+    const files = [
+      { filename: "src/a.ts", patch: "@@ -10,3 +10,5 @@ fn\n x\n+y\n+z\n w\n v" },
+      { filename: "logo.png" },
+    ];
+    const posted = { data: { state: "COMMENTED", commit_id: "abc", html_url: "u" } };
+
+    it("posts a comment on a changed line inline, defaulting to the new side", async () => {
+      octokit.paginate.mockResolvedValue(files);
+      octokit.pulls.createReview.mockResolvedValue(posted);
+      const result = await run({ event: "COMMENT", comments: [{ path: "src/a.ts", line: 11, body: "Null here?" }] });
+      expect(octokit.paginate).toHaveBeenCalledWith(octokit.pulls.listFiles, {
+        owner: "o",
+        repo: "r",
+        pull_number: 7,
+        per_page: 100,
+      });
+      expect(octokit.pulls.createReview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: "Looks right.",
+          comments: [{ path: "src/a.ts", line: 11, side: "RIGHT", body: "Null here?" }],
+        }),
+      );
+      expect(result.content).toContain("Line comments: 1 on the diff, 0 moved into the body");
+    });
+
+    it("posts a range with its start on the same side", async () => {
+      octokit.paginate.mockResolvedValue(files);
+      octokit.pulls.createReview.mockResolvedValue(posted);
+      await run({ event: "COMMENT", comments: [{ path: "src/a.ts", start_line: 10, line: 12, side: "LEFT", body: "b" }] });
+      expect(octokit.pulls.createReview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          comments: [{ path: "src/a.ts", line: 12, side: "LEFT", body: "b", start_line: 10, start_side: "LEFT" }],
+        }),
+      );
+    });
+
+    it("moves a comment outside the diff, or on a file without a patch, into the body", async () => {
+      octokit.paginate.mockResolvedValue(files);
+      octokit.pulls.createReview.mockResolvedValue(posted);
+      const result = await run({
+        event: "COMMENT",
+        comments: [
+          { path: "src/a.ts", line: 40, body: "Far away" },
+          { path: "logo.png", line: 1, body: "Binary" },
+          { path: "src/missing.ts", start_line: 2, line: 3, body: "Not in the PR" },
+        ],
+      });
+      // Safe: the mock records the request object the tool built.
+      const call = octokit.pulls.createReview.mock.calls[0]?.[0] as { body: string; comments?: unknown };
+      expect(call.comments).toBeUndefined();
+      expect(call.body).toContain("**Comments not on a line this pull request changed**");
+      expect(call.body).toContain("**`src/a.ts`, line 40**\n\nFar away");
+      expect(call.body).toContain("**`src/missing.ts`, lines 2-3**\n\nNot in the PR");
+      expect(result.content).toContain("0 on the diff, 3 moved into the body");
+    });
+
+    it("retries with every comment in the body when GitHub still refuses a line", async () => {
+      octokit.paginate.mockResolvedValue(files);
+      octokit.pulls.createReview
+        .mockRejectedValueOnce(Object.assign(new Error("Line could not be resolved"), { status: 422 }))
+        .mockResolvedValueOnce(posted);
+      const result = await run({ event: "COMMENT", comments: [{ path: "src/a.ts", line: 11, body: "Null here?" }] });
+      expect(octokit.pulls.createReview).toHaveBeenCalledTimes(2);
+      // Safe: the mock records the request object the tool built.
+      const retry = octokit.pulls.createReview.mock.calls[1]?.[0] as { body: string; comments?: unknown };
+      expect(retry.comments).toBeUndefined();
+      expect(retry.body).toContain("Null here?");
+      expect(result.content).toContain("0 on the diff, 1 moved into the body");
+    });
+
+    it("does not retry a refusal that is not about a line", async () => {
+      octokit.paginate.mockResolvedValue(files);
+      octokit.pulls.createReview.mockRejectedValue(Object.assign(new Error("Validation Failed: body"), { status: 422 }));
+      const result = await run({ event: "COMMENT", comments: [{ path: "src/a.ts", line: 11, body: "x" }] });
+      expect(octokit.pulls.createReview).toHaveBeenCalledTimes(1);
+      expect(result.is_error).toBe(true);
+    });
+
+    it("tries every comment inline when the file list cannot be read", async () => {
+      octokit.paginate.mockRejectedValue(Object.assign(new Error("Server Error"), { status: 500 }));
+      octokit.pulls.createReview.mockResolvedValue(posted);
+      await run({ event: "COMMENT", comments: [{ path: "src/a.ts", line: 99, body: "x" }] });
+      expect(octokit.pulls.createReview).toHaveBeenCalledWith(
+        expect.objectContaining({ comments: [{ path: "src/a.ts", line: 99, side: "RIGHT", body: "x" }] }),
+      );
+    });
+
+    it("reads no file list for a review without line comments", async () => {
+      octokit.pulls.createReview.mockResolvedValue(posted);
+      const result = await run({ event: "COMMENT" });
+      expect(octokit.paginate).not.toHaveBeenCalled();
+      expect(result.content).not.toContain("Line comments");
+    });
+
+    it("refuses a range that does not run forwards, and more than 50 comments", () => {
+      const t = createCreateReviewTool(asOctokit());
+      const base = { owner: "o", repo: "r", pr_number: 7, event: "COMMENT", body: "x" };
+      expect(() => t.parameters.parse({ ...base, comments: [{ path: "a", start_line: 5, line: 5, body: "b" }] })).toThrow();
+      const many = Array.from({ length: 51 }, () => ({ path: "a", line: 1, body: "b" }));
+      expect(() => t.parameters.parse({ ...base, comments: many })).toThrow();
+    });
   });
 
   it("is marked destructive", () => {
