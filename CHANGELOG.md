@@ -4,6 +4,8 @@
 
 ### Fixed
 
+**CI runs on Node 24, the version the packages require.** `package.json` asks for Node 24 or later, but `ci.yml` and `modal-smoke.yml` set up Node 22, so CI never tested the runtime users install on. Both workflows now use Node 24. Nothing published changes.
+
 **Shortening a long conversation no longer throws away its Claude Code session on every turn** ([ADR-0026](https://github.com/tuttiai/knowledge/blob/main/projects/tutti/adr/0026-context-is-shortened-in-steps-so-sessions-resume.md)). Once a conversation passed `trim_after_tokens`, each turn shortened one more old tool result. That rewrote the history, so the next call could not resume its session (ADR-0024) and re-sent and re-cached the whole conversation. When the recent results alone were over the threshold this happened on every turn: on 21 Oct 2026 one Developer agent wrote 46M tokens to the cache in a day. `compactContext` now trims down to three quarters of the threshold, keeping fewer recent results whole when it must (always the latest), and then leaves the history alone until it has grown by a quarter of the threshold again. Summarising follows the same step, so a summary that leaves the conversation over its threshold is not repeated on the next turn.
 
 ### Added
