@@ -163,6 +163,14 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 **`undici` goes from 6.28.1 to 6.29.1 under the Discord voice.** `discord.js` 14.27.0 in `@tuttiai/discord` pulls in `undici`, and 6.28.1 carried three high advisories ([GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-2m5v-pch6-74hx](https://github.com/advisories/GHSA-2m5v-pch6-74hx), [GHSA-qrxm-fqhp-jwvm](https://github.com/advisories/GHSA-qrxm-fqhp-jwvm)) and two moderate ones ([GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685), [GHSA-9fm3-97px-rjf6](https://github.com/advisories/GHSA-9fm3-97px-rjf6)). `discord.js` already asks for `^6.27.0`, so only the lockfile moves, and a fresh install of `@tuttiai/discord` already resolves the patched version. No public API changes.
 
+**Transitive runtime dependencies patched within their current majors.** Every parent's range already allowed the fix, so only the lockfile moves:
+
+- `proxy-addr` 2.0.7 to 2.0.8 (critical, [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h)) and `body-parser` 2.3.0 to 2.4.0 (high, [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828)), both under `express` 5 in `@tuttiai/cli`. `body-parser` brings `qs` 6.16.1 and `iconv-lite` 0.7.3 with it.
+- `follow-redirects` 1.16.0 to 1.16.2 (high, [GHSA-q3jh-wrc6-jgq8](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [GHSA-8r9p-f939-6h3c](https://github.com/advisories/GHSA-8r9p-f939-6h3c)), under `axios` in `@slack/web-api` in `@tuttiai/slack`.
+- `systeminformation` 5.33.8 to 5.33.19 (high, [GHSA-3f7j-7jwc-fxfj](https://github.com/advisories/GHSA-3f7j-7jwc-fxfj); moderate, [GHSA-7648-jmwf-vw7j](https://github.com/advisories/GHSA-7648-jmwf-vw7j); low, [GHSA-4vjg-vx72-qq4g](https://github.com/advisories/GHSA-4vjg-vx72-qq4g)), under `@opentelemetry/auto-instrumentations-node` in `@tuttiai/core`.
+
+No public API changes.
+
 **`sandbox` no longer hands the agent's environment to the code it runs.** Every snippet and package install started with the whole of the server's `process.env`, which in the stock image holds the model credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and every voice's token inside `TUTTI_VOICES`. One `echo` was enough to print them into the conversation. A child process now inherits only an allowlist: `PATH`, `HOME`, user, shell, locale, `TZ`, `TMPDIR`, `TERM`, the proxy variables and the CA bundle variables. The voice's `env` option is unchanged and still wins over anything inherited.
 
 - **This is not isolation.** Sandboxed code runs as the same user as the server, so it can still read the server's credentials from `/proc/1/environ`. What changed is that a snippet no longer receives them unasked, and so cannot print them by accident. Give `shell` only to an agent whose container holds nothing worth taking; tutti-app's deploy check already refuses it beside a connection.
