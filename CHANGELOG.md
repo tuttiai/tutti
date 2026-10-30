@@ -161,6 +161,8 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Security
 
+**`undici` goes from 6.28.1 to 6.29.1 under the Discord voice.** `discord.js` 14.27.0 in `@tuttiai/discord` pulls in `undici`, and 6.28.1 carried three high advisories ([GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-2m5v-pch6-74hx](https://github.com/advisories/GHSA-2m5v-pch6-74hx), [GHSA-qrxm-fqhp-jwvm](https://github.com/advisories/GHSA-qrxm-fqhp-jwvm)) and two moderate ones ([GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685), [GHSA-9fm3-97px-rjf6](https://github.com/advisories/GHSA-9fm3-97px-rjf6)). `discord.js` already asks for `^6.27.0`, so only the lockfile moves, and a fresh install of `@tuttiai/discord` already resolves the patched version. No public API changes.
+
 **Transitive runtime dependencies patched within their current majors.** Every parent's range already allowed the fix, so only the lockfile moves:
 
 - `proxy-addr` 2.0.7 to 2.0.8 (critical, [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h)) and `body-parser` 2.3.0 to 2.4.0 (high, [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828)), both under `express` 5 in `@tuttiai/cli`. `body-parser` brings `qs` 6.16.1 and `iconv-lite` 0.7.3 with it.
