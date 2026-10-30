@@ -161,6 +161,14 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 ### Security
 
+**Transitive runtime dependencies patched within their current majors.** Every parent's range already allowed the fix, so only the lockfile moves:
+
+- `proxy-addr` 2.0.7 to 2.0.8 (critical, [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h)) and `body-parser` 2.3.0 to 2.4.0 (high, [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828)), both under `express` 5 in `@tuttiai/cli`. `body-parser` brings `qs` 6.16.1 and `iconv-lite` 0.7.3 with it.
+- `follow-redirects` 1.16.0 to 1.16.2 (high, [GHSA-q3jh-wrc6-jgq8](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [GHSA-8r9p-f939-6h3c](https://github.com/advisories/GHSA-8r9p-f939-6h3c)), under `axios` in `@slack/web-api` in `@tuttiai/slack`.
+- `systeminformation` 5.33.8 to 5.33.19 (high, [GHSA-3f7j-7jwc-fxfj](https://github.com/advisories/GHSA-3f7j-7jwc-fxfj), with a moderate and a low), under `@opentelemetry/auto-instrumentations-node` in `@tuttiai/core`.
+
+No public API changes.
+
 **`sandbox` no longer hands the agent's environment to the code it runs.** Every snippet and package install started with the whole of the server's `process.env`, which in the stock image holds the model credential (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and every voice's token inside `TUTTI_VOICES`. One `echo` was enough to print them into the conversation. A child process now inherits only an allowlist: `PATH`, `HOME`, user, shell, locale, `TZ`, `TMPDIR`, `TERM`, the proxy variables and the CA bundle variables. The voice's `env` option is unchanged and still wins over anything inherited.
 
 - **This is not isolation.** Sandboxed code runs as the same user as the server, so it can still read the server's credentials from `/proc/1/environ`. What changed is that a snippet no longer receives them unasked, and so cannot print them by accident. Give `shell` only to an agent whose container holds nothing worth taking; tutti-app's deploy check already refuses it beside a connection.
