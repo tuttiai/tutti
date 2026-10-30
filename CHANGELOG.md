@@ -165,7 +165,7 @@ No behaviour changes. No voice reads its schema yet, no constructor validates, a
 
 - `proxy-addr` 2.0.7 to 2.0.8 (critical, [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h)) and `body-parser` 2.3.0 to 2.4.0 (high, [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828)), both under `express` 5 in `@tuttiai/cli`. `body-parser` brings `qs` 6.16.1 and `iconv-lite` 0.7.3 with it.
 - `follow-redirects` 1.16.0 to 1.16.2 (high, [GHSA-q3jh-wrc6-jgq8](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [GHSA-8r9p-f939-6h3c](https://github.com/advisories/GHSA-8r9p-f939-6h3c)), under `axios` in `@slack/web-api` in `@tuttiai/slack`.
-- `systeminformation` 5.33.8 to 5.33.19 (high, [GHSA-3f7j-7jwc-fxfj](https://github.com/advisories/GHSA-3f7j-7jwc-fxfj), with a moderate and a low), under `@opentelemetry/auto-instrumentations-node` in `@tuttiai/core`.
+- `systeminformation` 5.33.8 to 5.33.19 (high, [GHSA-3f7j-7jwc-fxfj](https://github.com/advisories/GHSA-3f7j-7jwc-fxfj); moderate, [GHSA-7648-jmwf-vw7j](https://github.com/advisories/GHSA-7648-jmwf-vw7j); low, [GHSA-4vjg-vx72-qq4g](https://github.com/advisories/GHSA-4vjg-vx72-qq4g)), under `@opentelemetry/auto-instrumentations-node` in `@tuttiai/core`.
 
 No public API changes.
 
