@@ -25,7 +25,8 @@ export function countingVoice(counts: Counts): Voice {
   const tool = (name: keyof Counts, destructive: boolean, finish: boolean): Voice["tools"][number] => ({
     name,
     description: name,
-    parameters: z.object({ path: z.string() }),
+    // The default makes the parsed arguments differ from the raw input, as real voices do.
+    parameters: z.object({ path: z.string(), confirm: z.boolean().default(true) }),
     ...(destructive ? { destructive: true } : {}),
     execute: () => {
       counts[name]++;
