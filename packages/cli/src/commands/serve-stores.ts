@@ -48,7 +48,7 @@ export type WarnStores = (message: string) => void;
 
 /** The warning logged once at start when approvals live in memory. */
 export const MEMORY_APPROVALS_WARNING =
-  "pending approvals will not survive a restart; set TUTTI_STATE_DIR or configure Postgres";
+  "pending approvals will not survive a restart; set TUTTI_PG_URL to keep them in Postgres";
 
 /**
  * Choose where `serve` keeps pending approvals. Built once per process, so
