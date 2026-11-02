@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+**Internal file stores for approvals and checkpoints in the server** (`@tuttiai/server`). `FileInterruptStore` keeps one approval record per file (`<dir>/<interrupt_id>.json`) and `FileCheckpointStore` keeps `<dir>/<session_id>/<turn>.json`, both written atomically with mode 0600 and validated with Zod on every read. A corrupt approval record is skipped when listing and makes `get` or `resolve` throw `TuttiError("INTERRUPT_RECORD_CORRUPT")` with its id only; an id that is not one the store generates never reaches the filesystem. They are not exported and nothing uses them yet: the server image wires them in under `TUTTI_STATE_DIR` in a later change.
+
 ### Fixed
 
 **An approval resolved after a restart now resumes its run** (`@tuttiai/core`). The run waiting on an approval lived only in process memory, so once the process restarted `TuttiRuntime.resolveInterrupt` updated the record and nothing carried on. When the runtime has a `checkpointStore` and an `interruptStore`, a turn that stops at the approval gate now saves a pause checkpoint (`awaiting_tool_results: false` with `pending_tool_ids`), rewritten as the turn's other calls finish. Resolving an approval that no run in the process waits on resumes the run from it in the background: approved calls run once, a denial ends the run with `InterruptDeniedError` and the recorded reason, finished calls are not run again, and a call the restart cut off gets an error result saying so. A session is resumed once at a time per process, and a second resolve changes nothing. With stores other than the memory ones, a run aborted while it waits (a shutdown, a client that went away) now leaves its approval pending instead of denying it with "run aborted". The signature of `resolveInterrupt` is unchanged; its behaviour is what changed. Pause checkpoints of agents without `durable` are deleted when the run ends. No new export.
