@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+**Internal file stores for approvals and checkpoints in the server** (`@tuttiai/server`). `FileInterruptStore` keeps one approval record per file (`<dir>/<interrupt_id>.json`) and `FileCheckpointStore` keeps `<dir>/<session_id>/<turn>.json`, both written atomically with mode 0600 and validated with Zod on every read. A corrupt approval record is skipped when listing and makes `get` or `resolve` throw `TuttiError("INTERRUPT_RECORD_CORRUPT")` with its id only; an id that is not one the store generates never reaches the filesystem. They are not exported and nothing uses them yet: the server image wires them in under `TUTTI_STATE_DIR` in a later change.
+
 ### Fixed
 
 **CI runs on Node 24, the version the packages require.** `package.json` asks for Node 24 or later, but `ci.yml` and `modal-smoke.yml` set up Node 22, so CI never tested the runtime users install on. Both workflows now use Node 24. Nothing published changes.
