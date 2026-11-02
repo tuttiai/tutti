@@ -112,7 +112,11 @@ export class FileInterruptStore implements InterruptStore {
     return attempt(() => this.readAll().filter((r) => r.session_id === session_id));
   }
 
+  /** The record's file. Refuses an id outside the pattern, so no other path is ever built. */
   private path(interrupt_id: string): string {
+    if (!INTERRUPT_ID_PATTERN.test(interrupt_id)) {
+      throw new Error("FileInterruptStore: refusing an interrupt id outside the store's pattern");
+    }
     return join(this.dir, `${interrupt_id}${FILE_SUFFIX}`);
   }
 
@@ -122,8 +126,10 @@ export class FileInterruptStore implements InterruptStore {
 
   /** `null` for an id outside the pattern or with no file; throws for a record that cannot be read. */
   private read(interrupt_id: string): InterruptRequest | null {
-    if (!INTERRUPT_ID_PATTERN.test(interrupt_id) || !existsSync(this.path(interrupt_id))) return null;
-    const stored = parseRecord(this.path(interrupt_id), interrupt_id);
+    if (!INTERRUPT_ID_PATTERN.test(interrupt_id)) return null;
+    const file = this.path(interrupt_id);
+    if (!existsSync(file)) return null;
+    const stored = parseRecord(file, interrupt_id);
     if (!stored) {
       throw new TuttiError(INTERRUPT_RECORD_CORRUPT, `interrupt ${interrupt_id} record is unreadable`, { interrupt_id });
     }
