@@ -106,6 +106,15 @@ describe("planResume", () => {
     expect(plan.kind === "replay" && plan.turn.dispositions.get("t-del")).toEqual({ kind: "interrupted" });
   });
 
+  it("matches a record holding the parsed arguments, defaults filled in", () => {
+    const parsedRecord = record("approved", { tool_args: { path: "a", confirm: true } });
+    const parse = (_name: string, input: unknown): unknown => ({ ...(input as object), confirm: true }); // Safe: fixture input is an object.
+    const plan = planResume(checkpoint([readResult], ["t-del"]), [parsedRecord], parse);
+    expect(plan.kind === "replay" && plan.turn.dispositions.get("t-del")).toEqual({ kind: "approved" });
+    const unparsed = planResume(checkpoint([readResult], ["t-del"]), [parsedRecord]);
+    expect(unparsed.kind === "replay" && unparsed.turn.dispositions.get("t-del")).toEqual({ kind: "interrupted" });
+  });
+
   it("matches two identical gated calls to their records oldest first", () => {
     const twin: ChatMessage = {
       role: "assistant",

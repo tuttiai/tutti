@@ -1,16 +1,10 @@
 /**
  * Pause checkpoints: what a run saves when a tool call stops at the approval
- * gate, and how a later process plans to finish that turn from it.
- *
- * A pause checkpoint is an ordinary {@link Checkpoint} with
- * `state.awaiting_tool_results: false` and `state.pending_tool_ids` naming
- * the tool calls of the paused turn that had not finished. Its messages end
- * with the assistant's `tool_use` message, followed by a user message of the
- * `tool_result`s already finished when there are any. The durable resume in
+ * gate (`state.awaiting_tool_results: false`, `state.pending_tool_ids`, the
+ * assistant's `tool_use` message, then the results already finished), and
+ * how a later process plans to finish that turn. The durable resume in
  * `AgentRunner` only takes `awaiting_tool_results: true` checkpoints, so it
- * never mistakes one of these for its own.
- *
- * Everything here is pure: no store, no clock, no logger.
+ * never mistakes one of these for its own. Pure: no store, clock or logger.
  *
  * @module
  */
@@ -32,14 +26,12 @@ import type { InterruptRequest } from "./types.js";
 /** What a resumed turn does with one of its tool calls. */
 export type Disposition =
   | { kind: "done"; result: ToolResultBlock }
-  | { kind: "approved" }
-  | { kind: "denied"; record: InterruptRequest }
-  | { kind: "interrupted" };
+  | { kind: "approved" | "interrupted" }
+  | { kind: "denied"; record: InterruptRequest };
 
 /** A paused turn, ready to be replayed by the runner without a model call. */
 export interface PausedTurn {
   session_id: string;
-  /** The turn number that paused. */
   turn: number;
   /** The history before the assistant's `tool_use` message. */
   messages: ChatMessage[];
@@ -51,11 +43,11 @@ export interface PausedTurn {
   usage: TokenUsage;
 }
 
+/** Parses a call's raw input with its tool's schema; `undefined` when it cannot. */
+export type ArgsParser = (tool_name: string, input: unknown) => unknown;
+
 /** The outcome of {@link planResume}. */
-export type ResumePlan =
-  | { kind: "replay"; turn: PausedTurn }
-  | { kind: "wait" }
-  | { kind: "invalid" };
+export type ResumePlan = { kind: "replay"; turn: PausedTurn } | { kind: "wait" } | { kind: "invalid" };
 
 /** What {@link buildPauseCheckpoint} needs. */
 export interface PauseSnapshot {
@@ -116,11 +108,20 @@ export function isPauseCheckpoint(cp: Checkpoint): boolean {
  * a denied one ends the run; approved ones run. An unfinished call with no
  * record was running when the process stopped and is never run again.
  *
+ * A record holds the arguments after the tool's schema parsed them (with its
+ * defaults filled in), while the checkpoint holds the model's raw input, so
+ * a call matches a record equal to either.
+ *
  * @param cp - A pause checkpoint.
  * @param records - The session's approval records, in any order.
+ * @param parseArgs - The tool's parsed arguments for a call, or `undefined` when they cannot be parsed.
  * @returns `replay`, `wait`, or `invalid` when the checkpoint cannot be read as a paused turn.
  */
-export function planResume(cp: Checkpoint, records: InterruptRequest[]): ResumePlan {
+export function planResume(
+  cp: Checkpoint,
+  records: InterruptRequest[],
+  parseArgs: ArgsParser = () => undefined,
+): ResumePlan {
   const split = splitPausedMessages(cp.messages);
   if (!isPauseCheckpoint(cp) || !split) return { kind: "invalid" };
   const pending = new Set(cp.state.pending_tool_ids);
@@ -131,7 +132,7 @@ export function planResume(cp: Checkpoint, records: InterruptRequest[]): ResumeP
   for (const block of toolUses(split.assistant.content)) {
     const done = split.finished.find((r) => r.tool_use_id === block.id);
     if (done) decided.set(block.id, { kind: "done", result: done });
-    else if (pending.has(block.id)) decided.set(block.id, claim(block, candidates));
+    else if (pending.has(block.id)) decided.set(block.id, claim(block, parseArgs(block.name, block.input), candidates));
     else return { kind: "invalid" };
   }
   const dispositions = settle(decided);
@@ -174,9 +175,11 @@ function toolUses(content: ChatMessage["content"]): ToolUseBlock[] {
   return content.filter((b): b is ToolUseBlock => b.type === "tool_use");
 }
 
-function claim(block: ToolUseBlock, candidates: InterruptRequest[]): Disposition | "wait" {
+function claim(block: ToolUseBlock, parsed: unknown, candidates: InterruptRequest[]): Disposition | "wait" {
   const index = candidates.findIndex(
-    (r) => r.tool_name === block.name && isDeepStrictEqual(r.tool_args, block.input),
+    (r) =>
+      r.tool_name === block.name &&
+      (isDeepStrictEqual(r.tool_args, block.input) || (parsed !== undefined && isDeepStrictEqual(r.tool_args, parsed))),
   );
   if (index < 0) return { kind: "interrupted" };
   const [record] = candidates.splice(index, 1);

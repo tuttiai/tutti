@@ -14,7 +14,7 @@
  * @module
  */
 
-import type { Session, SessionStore } from "@tuttiai/types";
+import type { ScoreConfig, Session, SessionStore } from "@tuttiai/types";
 
 import type { CheckpointStore } from "../checkpoint/store.js";
 import type { Checkpoint } from "../checkpoint/types.js";
@@ -23,7 +23,7 @@ import { FileSessionStore } from "../file-session-store.js";
 import { logger } from "../logger.js";
 import { InMemorySessionStore } from "../session-store.js";
 import { queueReplay, resumeOnce } from "./live-waiters.js";
-import { isPauseCheckpoint, planResume } from "./pause.js";
+import { isPauseCheckpoint, planResume, type ArgsParser } from "./pause.js";
 import type { InterruptStore } from "./store.js";
 import type { InterruptRequest } from "./types.js";
 
@@ -38,6 +38,23 @@ export interface ResumeDeps {
   agents: string[];
   /** Starts a run of the session, as `TuttiRuntime.run(agent, "", session_id)`. */
   run: (agent_name: string, session_id: string) => Promise<unknown>;
+  /** The agent's argument parser, as {@link scoreArgsParser} builds it. */
+  parseArgs?: (agent_name: string) => ArgsParser;
+}
+
+/**
+ * Parse a call's input with the schema of the named agent's tool, as the
+ * runner does before it asks for approval.
+ *
+ * @param score - The runtime's score.
+ * @returns A parser per agent; it gives `undefined` for an unknown tool or invalid input.
+ */
+export function scoreArgsParser(score: ScoreConfig): (agent_name: string) => ArgsParser {
+  return (agent_name) => (tool_name, input) => {
+    const tool = score.agents[agent_name]?.voices.flatMap((v) => v.tools).find((t) => t.name === tool_name);
+    const parsed = tool?.parameters.safeParse(input);
+    return parsed?.success ? parsed.data : undefined;
+  };
 }
 
 /**
@@ -69,7 +86,7 @@ async function attempt(deps: ResumeDeps, record: InterruptRequest): Promise<void
   }
   const agent = await sessionAgent(deps, cp);
   if (agent === undefined) return;
-  const plan = planResume(cp, await deps.interrupts.listBySession(record.session_id));
+  const plan = planResume(cp, await deps.interrupts.listBySession(record.session_id), deps.parseArgs?.(agent));
   if (plan.kind === "wait") {
     logger.info(log, "Approval recorded; the run resumes once its other pending approvals are resolved");
     return;

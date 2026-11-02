@@ -21,7 +21,7 @@ import type { UserModelStore } from "./memory/user-model.js";
 import type { CheckpointStore } from "./checkpoint/index.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { hasWaiter } from "./interrupt/live-waiters.js";
-import { resumePausedRun } from "./interrupt/resume.js";
+import { resumePausedRun, scoreArgsParser } from "./interrupt/resume.js";
 import { EventBus } from "./event-bus.js";
 import { InMemorySessionStore } from "./session-store.js";
 import { PostgresSessionStore } from "./memory/postgres.js";
@@ -438,6 +438,7 @@ export class TuttiRuntime {
           interrupts: this.interruptStore,
           agents: Object.keys(this._score.agents),
           run: (agent, session_id) => this.run(agent, "", session_id),
+          parseArgs: scoreArgsParser(this._score),
         },
         resolved,
       );
