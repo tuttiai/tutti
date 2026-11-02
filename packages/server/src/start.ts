@@ -6,9 +6,11 @@
  * `start-env.ts`). For multi-agent setups, mount a score file and use the
  * library API (`createServer`) instead.
  *
- * The runtime always carries an in-memory interrupt store, so a gated tool
- * call pauses for a person (`POST /interrupts/:id/approve` or `/deny`)
- * instead of failing the run. Pending approvals do not survive a restart.
+ * The runtime always carries an interrupt store, so a gated tool call
+ * pauses for a person (`POST /interrupts/:id/approve` or `/deny`) instead of
+ * failing the run. With `TUTTI_PG_URL` or a usable `TUTTI_STATE_DIR`,
+ * pending approvals survive a restart and approving one resumes its run;
+ * otherwise they live in memory, with a warning; see `start-stores.ts`.
  *
  * With a usable `TUTTI_STATE_DIR`, sessions (and, for `claude-code`, the
  * provider's session registry and the CLI's own `CLAUDE_CONFIG_DIR`) are
@@ -23,6 +25,7 @@ import { readStartAgentEnv } from "./start-env.js";
 import { buildStartProvider } from "./start-provider.js";
 import { buildStartAgent, buildStartRuntime } from "./start-runtime.js";
 import { readStartState, usableStartState } from "./start-state.js";
+import { buildStartStores } from "./start-stores.js";
 import { loadVoices } from "./voice-loader.js";
 
 const logger = createLogger("tutti-server");
@@ -61,7 +64,12 @@ const score: ScoreConfig = {
 };
 
 // Carries an interrupt store, so a gated tool call waits for a person.
-const runtime = buildStartRuntime(score, state);
+const stores = buildStartStores(
+  SecretsManager.optional("TUTTI_PG_URL"),
+  state,
+  (context, message) => logger.warn(context, message),
+);
+const runtime = buildStartRuntime(score, state, stores);
 
 const app = await createServer({
   port: PORT,
@@ -86,6 +94,7 @@ logger.info(
     require_approval: agentEnv.require_approval ?? "destructive",
     context: agentEnv.context ?? "off",
     sessions: state ? state.sessions : "memory",
+    durability: stores.durability,
   },
   "Tutti server started",
 );

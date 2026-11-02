@@ -7,7 +7,6 @@
 import {
   FileSessionStore,
   InMemorySessionStore,
-  MemoryInterruptStore,
   TuttiRuntime,
   createLogger,
 } from "@tuttiai/core";
@@ -16,6 +15,7 @@ import type { AgentConfig, ScoreConfig, Voice } from "@tuttiai/types";
 
 import type { StartAgentEnv } from "./start-env.js";
 import type { StartStatePaths } from "./start-state.js";
+import { memoryStartStores, type StartStores } from "./start-stores.js";
 
 /** The agent fields `start.ts` reads from its own variables. */
 export interface StartAgentBase {
@@ -59,10 +59,12 @@ export function buildStartAgent(
  * Build the runtime for the image's score.
  *
  * @remarks
- * It always carries a {@link MemoryInterruptStore}. Without one, a tool the
- * framework gates by default (any marked `destructive`) throws when called,
- * and the approve and deny routes answer 503. Pending approvals live in
- * memory, so a restart forgets them and the runs waiting on them.
+ * It always carries an interrupt store. Without one, a tool the framework
+ * gates by default (any marked `destructive`) throws when called, and the
+ * approve and deny routes answer 503. Which store is `start-stores.ts`'s
+ * choice: with Postgres or a state directory, approvals and the turns their
+ * runs paused at survive a restart, and approving afterwards resumes the
+ * run. Left to the default, they live in memory and a restart forgets them.
  *
  * Given `TUTTI_STATE_DIR`'s paths, sessions are kept in a
  * {@link FileSessionStore} there and survive a restart. Without them they
@@ -71,14 +73,20 @@ export function buildStartAgent(
  *
  * @param score - The one-agent score.
  * @param state - The paths `readStartState` read, or `undefined` to keep sessions in memory.
+ * @param stores - What `buildStartStores` chose. Defaults to memory.
  * @returns A runtime whose gated tool calls pause for a person.
  *
  * @example
- * const runtime = buildStartRuntime(score, readStartState(read));
+ * const runtime = buildStartRuntime(score, state, buildStartStores(pgUrl, state, warn));
  */
-export function buildStartRuntime(score: ScoreConfig, state?: StartStatePaths): TuttiRuntime {
+export function buildStartRuntime(
+  score: ScoreConfig,
+  state?: StartStatePaths,
+  stores: StartStores = memoryStartStores(),
+): TuttiRuntime {
   return new TuttiRuntime(score, {
-    interruptStore: new MemoryInterruptStore(),
+    interruptStore: stores.interrupts,
+    ...(stores.checkpoints !== undefined ? { checkpointStore: stores.checkpoints } : {}),
     sessionStore: buildSessionStore(state),
   });
 }

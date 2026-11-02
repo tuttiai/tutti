@@ -26,6 +26,8 @@ describe("readStartState", () => {
       sessions: "/state/sessions",
       claude_code_sessions: "/state/claude-code-sessions.json",
       claude_config: "/state/claude",
+      interrupts: "/state/interrupts",
+      checkpoints: "/state/checkpoints",
     });
   });
 

@@ -4,6 +4,8 @@ import type { FastifyInstance } from "fastify";
 import type { InterruptRequest, TuttiRuntime } from "@tuttiai/core";
 import type { TuttiEvent } from "@tuttiai/types";
 
+import { lookupInterrupt } from "./interrupt-lookup.js";
+
 /** Shape of the JSON body for `POST /interrupts/:interruptId/approve`. */
 interface ApproveBody {
   resolved_by?: string;
@@ -129,13 +131,9 @@ export function registerInterruptsRoutes(
       const r = requireStore();
       if (!r.ok) return reply.code(503).send(r.error);
 
-      const existing = await r.store.get(request.params.interruptId);
-      if (!existing) {
-        return reply.code(404).send({
-          error: "interrupt_not_found",
-          message: `No interrupt with id "${request.params.interruptId}"`,
-        });
-      }
+      const found = await lookupInterrupt(r.store, request.params.interruptId);
+      if (!found.ok) return reply.code(found.status).send(found.body);
+      const existing = found.record;
       if (existing.status !== "pending") {
         return reply.code(409).send({
           error: "already_resolved",
@@ -164,13 +162,9 @@ export function registerInterruptsRoutes(
       const r = requireStore();
       if (!r.ok) return reply.code(503).send(r.error);
 
-      const existing = await r.store.get(request.params.interruptId);
-      if (!existing) {
-        return reply.code(404).send({
-          error: "interrupt_not_found",
-          message: `No interrupt with id "${request.params.interruptId}"`,
-        });
-      }
+      const found = await lookupInterrupt(r.store, request.params.interruptId);
+      if (!found.ok) return reply.code(found.status).send(found.body);
+      const existing = found.record;
       if (existing.status !== "pending") {
         return reply.code(409).send({
           error: "already_resolved",

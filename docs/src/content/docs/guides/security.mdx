@@ -243,6 +243,15 @@ Give the runtime a `checkpointStore` as well as an `interruptStore` and a turn t
 
 With stores that outlive the process (anything but `MemoryInterruptStore` and `MemoryCheckpointStore`), a run aborted while it waits leaves its approval pending instead of denying it with "run aborted". On the memory stores it is still denied, as nothing could resume it.
 
+### Approvals across a restart in the server image
+
+Pending approvals survive a restart of the server image when `TUTTI_PG_URL` is set (Postgres interrupt and checkpoint tables) or when `TUTTI_STATE_DIR` points to a writable directory (files under `<dir>/interrupts/` and `<dir>/checkpoints/`). Otherwise they are kept in memory, lost on restart, and a warning is logged at start: "pending approvals will not survive a restart; set TUTTI_STATE_DIR or configure Postgres". The started log line names the store in use as `durability: postgres|file|memory`.
+
+- Stored approvals keep the tool's arguments in plain text under `<TUTTI_STATE_DIR>/interrupts/` (file mode 0600, directory 0700) or in the Postgres interrupts table. Protect that volume or database the way you protect sessions.
+- A second resolve of the same approval is refused with 409 `already_resolved` and has no side effect: the run is not resumed twice and no tool runs twice.
+- A resumed run calls PermissionGuard again, through `TuttiRuntime.run`.
+- A record that cannot be read answers 500 `interrupt_record_corrupt` naming only its id, and is left out of `GET /interrupts/pending`; the other approvals keep working.
+
 :::tip[Routing impact]
 When the [smart router](./smart-routing) is enabled, agents with destructive tools loaded automatically bias toward larger, safer models. The cost of an LLM mistake on a destructive call (a posted tweet, a voided invoice, a deleted message) is far higher than the cost of using a smarter model for that turn — `SmartProvider` factors this into every routing decision.
 :::
