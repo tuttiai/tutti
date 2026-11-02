@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
-    "@vitest/coverage-v8": "3.2.7",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "^10.2.0",
     "eslint-plugin-security": "^4.0.0",
     "tsup": "8.5.1",
@@ -28,7 +28,7 @@
     "turbo": "2.9.5",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.58.1",
-    "vitest": "3.2.7"
+    "vitest": "5.0.5"
   },
   "license": "Apache-2.0",
   "repository": {
