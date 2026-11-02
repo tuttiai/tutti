@@ -176,10 +176,20 @@ async function postResolve(
     process.exit(1);
   }
   if (status < 200 || status >= 300) {
-    console.error(chalk.red("Unexpected server response: " + status));
+    console.error(chalk.red(serverMessage(body) ?? "Unexpected server response: " + status));
     process.exit(1);
   }
   return reviveInterrupt(body);
+}
+
+/**
+ * The `message` of a server error body, such as "interrupt <id> record is
+ * unreadable" for a corrupt approval record, so the operator sees why.
+ */
+function serverMessage(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("message" in body)) return undefined;
+  const { message } = body;
+  return typeof message === "string" && message.length > 0 ? message : undefined;
 }
 
 /* ------------------------------------------------------------------ */
