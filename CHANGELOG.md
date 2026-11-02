@@ -4,6 +4,8 @@
 
 ### Fixed
 
+**`tutti-ai serve` keeps pending approvals under `TUTTI_STATE_DIR` when Postgres is not configured.** With `TUTTI_STATE_DIR` set to an absolute, writable path and `TUTTI_PG_URL` unset, `serve` keeps approvals and pause checkpoints as files under `interrupts/` and `checkpoints/` there, as the server image does, so they survive a restart. A relative or unwritable path is ignored with a warning. `@tuttiai/server` now exports `FileInterruptStore` and `FileCheckpointStore` for this.
+
 **`tutti-ai serve` now has an interrupt store, so destructive tools no longer fail there.** `serve` built its runtime without one, so any tool gated by default (marked `destructive`) failed the run. It now keeps pending approvals in Postgres when `TUTTI_PG_URL` is set, with the turns their runs paused at, so they survive a restart and approving afterwards resumes the run; otherwise in memory, with the warning "pending approvals will not survive a restart; set TUTTI_STATE_DIR or configure Postgres" at start. The store is built once, so a watch-mode reload keeps the approvals already waiting. A Postgres that cannot be reached is not a reason to fall back: the error surfaces on first use.
 
 **CI runs on Node 24, the version the packages require.** `package.json` asks for Node 24 or later, but `ci.yml` and `modal-smoke.yml` set up Node 22, so CI never tested the runtime users install on. Both workflows now use Node 24. Nothing published changes.
