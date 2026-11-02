@@ -6,6 +6,8 @@
  * | `<dir>/sessions/<id>.json` | one conversation each | `FileSessionStore` |
  * | `<dir>/claude-code-sessions.json` | which Claude Code session holds which conversation | `ClaudeCodeProvider`, only for `TUTTI_PROVIDER=claude-code` |
  * | `<dir>/claude/` | the Claude Code CLI's `CLAUDE_CONFIG_DIR`: its session files | the CLI, only for `claude-code` |
+ * | `<dir>/interrupts/<id>.json` | one pending or resolved approval each | `FileInterruptStore`, unless `TUTTI_PG_URL` is set |
+ * | `<dir>/checkpoints/<session>/<turn>.json` | the turn a run paused at, to resume it | `FileCheckpointStore`, unless `TUTTI_PG_URL` is set |
  *
  * Set but unusable (it cannot be created or written, as on an older image
  * where `/state` is a root-owned mount point), the server logs a warning and
@@ -38,6 +40,10 @@ export interface StartStatePaths {
   readonly claude_code_sessions: string;
   /** The Claude Code CLI's config directory, unless `CLAUDE_CONFIG_DIR` already names one. */
   readonly claude_config: string;
+  /** The directory `FileInterruptStore` keeps approvals in. */
+  readonly interrupts: string;
+  /** The directory `FileCheckpointStore` keeps pause checkpoints in. */
+  readonly checkpoints: string;
 }
 
 /**
@@ -60,6 +66,8 @@ export function readStartState(read: ReadVariable): StartStatePaths | undefined 
     sessions: join(dir, "sessions"),
     claude_code_sessions: join(dir, "claude-code-sessions.json"),
     claude_config: join(dir, "claude"),
+    interrupts: join(dir, "interrupts"),
+    checkpoints: join(dir, "checkpoints"),
   };
 }
 
