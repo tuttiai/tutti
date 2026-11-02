@@ -2,10 +2,6 @@
 
 ## [Unreleased]
 
-### Added
-
-**Internal file stores for approvals and checkpoints in the server** (`@tuttiai/server`). `FileInterruptStore` keeps one approval record per file (`<dir>/<interrupt_id>.json`) and `FileCheckpointStore` keeps `<dir>/<session_id>/<turn>.json`, both written atomically with mode 0600 and validated with Zod on every read. A corrupt approval record is skipped when listing and makes `get` or `resolve` throw `TuttiError("INTERRUPT_RECORD_CORRUPT")` with its id only; an id that is not one the store generates never reaches the filesystem. They are not exported and nothing uses them yet: the server image wires them in under `TUTTI_STATE_DIR` in a later change.
-
 ### Fixed
 
 **Pending approvals in the server image survive a restart** (`@tuttiai/server`). Pending approvals in the server image are now stored in Postgres when `TUTTI_PG_URL` is set, or under `TUTTI_STATE_DIR` (`interrupts/` and `checkpoints/`), so they survive a restart and approving resumes the run from its last checkpoint. With neither, they stay in memory and a warning is logged at start. The started log line carries `durability: postgres|file|memory`. The approve and deny routes answer 500 `interrupt_record_corrupt` for a record that cannot be read. No new export and no new variable.
@@ -17,6 +13,8 @@
 **Shortening a long conversation no longer throws away its Claude Code session on every turn** ([ADR-0026](https://github.com/tuttiai/knowledge/blob/main/projects/tutti/adr/0026-context-is-shortened-in-steps-so-sessions-resume.md)). Once a conversation passed `trim_after_tokens`, each turn shortened one more old tool result. That rewrote the history, so the next call could not resume its session (ADR-0024) and re-sent and re-cached the whole conversation. When the recent results alone were over the threshold this happened on every turn: on 21 Oct 2026 one Developer agent wrote 46M tokens to the cache in a day. `compactContext` now trims down to three quarters of the threshold, keeping fewer recent results whole when it must (always the latest), and then leaves the history alone until it has grown by a quarter of the threshold again. Summarising follows the same step, so a summary that leaves the conversation over its threshold is not repeated on the next turn.
 
 ### Added
+
+**Internal file stores for approvals and checkpoints in the server** (`@tuttiai/server`). `FileInterruptStore` keeps one approval record per file (`<dir>/<interrupt_id>.json`) and `FileCheckpointStore` keeps `<dir>/<session_id>/<turn>.json`, both written atomically with mode 0600 and validated with Zod on every read. A corrupt approval record is skipped when listing and makes `get` or `resolve` throw `TuttiError("INTERRUPT_RECORD_CORRUPT")` with its id only; an id that is not one the store generates never reaches the filesystem. They are not exported and nothing uses them yet: the server image wires them in under `TUTTI_STATE_DIR` in a later change.
 
 **`create_review` on the GitHub voice takes comments on lines of the diff.** A review could only carry one body, so an agent reviewing a pull request put every finding in it and none on the code it was about. The new optional `comments` input (up to 50, each `path`, `line`, optional `start_line` and `side`, `body`) posts each one on its line. GitHub refuses the whole review over a single comment on a line the pull request did not change, without saying which, so the tool reads the pull request's file list first and moves any comment outside a hunk, or on a file with no patch, into the body under its file and line. Should GitHub still refuse a line, it posts once more with every comment in the body rather than losing the review. Reviews without `comments` are sent exactly as before.
 
