@@ -122,6 +122,24 @@ tutti-ai deploy rollback            # roll back to the previous release
 
 Each subcommand dispatches to the matching platform command (`fly status`, `railway logs`, etc.) so you don't need to remember the platform's exact verbs.
 
+## Pending approvals and restarts
+
+The server image (`packages/server`, `dist/start.js`) keeps pending approvals, and the turn each paused run stopped at, so approving after a restart resumes the run from that point:
+
+| Configuration | Where approvals live | Survive a restart |
+|---|---|---|
+| `TUTTI_PG_URL` set | Postgres (`PostgresInterruptStore`, `PostgresCheckpointStore`) | yes |
+| otherwise `TUTTI_STATE_DIR` set and writable | `<dir>/interrupts/<id>.json` and `<dir>/checkpoints/<session>/<turn>.json` | yes |
+| neither | memory, with a warning at start | no |
+
+- Mount a persistent volume at the state directory (for example `-v tutti-state:/state -e TUTTI_STATE_DIR=/state`) for approvals and sessions to survive a container restart.
+- Run one server per approval store: a file store or a Postgres table shared by two servers would let both resume the same run.
+- Postgres that cannot be reached is not a reason to fall back to memory: the error surfaces on the first approval.
+- Postgres checkpoints expire after their TTL (24 hours by default). An approval resolved after that is recorded, but its run cannot resume, and a warning says so.
+- `tutti-ai serve` keeps approvals in Postgres when `TUTTI_PG_URL` is set and in memory otherwise; it does not read `TUTTI_STATE_DIR`.
+
+After a restart the original `/run/stream` client is gone, so the resumed run's answer is on `GET /sessions/:id` rather than on that stream.
+
 ## Cost monitoring after deploy
 
 Once your service is running, configure a `RunCostStore` so the cost-analysis CLI can read live data:
