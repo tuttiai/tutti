@@ -32,9 +32,8 @@ describe("buildServeStores", () => {
     expect(stores.checkpointStore).toBeUndefined();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(MEMORY_APPROVALS_WARNING);
-    // serve does not read TUTTI_STATE_DIR, so the warning must not send operators there.
-    expect(MEMORY_APPROVALS_WARNING).toBe("pending approvals will not survive a restart; set TUTTI_PG_URL to keep them in Postgres");
-    expect(MEMORY_APPROVALS_WARNING).not.toContain("TUTTI_STATE_DIR");
+    // serve reads both variables, so the warning names both.
+    expect(MEMORY_APPROVALS_WARNING).toBe("pending approvals will not survive a restart; set TUTTI_STATE_DIR or TUTTI_PG_URL");
   });
 
   it("never puts the connection string in a warning", () => {
