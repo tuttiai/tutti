@@ -35,6 +35,8 @@ export {
 export { registerAuth, resolveApiKey, extractBearer } from "./middleware/auth.js";
 export type { AuthOptions } from "./middleware/auth.js";
 export { estimateCostUsd } from "./cost.js";
+export { FileInterruptStore } from "./state/file-interrupt-store.js";
+export { FileCheckpointStore } from "./state/file-checkpoint-store.js";
 
 import type { ServerConfig } from "./config.js";
 
