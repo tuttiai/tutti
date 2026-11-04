@@ -17,6 +17,7 @@ import { createServer, DEFAULT_PORT, SERVER_VERSION } from "@tuttiai/server";
 import type { FastifyInstance } from "fastify";
 import { ReactiveScore } from "../watch/score-watcher.js";
 import { logger } from "../logger.js";
+import { buildServeStores, type ServeStores } from "./serve-stores.js";
 
 export interface ServeOptions {
   port?: string;
@@ -155,7 +156,14 @@ export async function serveCommand(
     ? new InMemorySessionStore()
     : undefined;
 
-  let runtime = buildRuntime(score, sharedSessions);
+  // Approvals are kept across watch-mode reloads, like sessions.
+  const approvals = buildServeStores(
+    (key) => SecretsManager.optional(key),
+    (message) => logger.warn(message),
+  );
+  logger.info({ durability: approvals.durability }, "Approval store ready");
+
+  let runtime = buildRuntime(score, sharedSessions, approvals);
   const initialGraphConfig = extractGraphConfig(score);
   const initialGraphRunner: TuttiGraph | undefined = initialGraphConfig
     ? runtime.createGraph(initialGraphConfig)
@@ -186,7 +194,7 @@ export async function serveCommand(
         try {
           const nextScore = reactive?.current;
           if (!nextScore) return;
-          const nextRuntime = buildRuntime(nextScore, sharedSessions);
+          const nextRuntime = buildRuntime(nextScore, sharedSessions, approvals);
           const nextGraphConfig = extractGraphConfig(nextScore);
           const nextGraphRunner = nextGraphConfig
             ? nextRuntime.createGraph(nextGraphConfig)
@@ -267,11 +275,13 @@ function parsePort(raw: string | undefined): number {
 function buildRuntime(
   score: ScoreConfig,
   sessionStore: SessionStore | undefined,
+  approvals: ServeStores,
 ): TuttiRuntime {
-  return new TuttiRuntime(
-    score,
-    sessionStore ? { sessionStore } : {},
-  );
+  return new TuttiRuntime(score, {
+    interruptStore: approvals.interruptStore,
+    ...(approvals.checkpointStore ? { checkpointStore: approvals.checkpointStore } : {}),
+    ...(sessionStore ? { sessionStore } : {}),
+  });
 }
 
 async function buildApp(
