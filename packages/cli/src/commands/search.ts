@@ -44,11 +44,11 @@ const BUILTIN_VOICES: VoiceEntry[] = [
   },
   {
     name: "postgres",
-    package: "pg",
-    description: "PostgreSQL session persistence and database access",
-    tags: ["database", "postgres", "sql", "persistence", "sessions"],
+    package: "@tuttiai/postgres",
+    description: "Query and inspect a PostgreSQL database (read-only by default; writes via destructive 'execute' tool)",
+    tags: ["postgres", "postgresql", "database", "sql", "analytics"],
     official: true,
-    tools: 0,
+    tools: 8,
   },
 ];
 
@@ -59,7 +59,8 @@ interface RegistryEntry {
   tags: string[];
 }
 
-async function fetchRegistry(): Promise<VoiceEntry[]> {
+/** Fetch the voice registry, falling back to the built-in list when it is unreachable. */
+export async function fetchRegistry(): Promise<VoiceEntry[]> {
   try {
     const res = await fetch(REGISTRY_URL);
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -81,7 +82,7 @@ async function fetchRegistry(): Promise<VoiceEntry[]> {
 }
 
 function toolCount(name: string): number {
-  const counts = new Map<string, number>([["filesystem", 7], ["github", 23], ["playwright", 12]]);
+  const counts = new Map<string, number>([["filesystem", 7], ["github", 23], ["playwright", 12], ["postgres", 8]]);
   return counts.get(name) ?? 0;
 }
 
@@ -120,7 +121,7 @@ function printVoice(voice: VoiceEntry, showInstallStatus: boolean): void {
   console.log("  " + chalk.bold(voice.package) + badge + status);
   console.log("  " + voice.description);
 
-  const installCmd = voice.official && voice.name !== "postgres"
+  const installCmd = voice.official
     ? "tutti-ai add " + voice.name
     : "npm install " + voice.package;
   console.log("  " + chalk.dim("Install: ") + chalk.cyan(installCmd));
