@@ -20,6 +20,8 @@ import type {
 import type { UserModelStore } from "./memory/user-model.js";
 import type { CheckpointStore } from "./checkpoint/index.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
+import { hasWaiter } from "./interrupt/live-waiters.js";
+import { resumePausedRun, scoreArgsParser } from "./interrupt/resume.js";
 import { EventBus } from "./event-bus.js";
 import { InMemorySessionStore } from "./session-store.js";
 import { PostgresSessionStore } from "./memory/postgres.js";
@@ -143,6 +145,7 @@ export class TuttiRuntime {
    */
   readonly runCostStore: RunCostStore | undefined;
   private _sessions: SessionStore;
+  private _checkpoints: CheckpointStore | undefined;
   private _runner: AgentRunner;
   private _score: ScoreConfig;
   /** Teardown for any exporter installed during construction. */
@@ -155,6 +158,7 @@ export class TuttiRuntime {
     this.semanticMemory = new InMemorySemanticStore();
     this.toolCache = new InMemoryToolCache();
     this.interruptStore = options.interruptStore;
+    this._checkpoints = options.checkpointStore;
     this.runCostStore = options.runCostStore;
     const trajectoryObserver = TuttiRuntime.createTrajectoryObserver(
       score,
@@ -402,18 +406,44 @@ export class TuttiRuntime {
    * Idempotent: resolving an already-resolved interrupt returns the
    * existing record without side-effects.
    *
+   * When no run in this process waits on the interrupt (the process that
+   * paused it was restarted, or the run's caller went away while the stores
+   * are durable), resolving it moves it out of `"pending"` and then resumes
+   * the run in the background from its pause checkpoint, if the runtime has
+   * a `checkpointStore`: approved calls run, a denial ends the run with
+   * {@link InterruptDeniedError}, and calls that had already finished are not
+   * run again. The resumed run's output lands in its session. A session is
+   * resumed at most once at a time in a process.
+   *
    * @param interrupt_id - Id from the `interrupt:requested` event payload.
    * @param status - `"approved"` resumes the tool call; `"denied"`
    *   throws {@link InterruptDeniedError} into the run.
    * @param options - Optional metadata: `resolved_by` (reviewer id),
    *   `denial_reason` (free-text, appears in the thrown error message).
    */
-  resolveInterrupt(
+  async resolveInterrupt(
     interrupt_id: string,
     status: "approved" | "denied",
     options?: { resolved_by?: string; denial_reason?: string },
   ): Promise<InterruptRequest> {
-    return this._runner.resolveInterrupt(interrupt_id, status, options);
+    const live = hasWaiter(this._runner, interrupt_id);
+    const before = live || !this.interruptStore ? null : await this.interruptStore.get(interrupt_id);
+    const resolved = await this._runner.resolveInterrupt(interrupt_id, status, options);
+    if (before?.status === "pending" && this.interruptStore) {
+      void resumePausedRun(
+        {
+          owner: this._runner,
+          sessions: this._sessions,
+          checkpoints: this._checkpoints,
+          interrupts: this.interruptStore,
+          agents: Object.keys(this._score.agents),
+          run: (agent, session_id) => this.run(agent, "", session_id),
+          parseArgs: scoreArgsParser(this._score),
+        },
+        resolved,
+      );
+    }
+    return resolved;
   }
 
   /**

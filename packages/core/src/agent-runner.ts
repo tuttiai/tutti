@@ -67,6 +67,15 @@ import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { needsApproval } from "./interrupt/index.js";
+import { dropWaiter, noteWaiter, takeReplay } from "./interrupt/live-waiters.js";
+import {
+  PauseRecorder,
+  approvedBeforeRestart,
+  presetResult,
+  recorderFor,
+  replayResponse,
+  storesAreDurable,
+} from "./interrupt/pause-recorder.js";
 import { addUsage } from "./usage.js";
 import { compactContext, capToolResults } from "./context/index.js";
 import {
@@ -432,6 +441,7 @@ export class AgentRunner {
     const pending = this.pendingInterrupts.get(interrupt_id);
     if (pending) {
       this.pendingInterrupts.delete(interrupt_id);
+      dropWaiter(this, interrupt_id);
       if (resolved.status === "approved") {
         pending.resolve(resolved);
       } else {
@@ -469,7 +479,7 @@ export class AgentRunner {
    * is almost certainly a misconfiguration.
    */
   private async awaitApproval(
-    call: { session_id: string; tool_name: string; tool_args: unknown },
+    call: { session_id: string; tool_name: string; tool_args: unknown; keepsPending?: () => boolean },
     signal?: AbortSignal,
   ): Promise<InterruptRequest> {
     const { session_id, tool_name, tool_args } = call;
@@ -490,6 +500,7 @@ export class AgentRunner {
       // Register the resolver BEFORE emitting so a synchronous handler
       // that calls resolveInterrupt() immediately still finds a waiter.
       this.pendingInterrupts.set(request.interrupt_id, { resolve, reject });
+      noteWaiter(this, request.interrupt_id);
 
       this.events.emit({
         type: "interrupt:requested",
@@ -505,16 +516,26 @@ export class AgentRunner {
       );
     });
     if (!signal) return approval;
-    return raceAbort(approval, signal, () => this.withdrawInterrupt(request.interrupt_id));
+    return raceAbort(approval, signal, () =>
+      this.withdrawInterrupt(request.interrupt_id, call.keepsPending?.() === true),
+    );
   }
 
   /**
    * Retire an approval whose run was aborted while it waited. The waiter is
    * dropped first, so the denial written to the store reaches no run, and a
    * reviewer is not left a request that nothing would act on.
+   *
+   * When the turn's pause checkpoint is in durable stores, the approval is
+   * left pending instead: approving it later resumes the run from there.
    */
-  private withdrawInterrupt(interrupt_id: string): void {
+  private withdrawInterrupt(interrupt_id: string, keepPending: boolean): void {
     this.pendingInterrupts.delete(interrupt_id);
+    dropWaiter(this, interrupt_id);
+    if (keepPending) {
+      logger.info({ interrupt_id }, "Run stopped while awaiting approval; the approval stays pending and resumes it");
+      return;
+    }
     void this.resolveInterrupt(interrupt_id, "denied", { denial_reason: "run aborted" }).catch(
       (err: unknown) => {
         logger.warn(
@@ -788,17 +809,23 @@ export class AgentRunner {
       // run exits cleanly), so we don't need to handle that branch.
       const durableEnabled = agent.durable !== undefined && agent.durable !== false;
       const checkpointStore = this.checkpointStore;
+      // A turn paused at the approval gate in another process, queued by
+      // `TuttiRuntime.resolveInterrupt`: replayed instead of a model call.
+      const paused = takeReplay(this, session.id);
+      let replayTurn = paused;
       const checkpoint =
-        durableEnabled && checkpointStore
+        durableEnabled && checkpointStore && !paused
           ? await Tracing.checkpoint(session.id, 0, () =>
               checkpointStore.loadLatest(session.id),
             )
           : null;
       const resuming = !!checkpoint && checkpoint.state.awaiting_tool_results === true;
 
-      const messages: ChatMessage[] = resuming && checkpoint
-        ? [...checkpoint.messages]
-        : [...session.messages, { role: "user", content: guardedInput }];
+      const messages: ChatMessage[] = paused
+        ? [...paused.messages]
+        : resuming && checkpoint
+          ? [...checkpoint.messages]
+          : [...session.messages, { role: "user", content: guardedInput }];
 
       const maxTurns = agent.max_turns ?? DEFAULT_MAX_TURNS;
       const maxToolCalls = agent.max_tool_calls ?? DEFAULT_MAX_TOOL_CALLS;
@@ -858,14 +885,15 @@ export class AgentRunner {
               ...(rawCfg.warn_at_percent !== undefined ? { warn_at_percent: rawCfg.warn_at_percent } : {}),
             }
         : undefined;
-      const totalUsage: TokenUsage =
-        resuming && checkpoint
+      const totalUsage: TokenUsage = paused
+        ? { ...paused.usage }
+        : resuming && checkpoint
           ? {
               input_tokens: checkpoint.state.prompt_tokens_used,
               output_tokens: checkpoint.state.completion_tokens_used,
             }
           : { input_tokens: 0, output_tokens: 0 };
-      let turns = resuming && checkpoint ? checkpoint.turn : 0;
+      let turns = paused ? paused.turn - 1 : resuming && checkpoint ? checkpoint.turn : 0;
       let totalToolCalls = 0;
       // Trajectory audit: every successful or failed tool execution
       // appends one entry. Drained at run end into the
@@ -1028,10 +1056,14 @@ export class AgentRunner {
           turn: turns,
         });
 
+        // The paused turn's response, replayed once in place of a model call.
+        const replay = replayTurn ? replayResponse(replayTurn) : undefined;
+        replayTurn = undefined;
+
         // Shorten the history per the agent's context settings before it
         // is sent. A summary costs a model call of its own, which counts
         // against the run's usage and budget like any other.
-        if (agent.context) {
+        if (agent.context && !replay) {
           const summary = await compactContext(messages, agent.context, {
             agent_name: agent.name,
             chat: (req) =>
@@ -1056,20 +1088,22 @@ export class AgentRunner {
 
         // beforeLLMCall hooks — may modify the request
         hookCtx.turn = turns;
-        const globalReq = await this.safeHook(() => this.globalHooks?.beforeLLMCall?.(hookCtx, request));
-        if (globalReq) request = globalReq;
-        const agentReq = await this.safeHook(() => agentHooks?.beforeLLMCall?.(hookCtx, request));
-        if (agentReq) request = agentReq;
+        if (!replay) {
+          const globalReq = await this.safeHook(() => this.globalHooks?.beforeLLMCall?.(hookCtx, request));
+          if (globalReq) request = globalReq;
+          const agentReq = await this.safeHook(() => agentHooks?.beforeLLMCall?.(hookCtx, request));
+          if (agentReq) request = agentReq;
 
-        logger.debug({ agent: agent.name, model: agent.model }, "LLM request");
+          logger.debug({ agent: agent.name, model: agent.model }, "LLM request");
 
-        this.events.emit({
-          type: "llm:request",
-          agent_name: agent.name,
-          request,
-        });
+          this.events.emit({
+            type: "llm:request",
+            agent_name: agent.name,
+            request,
+          });
+        }
 
-        const response = await Tracing.llmCall(
+        const response = replay ?? await Tracing.llmCall(
           agent.model ?? "unknown",
           async () => {
             const call = withSignal(request, signal);
@@ -1110,15 +1144,17 @@ export class AgentRunner {
           "LLM response",
         );
 
-        this.events.emit({
-          type: "llm:response",
-          agent_name: agent.name,
-          response,
-        });
+        if (!replay) {
+          this.events.emit({
+            type: "llm:response",
+            agent_name: agent.name,
+            response,
+          });
 
-        // afterLLMCall hooks
-        await this.safeHook(() => this.globalHooks?.afterLLMCall?.(hookCtx, response));
-        await this.safeHook(() => agentHooks?.afterLLMCall?.(hookCtx, response));
+          // afterLLMCall hooks
+          await this.safeHook(() => this.globalHooks?.afterLLMCall?.(hookCtx, response));
+          await this.safeHook(() => agentHooks?.afterLLMCall?.(hookCtx, response));
+        }
 
         addUsage(totalUsage, response.usage);
 
@@ -1294,6 +1330,7 @@ export class AgentRunner {
         // Pass the audit array only when an observer is wired —
         // executeTool short-circuits the hash + push when undefined.
         const auditSink = this.trajectoryObserver ? trajectoryAudit : undefined;
+        const recorder = this.pauseRecorder(session.id, turns, messages, totalUsage, toolUseBlocks);
         const toolResults: ToolResultBlock[] = await Promise.all(
           toolUseBlocks.map((block) =>
             this.executeTool(
@@ -1307,9 +1344,13 @@ export class AgentRunner {
               agent.requireApproval,
               auditSink,
               signal,
-            ),
+            ).then((result) => {
+              recorder?.finish(result);
+              return result;
+            }),
           ),
         );
+        await recorder?.settled();
 
         // Add tool results as a user message (Anthropic API format)
         const maxResultChars = agent.context?.max_tool_result_chars;
@@ -1369,6 +1410,9 @@ export class AgentRunner {
       } catch (err) {
         if (err instanceof RunAbortedError) {
           logger.info({ agent: agent.name, session: session.id, turn: turns }, "Agent run aborted by its caller");
+        }
+        if (!(err instanceof RunAbortedError) || !this.pauseOutlivesProcess()) {
+          await this.clearPause(session.id, durableEnabled);
         }
         if (durableEnabled) {
           logger.error(
@@ -1471,6 +1515,7 @@ export class AgentRunner {
 
       // Persist updated messages
       this.sessions.update(session.id, messages);
+      await this.clearPause(session.id, durableEnabled);
 
       logger.info(
         { agent: agent.name, session: session.id, turns, usage: totalUsage },
@@ -1756,6 +1801,44 @@ export class AgentRunner {
     };
   }
 
+  /**
+   * The recorder that saves a tool turn's pause checkpoint, when the runner
+   * has both a checkpoint store and an interrupt store.
+   */
+  private pauseRecorder(
+    session_id: string,
+    turn: number,
+    messages: ChatMessage[],
+    usage: TokenUsage,
+    blocks: ToolUseBlock[],
+  ): PauseRecorder | undefined {
+    if (!this.checkpointStore || !this.interruptStore) return undefined;
+    const durable = storesAreDurable(this.checkpointStore, this.interruptStore);
+    const snapshot = { session_id, turn, messages: [...messages], usage: { ...usage }, blocks };
+    return new PauseRecorder(this.checkpointStore, snapshot, durable);
+  }
+
+  /** Whether a paused turn's checkpoint and approvals outlive this process. */
+  private pauseOutlivesProcess(): boolean {
+    return !!this.checkpointStore && !!this.interruptStore && storesAreDurable(this.checkpointStore, this.interruptStore);
+  }
+
+  /**
+   * Drop a finished run's pause checkpoints. Only for agents that are not
+   * `durable`: theirs are the only checkpoints such a run writes. Best-effort.
+   */
+  private async clearPause(session_id: string, durableAgent: boolean): Promise<void> {
+    if (durableAgent || !this.checkpointStore || !this.interruptStore) return;
+    try {
+      await this.checkpointStore.delete(session_id);
+    } catch (err) {
+      logger.warn(
+        { session: session_id, error: err instanceof Error ? err.message : String(err) },
+        "Could not delete the run's pause checkpoint",
+      );
+    }
+  }
+
   private async executeTool(
     tools: Tool[],
     block: ToolUseBlock,
@@ -1770,6 +1853,9 @@ export class AgentRunner {
   ): Promise<ToolResultBlock> {
     // An aborted run starts no tool, not even a hook or a lookup.
     throwIfAborted(signal);
+    // A replayed call that finished, or was cut off, before a restart.
+    const preset = presetResult(block);
+    if (preset) return preset;
     const tool = tools.find((t) => t.name === block.name);
     if (!tool) {
       const available = tools.map((t) => t.name).join(", ") || "(none)";
@@ -1858,9 +1944,16 @@ export class AgentRunner {
         // see) and BEFORE cache lookup (so a cached result doesn't
         // bypass review). Denial throws InterruptDeniedError which
         // propagates up and aborts the run.
-        if (needsApproval(requireApproval, block.name, tool.destructive)) {
+        if (needsApproval(requireApproval, block.name, tool.destructive) && !approvedBeforeRestart(block)) {
+          const recorder = recorderFor(block);
+          await recorder?.pause();
           await this.awaitApproval(
-            { session_id: context.session_id, tool_name: block.name, tool_args: parsed },
+            {
+              session_id: context.session_id,
+              tool_name: block.name,
+              tool_args: parsed,
+              keepsPending: () => recorder?.keepsPending() === true,
+            },
             signal,
           );
         }
