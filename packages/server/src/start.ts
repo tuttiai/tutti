@@ -31,7 +31,7 @@ import { loadVoices } from "./voice-loader.js";
 const logger = createLogger("tutti-server");
 
 const PROVIDER = SecretsManager.optional("TUTTI_PROVIDER");
-const MODEL = SecretsManager.optional("TUTTI_MODEL") ?? "claude-sonnet-4-20250514";
+const MODEL = SecretsManager.optional("TUTTI_MODEL") ?? "claude-sonnet-5-5";
 const SYSTEM_PROMPT =
   SecretsManager.optional("TUTTI_SYSTEM_PROMPT") ??
   "You are a helpful assistant.";
