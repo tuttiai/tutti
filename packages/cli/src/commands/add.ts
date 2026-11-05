@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { execSync } from "node:child_process";
 import chalk from "chalk";
-import ora from "ora";
 import { logger } from "../logger.js";
+import { runPackageManager } from "../package-manager.js";
+import { PACKAGE_SPEC_HINT, parsePackageSpec } from "../package-spec.js";
 
 const OFFICIAL_VOICES = new Map<string, { package: string; setup: string }>([
   ["filesystem", {
@@ -75,8 +75,35 @@ function isAlreadyInstalled(packageName: string): boolean {
   }
 }
 
+function failInvalid(message: string): never {
+  logger.error(message);
+  console.error(chalk.dim(PACKAGE_SPEC_HINT));
+  process.exit(1);
+}
+
+/** Resolve and validate the user's input before anything reaches npm. */
+function validateInput(voiceName: string): { spec: string; name: string } {
+  if (voiceName.trim() === "") failInvalid("Package name is required.");
+  const spec = resolvePackageName(voiceName);
+  const parsed = parsePackageSpec(spec);
+  if (!parsed.success) failInvalid(`Invalid package name: ${JSON.stringify(voiceName)}`);
+  return { spec, name: parsed.data.name };
+}
+
+function printSetup(voiceName: string): void {
+  const official = OFFICIAL_VOICES.get(voiceName);
+  console.log();
+  if (official) {
+    console.log("  Setup:");
+    console.log(official.setup);
+  } else {
+    console.log(chalk.dim("  Check the package README for setup instructions."));
+  }
+  console.log();
+}
+
 export function addCommand(voiceName: string): void {
-  const packageName = resolvePackageName(voiceName);
+  const { spec, name } = validateInput(voiceName);
 
   // Check if package.json exists in cwd
   const pkgPath = resolve(process.cwd(), "package.json");
@@ -86,40 +113,17 @@ export function addCommand(voiceName: string): void {
     process.exit(1);
   }
 
-  // Check if already installed
-  if (isAlreadyInstalled(packageName)) {
-    console.log(chalk.green(`  ✔ ${packageName} is already installed`));
+  if (isAlreadyInstalled(name)) {
+    console.log(chalk.green(`  ✔ ${name} is already installed`));
     return;
   }
 
-  // Install
-  const spinner = ora(`Installing ${packageName}...`).start();
-
-  try {
-    execSync(`npm install ${packageName}`, {
-      cwd: process.cwd(),
-      stdio: "pipe",
-    });
-    spinner.succeed(`Installed ${packageName}`);
-  } catch (error) {
-    spinner.fail(`Failed to install ${packageName}`);
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error({ error: message, package: packageName }, "Installation failed");
+  console.log(chalk.cyan(`  Installing ${spec}...`));
+  const result = runPackageManager("npm", ["install", spec]);
+  if (!result.ok) {
+    logger.error(result.error);
     process.exit(1);
   }
-
-  // Print setup instructions
-  const official = OFFICIAL_VOICES.get(voiceName);
-  if (official) {
-    console.log();
-    console.log("  Setup:");
-    console.log(official.setup);
-    console.log();
-  } else {
-    console.log();
-    console.log(
-      chalk.dim("  Check the package README for setup instructions."),
-    );
-    console.log();
-  }
+  console.log(chalk.green(`  ✔ Installed ${spec}`));
+  printSetup(voiceName);
 }
