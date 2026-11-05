@@ -90,8 +90,10 @@ a chunk. So `/run/stream` writes an SSE comment, `: heartbeat`, every `stream_he
 long as the stream is open. SSE clients discard comments; a hand-written parser should skip any
 line starting with `:`.
 
-Closing the connection cancels the run. It makes no further model call and runs no further tool,
-and a pending approval is resolved as denied with the reason `run aborted`. `POST /run` does the
+Closing the connection cancels the run. It makes no further model call and runs no further tool.
+A pending approval is resolved as denied with the reason `run aborted`, unless the approvals and
+checkpoints are durable (the image with `TUTTI_PG_URL` or `TUTTI_STATE_DIR`): then it stays
+pending, and approving it later resumes the run. `POST /run` does the
 same when its client disconnects or when it answers `504`. To pick a run back up later, start a
 new one on the same `session_id`.
 
@@ -133,7 +135,8 @@ The image runs one agent configured entirely by environment:
 | `TUTTI_TOOL_TIMEOUT_MS` | 30000 | How long one tool call may run before it fails |
 | `TUTTI_MAX_COST_USD` | none | Hard cost ceiling per run |
 | `TUTTI_REQUIRE_APPROVAL` | `destructive` | Which tool calls wait for a person, below |
-| `TUTTI_STATE_DIR` | none | Absolute directory to keep sessions in across restarts, below |
+| `TUTTI_STATE_DIR` | none | Absolute directory to keep sessions and approvals in across restarts, below |
+| `TUTTI_PG_URL` | none | Postgres for pending approvals and pause checkpoints, chosen before `TUTTI_STATE_DIR` |
 
 Without `TUTTI_STATE_DIR`, sessions live in memory (at most 1,000, each dropped after 24 hours
 unused) and a restart loses them. With it, each session is a file under `<dir>/sessions/`, so a
@@ -143,6 +146,9 @@ finds it. The same bounds apply, and an evicted session's file is deleted. For
 in `<dir>/claude-code-sessions.json`, and the CLI runs with `CLAUDE_CONFIG_DIR=<dir>/claude`
 unless that variable is already set, because the CLI keeps the sessions themselves there. The
 image creates `/state` owned by `tutti`, so a named volume mounted there needs no further setup.
+Pending approvals are kept in `<dir>/interrupts/<id>.json` and the turn each paused run stopped at
+in `<dir>/checkpoints/<session>/<turn>.json` (mode 0600), unless `TUTTI_PG_URL` is set, which
+keeps them in Postgres instead.
 A directory the server cannot create or write is logged and set aside: sessions stay in memory
 and the CLI's environment is left as it was.
 
@@ -212,8 +218,13 @@ A list is comma-separated, and each item is a tool name or glob of letters, digi
 `_ * . -`; anything else stops the start. Only `*` is a wildcard, and `?` is refused because the
 matcher would read it as a literal.
 Approve or deny with `POST /interrupts/:id/approve` or `/deny`, taking the id from the
-`approval_requested` frame on `/run/stream` or from `GET /sessions/:id/interrupts`. Pending
-approvals live in memory, so a restart forgets them along with the runs waiting on them.
+`approval_requested` frame on `/run/stream` or from `GET /sessions/:id/interrupts`. With
+`TUTTI_PG_URL` or `TUTTI_STATE_DIR`, pending approvals survive a restart: `GET /interrupts/pending`
+lists them again, and approving one resumes its run from where it paused without running finished
+tool calls again; its answer lands on `GET /sessions/:id`. Without either, they live in memory, a
+restart forgets them, and a warning says so at start. The started log line carries
+`durability: postgres|file|memory`. A record that cannot be read answers 500
+`interrupt_record_corrupt`.
 
 ```bash
 docker run -p 3847:3847 -e TUTTI_API_KEY=key -e ANTHROPIC_API_KEY=sk-... \

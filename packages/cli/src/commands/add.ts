@@ -31,22 +31,24 @@ const OFFICIAL_VOICES = new Map<string, { package: string; setup: string }>([
     ${chalk.cyan("voices: [new PlaywrightVoice()]")}`,
   }],
   ["postgres", {
-    package: "pg",
-    setup: `  Add ${chalk.bold("DATABASE_URL")} to your .env file:
-    ${chalk.cyan("DATABASE_URL=postgres://user:pass@localhost:5432/tutti")}
+    package: "@tuttiai/postgres",
+    setup: `  Add ${chalk.bold("DATABASE_URL")} to your .env file (${chalk.bold("POSTGRES_URL")} also works):
+    ${chalk.cyan("DATABASE_URL=postgres://user:pass@host:5432/dbname")}
 
   Add to your score:
-    ${chalk.cyan("memory: { provider: 'postgres' }")}
-
-  Or with an explicit URL:
-    ${chalk.cyan("memory: { provider: 'postgres', url: process.env.DATABASE_URL }")}
-
-  Use the async factory for initialization:
-    ${chalk.cyan("const tutti = await TuttiRuntime.create(score)")}`,
+    ${chalk.cyan('import { PostgresVoice } from "@tuttiai/postgres"')}
+    ${chalk.cyan("voices: [new PostgresVoice()]")}
+    ${chalk.cyan('permissions: ["network"]')}`,
   }],
 ]);
 
-function resolvePackageName(input: string): string {
+/**
+ * Resolve what the user typed after `tutti-ai add` to an npm package name.
+ *
+ * @param input - A short official voice name (e.g. `postgres`), a scoped package or a bare name.
+ * @returns The official voice's package, the scoped name unchanged, or `@tuttiai/<input>`.
+ */
+export function resolvePackageName(input: string): string {
   // Known official voice
   const voice = OFFICIAL_VOICES.get(input);
   if (voice) {
