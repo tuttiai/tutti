@@ -3,8 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const mocks = vi.hoisted(() => ({ spawnSync: vi.fn() }));
+const mocks = vi.hoisted(() => ({ spawnSync: vi.fn(), logWarn: vi.fn(), logError: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawnSync }));
+vi.mock("../../src/logger.js", () => ({
+  logger: { warn: mocks.logWarn, error: mocks.logError, info: vi.fn() },
+}));
 
 import { upgradeCommand } from "../../src/commands/upgrade.js";
 
@@ -15,7 +18,6 @@ const HINT =
 describe("upgradeCommand", () => {
   let dir: string;
   let log: ReturnType<typeof vi.spyOn>;
-  let warn: ReturnType<typeof vi.spyOn>;
   let error: ReturnType<typeof vi.spyOn>;
 
   function writeDeps(dependencies: Record<string, string>): void {
@@ -30,9 +32,10 @@ describe("upgradeCommand", () => {
       throw new Error(`exit ${String(code)}`);
     });
     log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.spawnSync.mockReset();
+    mocks.logWarn.mockReset();
+    mocks.logError.mockReset();
     mocks.spawnSync.mockReturnValue({ status: 0, stdout: null });
   });
 
@@ -69,7 +72,7 @@ describe("upgradeCommand", () => {
 
     expect(mocks.spawnSync.mock.calls[0]?.[1]).toEqual(["install", "@tuttiai/core@latest"]);
     expect(JSON.stringify(mocks.spawnSync.mock.calls)).not.toContain("curl");
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Skipping ${JSON.stringify(EVIL_KEY)}`));
+    expect(mocks.logWarn).toHaveBeenCalledWith(`Skipping ${JSON.stringify(EVIL_KEY)}: not a valid npm package name.`);
   });
 
   it.each([
@@ -80,7 +83,7 @@ describe("upgradeCommand", () => {
     expect(() => upgradeCommand(target)).toThrow("exit 1");
 
     expect(mocks.spawnSync).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith(expect.stringContaining(`Invalid package name: ${JSON.stringify(target)}`));
+    expect(mocks.logError).toHaveBeenCalledWith(`Invalid package name: ${JSON.stringify(target)}`);
     expect(error).toHaveBeenCalledWith(expect.stringContaining(HINT));
   });
 
@@ -93,9 +96,7 @@ describe("upgradeCommand", () => {
     mocks.spawnSync.mockReturnValue({ status: 1, stdout: null });
 
     expect(() => upgradeCommand("core")).toThrow("exit 1");
-    expect(error).toHaveBeenCalledWith(
-      expect.stringContaining("npm install @tuttiai/core@latest failed (exit code 1)."),
-    );
+    expect(mocks.logError).toHaveBeenCalledWith("npm install @tuttiai/core@latest failed (exit code 1).");
     expect(log).toHaveBeenCalledWith(expect.stringContaining("Run manually: npm install @tuttiai/core@latest"));
   });
 
@@ -104,8 +105,6 @@ describe("upgradeCommand", () => {
     mocks.spawnSync.mockReturnValue({ status: null, stdout: null, error: enoent });
 
     expect(() => upgradeCommand()).toThrow("exit 1");
-    expect(error).toHaveBeenCalledWith(
-      expect.stringContaining("Could not run npm. Is Node.js/npm installed and on your PATH?"),
-    );
+    expect(mocks.logError).toHaveBeenCalledWith("Could not run npm. Is Node.js/npm installed and on your PATH?");
   });
 });

@@ -11,6 +11,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import chalk from "chalk";
+import { logger } from "../logger.js";
 import { runPackageManager } from "../package-manager.js";
 import { PACKAGE_SPEC_HINT, isValidPackageName } from "../package-spec.js";
 
@@ -67,7 +68,7 @@ function getInstalledTuttiPackages(): Map<string, string> {
 function dropInvalidNames(installed: Map<string, string>): void {
   for (const name of [...installed.keys()]) {
     if (!isValidPackageName(name)) {
-      console.warn(chalk.yellow(`  Skipping ${JSON.stringify(name)}: not a valid npm package name.`));
+      logger.warn(`Skipping ${JSON.stringify(name)}: not a valid npm package name.`);
       installed.delete(name);
     }
   }
@@ -94,7 +95,7 @@ export function upgradeCommand(target?: string): void {
   if (target) {
     const resolved = resolvePackageName(target);
     if (!isValidPackageName(resolved)) {
-      console.error(chalk.red("Invalid package name: " + JSON.stringify(target)));
+      logger.error(`Invalid package name: ${JSON.stringify(target)}`);
       console.error(chalk.dim(PACKAGE_SPEC_HINT));
       process.exit(1);
     }
@@ -113,7 +114,7 @@ export function upgradeCommand(target?: string): void {
   const args = [pm === "npm" ? "install" : "add", ...packages];
   const result = runPackageManager(pm, args);
   if (!result.ok) {
-    console.error(chalk.red("  " + result.error));
+    logger.error(result.error);
     console.log(chalk.dim("  Run manually: " + [pm, ...args].join(" ")));
     process.exit(1);
   }
