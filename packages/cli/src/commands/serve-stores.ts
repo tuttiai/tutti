@@ -6,7 +6,12 @@
  * | Configuration | Approvals and pause checkpoints | Survive a restart |
  * |---|---|---|
  * | `TUTTI_PG_URL` set | `PostgresInterruptStore` and `PostgresCheckpointStore` | yes |
+ * | otherwise a usable `TUTTI_STATE_DIR` | files under `interrupts/` and `checkpoints/` there | yes |
  * | otherwise | memory, with a warning at start | no |
+ *
+ * `TUTTI_STATE_DIR` follows the server image's rules: an absolute path, and
+ * one that cannot be created or written falls back to memory with a warning
+ * rather than stopping `serve`.
  *
  * Postgres that cannot be reached is not a reason to fall back: its stores
  * fail on first use and the error surfaces there.
@@ -14,15 +19,18 @@
  * @module
  */
 
+import { isAbsolute, join } from "node:path";
+
 import {
   MemoryInterruptStore,
   PostgresCheckpointStore,
   PostgresInterruptStore,
 } from "@tuttiai/core";
 import type { CheckpointStore, InterruptStore } from "@tuttiai/core";
+import { FileCheckpointStore, FileInterruptStore } from "@tuttiai/server";
 
 /** Which backend holds the approvals, as the started log line names it. */
-export type ServeDurability = "postgres" | "memory";
+export type ServeDurability = "postgres" | "file" | "memory";
 
 /** What {@link buildServeStores} chose. */
 export interface ServeStores {
@@ -40,7 +48,7 @@ export type WarnStores = (message: string) => void;
 
 /** The warning logged once at start when approvals live in memory. */
 export const MEMORY_APPROVALS_WARNING =
-  "pending approvals will not survive a restart; set TUTTI_PG_URL to keep them in Postgres";
+  "pending approvals will not survive a restart; set TUTTI_STATE_DIR or TUTTI_PG_URL";
 
 /**
  * Choose where `serve` keeps pending approvals. Built once per process, so
@@ -59,6 +67,27 @@ export function buildServeStores(read: ReadVariable, warn: WarnStores): ServeSto
       durability: "postgres",
     };
   }
+  const files = fileStores(read("TUTTI_STATE_DIR")?.trim(), warn);
+  if (files) return files;
   warn(MEMORY_APPROVALS_WARNING);
   return { interruptStore: new MemoryInterruptStore(), durability: "memory" };
+}
+
+function fileStores(dir: string | undefined, warn: WarnStores): ServeStores | undefined {
+  if (!dir) return undefined;
+  if (!isAbsolute(dir) || dir.includes("\0")) {
+    warn("TUTTI_STATE_DIR must be an absolute path, such as /state; ignoring it");
+    return undefined;
+  }
+  try {
+    return {
+      interruptStore: new FileInterruptStore(join(dir, "interrupts")),
+      checkpointStore: new FileCheckpointStore(join(dir, "checkpoints")),
+      durability: "file",
+    };
+  } catch {
+    // The path is the operator's own; the error text could name others.
+    warn("TUTTI_STATE_DIR cannot be written; keeping approvals in memory");
+    return undefined;
+  }
 }
