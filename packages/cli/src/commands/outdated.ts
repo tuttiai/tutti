@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
+import { logger } from "../logger.js";
 import { runPackageManager } from "../package-manager.js";
 import { isValidPackageName } from "../package-spec.js";
 
@@ -24,7 +25,7 @@ function getLatestVersion(pkg: string): string | null {
 function findInvalidNames(names: readonly string[]): Set<string> {
   const invalid = new Set(names.filter((name) => !isValidPackageName(name)));
   for (const name of invalid) {
-    console.warn(chalk.yellow(`  Skipping ${JSON.stringify(name)}: not a valid npm package name.`));
+    logger.warn(`Skipping ${JSON.stringify(name)}: not a valid npm package name.`);
   }
   return invalid;
 }

