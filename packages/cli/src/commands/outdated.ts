@@ -6,21 +6,27 @@
  * actually pull the latest versions.
  */
 
-import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
+import { runPackageManager } from "../package-manager.js";
+import { isValidPackageName } from "../package-spec.js";
 
 function getLatestVersion(pkg: string): string | null {
-  try {
-    return execSync(`npm view ${pkg} version 2>/dev/null`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-  } catch {
-    return null;
+  const result = runPackageManager("npm", ["view", pkg, "version"], { capture: true });
+  if (!result.ok) return null;
+  const version = result.stdout.trim();
+  return version === "" ? null : version;
+}
+
+/** Keys that are not valid npm names never reach npm; each is named once. */
+function findInvalidNames(names: readonly string[]): Set<string> {
+  const invalid = new Set(names.filter((name) => !isValidPackageName(name)));
+  for (const name of invalid) {
+    console.warn(chalk.yellow(`  Skipping ${JSON.stringify(name)}: not a valid npm package name.`));
   }
+  return invalid;
 }
 
 function pad(s: string, len: number): string {
@@ -62,14 +68,15 @@ export function outdatedCommand(): void {
     return;
   }
 
+  const invalid = findInvalidNames(tuttiDeps.map(([name]) => name));
   const spinner = ora("Checking npm registry...").start();
 
   const results: Array<{ name: string; current: string; latest: string; outdated: boolean }> = [];
   for (const [name, version] of tuttiDeps) {
-    const latest = getLatestVersion(name);
+    const latest = invalid.has(name) ? null : getLatestVersion(name);
     const current = version.replace(/^[\^~]/, "");
     results.push({
-      name,
+      name: invalid.has(name) ? JSON.stringify(name) : name,
       current,
       latest: latest ?? "?",
       outdated: latest !== null && current !== latest,
