@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **cli:** New project templates and schedules now default to `claude-sonnet-5-5` instead of the retired `claude-sonnet-4-20250514`. Cost lookups for it need the `@tuttiai/core` release that prices it (#62).
+
 **`tutti-ai serve` keeps pending approvals under `TUTTI_STATE_DIR` when Postgres is not configured.** With `TUTTI_STATE_DIR` set to an absolute, writable path and `TUTTI_PG_URL` unset, `serve` keeps approvals and pause checkpoints as files under `interrupts/` and `checkpoints/` there, as the server image does, so they survive a restart. A relative or unwritable path is ignored with a warning, and the memory warning becomes "pending approvals will not survive a restart; set TUTTI_STATE_DIR or TUTTI_PG_URL". `@tuttiai/server` now exports `FileInterruptStore` and `FileCheckpointStore` for this.
 
 **`tutti-ai add postgres` and `tutti-ai search postgres` give the `@tuttiai/postgres` voice instead of the `pg` driver** (`@tuttiai/cli`). The CLI mapped the `postgres` shorthand to node-postgres, so a user who followed the docs got a database driver and no voice. `add` now installs `@tuttiai/postgres` and its setup hint describes the voice (`DATABASE_URL` or `POSTGRES_URL`, `new PostgresVoice()`, `permissions: ["network"]`); `search` and `voices` list it with its 8 tools, online and offline. Postgres session memory needs no extra install: `pg` ships with `@tuttiai/core`.
