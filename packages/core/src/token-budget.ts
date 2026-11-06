@@ -10,7 +10,8 @@ import type { BudgetConfig } from "@tuttiai/types";
 export const PRICING: Record<string, { input: number; output: number }> = {
   "claude-sonnet-4-20250514": { input: 3.0, output: 15.0 },
   "claude-opus-4-20250514": { input: 15.0, output: 75.0 },
-  "claude-haiku-4-20250514": { input: 0.25, output: 1.25 },
+  "claude-haiku-4-5-20251001": { input: 1.0, output: 5.0 },
+  "claude-haiku-4-5": { input: 1.0, output: 5.0 },
   "gpt-4o": { input: 2.5, output: 10.0 },
   "gemini-2.0-flash": { input: 0.1, output: 0.4 },
 };
