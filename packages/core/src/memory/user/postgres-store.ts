@@ -133,17 +133,13 @@ export class PostgresUserMemoryStore implements UserMemoryStore {
       [user_id, trimmed, limit],
     );
 
-    if (result.rows.length > 0) {
-      const ids = result.rows.map((r) => r.id);
-      // Bump last_accessed_at on every hit. Atomic enough — readers don't
-      // care about the precise nanosecond and writers serialise on PK.
-      await this.pool.query(
-        "UPDATE " + this.table + " SET last_accessed_at = NOW() WHERE id = ANY($1::text[])",
-        [ids],
-      );
-    }
-
-    return result.rows.map(rowToMemory);
+    // Bump last_accessed_at on every hit and return the values just written,
+    // keeping the SELECT's ranking order.
+    const touched =
+      result.rows.length > 0
+        ? await this.touch(result.rows.map((r) => r.id))
+        : new Map<string, Date>();
+    return result.rows.map((r) => rowToMemory(withAccess(r, touched)));
   }
 
   async list(user_id: string): Promise<UserMemory[]> {
@@ -181,17 +177,24 @@ export class PostgresUserMemoryStore implements UserMemoryStore {
       [id],
     );
     if (result.rows.length === 0) return null;
-    // Bump last_accessed_at on the hit.
-    await this.pool.query(
-      "UPDATE " + this.table + " SET last_accessed_at = NOW() WHERE id = $1",
-      [id],
-    );
-    return rowToMemory(result.rows[0]);
+    // Bump last_accessed_at on the hit and return the value just written.
+    const touched = await this.touch([id]);
+    return rowToMemory(withAccess(result.rows[0], touched));
   }
 
   /** Close the connection pool. Call on shutdown. */
   async close(): Promise<void> {
     await this.pool.end();
+  }
+
+  /** Set `last_accessed_at = NOW()` on `ids`; return the times written, keyed by id. */
+  private async touch(ids: string[]): Promise<Map<string, Date>> {
+    const result = await this.pool.query<{ id: string; last_accessed_at: Date }>(
+      "UPDATE " + this.table + " SET last_accessed_at = NOW() " +
+        "WHERE id = ANY($1::text[]) RETURNING id, last_accessed_at",
+      [ids],
+    );
+    return new Map(result.rows.map((r) => [r.id, r.last_accessed_at]));
   }
 
   /** The search SELECT: trigram-ranked when `pg_trgm` is available, `ILIKE` otherwise. */
@@ -301,6 +304,11 @@ export class PostgresUserMemoryStore implements UserMemoryStore {
       );
     }
   }
+}
+
+/** Overlay the time `touch` wrote; a row it missed (deleted meanwhile) keeps its read value. */
+function withAccess(row: UserMemoryRow, touched: Map<string, Date>): UserMemoryRow {
+  return { ...row, last_accessed_at: touched.get(row.id) ?? row.last_accessed_at };
 }
 
 function rowToMemory(row: UserMemoryRow): UserMemory {
