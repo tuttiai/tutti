@@ -128,25 +128,10 @@ export class PostgresUserMemoryStore implements UserMemoryStore {
     const trimmed = query.trim();
     if (trimmed === "") return [];
 
-    const sql = this.trigramAvailable
-      ? "SELECT id, user_id, content, source, importance, tags, " +
-        "created_at, last_accessed_at, expires_at " +
-        "FROM " + this.table + " " +
-        "WHERE user_id = $1 " +
-        "AND (expires_at IS NULL OR expires_at > NOW()) " +
-        "AND content % $2 " +
-        "ORDER BY similarity(content, $2) DESC, importance DESC, created_at DESC " +
-        "LIMIT $3"
-      : "SELECT id, user_id, content, source, importance, tags, " +
-        "created_at, last_accessed_at, expires_at " +
-        "FROM " + this.table + " " +
-        "WHERE user_id = $1 " +
-        "AND (expires_at IS NULL OR expires_at > NOW()) " +
-        "AND content ILIKE '%' || $2 || '%' " +
-        "ORDER BY importance DESC, created_at DESC " +
-        "LIMIT $3";
-
-    const result = await this.pool.query<UserMemoryRow>(sql, [user_id, trimmed, limit]);
+    const result = await this.pool.query<UserMemoryRow>(
+      this.searchSql(),
+      [user_id, trimmed, limit],
+    );
 
     if (result.rows.length > 0) {
       const ids = result.rows.map((r) => r.id);
@@ -207,6 +192,27 @@ export class PostgresUserMemoryStore implements UserMemoryStore {
   /** Close the connection pool. Call on shutdown. */
   async close(): Promise<void> {
     await this.pool.end();
+  }
+
+  /** The search SELECT: trigram-ranked when `pg_trgm` is available, `ILIKE` otherwise. */
+  private searchSql(): string {
+    return this.trigramAvailable
+      ? "SELECT id, user_id, content, source, importance, tags, " +
+        "created_at, last_accessed_at, expires_at " +
+        "FROM " + this.table + " " +
+        "WHERE user_id = $1 " +
+        "AND (expires_at IS NULL OR expires_at > NOW()) " +
+        "AND content % $2 " +
+        "ORDER BY similarity(content, $2) DESC, importance DESC, created_at DESC " +
+        "LIMIT $3"
+      : "SELECT id, user_id, content, source, importance, tags, " +
+        "created_at, last_accessed_at, expires_at " +
+        "FROM " + this.table + " " +
+        "WHERE user_id = $1 " +
+        "AND (expires_at IS NULL OR expires_at > NOW()) " +
+        "AND content ILIKE '%' || $2 || '%' " +
+        "ORDER BY importance DESC, created_at DESC " +
+        "LIMIT $3";
   }
 
   /**
