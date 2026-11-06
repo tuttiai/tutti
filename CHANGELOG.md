@@ -10,6 +10,8 @@
 
 ### Fixed
 
+**The Daytona bundle's `snapshots.yaml` no longer carries a bare TODO** (`@tuttiai/deploy`). The generated `.daytona/snapshots.yaml` ended in `# TODO(deploy/daytona): move hibernation config into daytona.sh CLI flags.`, a leftover note in a file users commit. It now says Daytona may ignore `idle_minutes_until_hibernate` and `auto_resume`, tells the user to check auto-stop and hibernation in their Daytona sandbox settings, and links the follow-up, [#67](https://github.com/tuttiai/tutti/issues/67). The keys and values are unchanged, and `daytona.sh` is unchanged.
+
 **`tutti-ai serve` keeps pending approvals under `TUTTI_STATE_DIR` when Postgres is not configured.** With `TUTTI_STATE_DIR` set to an absolute, writable path and `TUTTI_PG_URL` unset, `serve` keeps approvals and pause checkpoints as files under `interrupts/` and `checkpoints/` there, as the server image does, so they survive a restart. A relative or unwritable path is ignored with a warning, and the memory warning becomes "pending approvals will not survive a restart; set TUTTI_STATE_DIR or TUTTI_PG_URL". `@tuttiai/server` now exports `FileInterruptStore` and `FileCheckpointStore` for this.
 
 **`tutti-ai add postgres` and `tutti-ai search postgres` give the `@tuttiai/postgres` voice instead of the `pg` driver** (`@tuttiai/cli`). The CLI mapped the `postgres` shorthand to node-postgres, so a user who followed the docs got a database driver and no voice. `add` now installs `@tuttiai/postgres` and its setup hint describes the voice (`DATABASE_URL` or `POSTGRES_URL`, `new PostgresVoice()`, `permissions: ["network"]`); `search` and `voices` list it with its 8 tools, online and offline. Postgres session memory needs no extra install: `pg` ships with `@tuttiai/core`.
