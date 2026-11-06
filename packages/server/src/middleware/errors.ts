@@ -11,6 +11,7 @@ import {
   ContextWindowError,
   PathTraversalError,
   UrlValidationError,
+  SecretsManager,
   createLogger,
 } from "@tuttiai/core";
 
@@ -37,7 +38,7 @@ function httpStatusForError(err: TuttiError): number {
 
 /** Whether we should hide implementation details from the response. */
 function isProduction(): boolean {
-  return process.env.NODE_ENV === "production";
+  return SecretsManager.optional("NODE_ENV") === "production";
 }
 
 /**
