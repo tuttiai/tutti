@@ -260,6 +260,7 @@ const ScoreSchema = z
     description: z.string().optional(),
     default_model: z.string().optional(),
     entry: EntrySchema.optional(),
+    nested_delegation: z.boolean().optional(),
     telemetry: TelemetrySchema.optional(),
     inbox: InboxSchema.optional(),
     skills: z
