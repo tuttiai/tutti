@@ -44,8 +44,8 @@ function formatSummary(summary: EvalSummary): string {
 }
 
 /**
- * Build the text printTable writes. Every line ends in "\n", one per
- * console.log call this replaced, so the output is unchanged byte for byte.
+ * Build the text printTable writes. Every line, blank ones included, ends
+ * in "\n", so the output matches the line-by-line printing it replaced.
  */
 function formatTable(report: EvalReport): string {
   const { results, summary } = report;
