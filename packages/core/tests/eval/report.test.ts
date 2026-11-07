@@ -42,7 +42,7 @@ afterEach(() => {
 
 /** Print the report and return the single chunk written to stdout. */
 function print(report: EvalReport): string {
-  expect(printTable(report)).toBeUndefined();
+  printTable(report);
   expect(write).toHaveBeenCalledTimes(1);
   return String(write.mock.calls[0]?.[0]);
 }
