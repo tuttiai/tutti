@@ -316,11 +316,12 @@ export class SlackClientWrapper {
    * can ignore inbound entirely.
    */
   async launch(): Promise<void> {
-    if (this.appToken === undefined) return;
+    const appToken = this.appToken;
+    if (appToken === undefined) return;
     if (this.socketStarted) return;
     if (this.socketStartPromise) return this.socketStartPromise;
     this.socketStartPromise = (async () => {
-      const socket = this.socket ?? this.socketModeFactory(this.appToken!);
+      const socket = this.socket ?? this.socketModeFactory(appToken);
       this.socket = socket;
       if (!this.dispatcherInstalled) {
         socket.on("slack_event", (envelope) => {
