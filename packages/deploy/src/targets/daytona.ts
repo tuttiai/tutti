@@ -71,9 +71,10 @@ export function buildDevcontainer(manifest: DeployManifest): string {
  * is emitted because the deploy spec calls for it, but it may be silently
  * ignored by the platform.
  *
- * TODO(deploy/daytona): replace with `daytona sandbox create --auto-stop 5
+ * TODO(#67): replace with `daytona sandbox create --auto-stop 5
  * --auto-archive 5` invocation in `daytona.sh` once the canonical hibernation
- * mechanism is confirmed against current Daytona docs.
+ * mechanism is confirmed against current Daytona docs
+ * (https://github.com/tuttiai/tutti/issues/67).
  */
 export function buildSnapshotsYaml(): string {
   const lines: string[] = [
@@ -82,7 +83,10 @@ export function buildSnapshotsYaml(): string {
     "# is normally configured via the SDK or `daytona sandbox create` flags,",
     "# not a checked-in YAML. This file is emitted because the deploy spec",
     "# requests it; treat it as a placeholder until the schema is confirmed.",
-    "# TODO(deploy/daytona): move hibernation config into daytona.sh CLI flags.",
+    // TODO(#67): move hibernation config into daytona.sh CLI flags.
+    "# Daytona may ignore idle_minutes_until_hibernate and auto_resume: check",
+    "# auto-stop and hibernation in your Daytona sandbox settings.",
+    "# Follow-up: https://github.com/tuttiai/tutti/issues/67",
     "idle_minutes_until_hibernate: 5",
     "auto_resume: true",
     "",

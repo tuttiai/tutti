@@ -166,6 +166,8 @@ export type {
   UserProfileWritable,
   UserModelStore,
 } from "./memory/user-model.js";
+export { PostgresUserModelStore } from "./memory/user-model-postgres.js";
+export type { PostgresUserModelStoreOptions } from "./memory/user-model-postgres.js";
 export {
   DEFAULT_EVERY_N_TURNS,
   DEFAULT_RECENT_MEMORY_LIMIT,

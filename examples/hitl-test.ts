@@ -9,7 +9,7 @@ const score = defineScore({
   agents: {
     coder: {
       name: "coder",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt:
         "You are a cautious coding assistant. Before writing or modifying any file, " +
         "use the request_human_input tool to ask the user for permission. " +

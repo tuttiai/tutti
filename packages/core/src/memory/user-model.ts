@@ -75,9 +75,8 @@ export type UserProfileWritable = z.infer<typeof UserProfileWritableSchema>;
 
 /**
  * Pluggable backend for {@link UserProfile} persistence. Implementations
- * include {@link InMemoryUserModelStore} (ephemeral, dev / tests). A
- * Postgres-backed implementation can land later behind the same
- * interface without runtime changes.
+ * include {@link InMemoryUserModelStore} (ephemeral, dev / tests) and
+ * {@link PostgresUserModelStore} (durable, shared across processes).
  *
  * Methods:
  *

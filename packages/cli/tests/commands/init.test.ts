@@ -86,6 +86,18 @@ describe("initCommand", () => {
     expect(content).toContain("AnthropicProvider()");
   });
 
+  it("writes a tutti.score.ts that defaults to claude-sonnet-5-5", async () => {
+    const { initCommand } = await import("../../src/commands/init.js");
+
+    await initCommand("model-test", "minimal");
+
+    const scorePath = join(testDir, "model-test", "tutti.score.ts");
+    const content = readFileSync(scorePath, "utf-8");
+
+    expect(content).toContain('default_model: "claude-sonnet-5-5"');
+    expect(content).not.toContain("claude-sonnet-4-20250514");
+  });
+
   it("writes .env.example with ANTHROPIC_API_KEY placeholder", async () => {
     const { initCommand } = await import("../../src/commands/init.js");
 

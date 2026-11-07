@@ -21,6 +21,7 @@ import {
 } from "@tuttiai/core";
 import type { ScheduleStore } from "@tuttiai/core";
 import { logger } from "../logger.js";
+import { withDefaultModel } from "../default-model.js";
 
 function resolveStore(): ScheduleStore {
   const pgUrl = SecretsManager.optional("TUTTI_PG_URL");
@@ -56,9 +57,7 @@ export async function scheduleCommand(scorePath?: string): Promise<void> {
   let registered = 0;
   for (const [agentId, agent] of Object.entries(score.agents)) {
     if (!agent.schedule) continue;
-    const resolvedAgent = agent.model
-      ? agent
-      : { ...agent, model: score.default_model ?? "claude-sonnet-4-20250514" };
+    const resolvedAgent = withDefaultModel(agent, score.default_model);
     await engine.schedule(agentId, resolvedAgent, agent.schedule);
     registered++;
   }

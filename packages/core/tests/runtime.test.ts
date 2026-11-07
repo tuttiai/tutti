@@ -94,13 +94,35 @@ describe("TuttiRuntime", () => {
     );
   });
 
-  it("falls back to claude-sonnet-4-20250514 when no model is set anywhere", async () => {
+  it("falls back to claude-sonnet-5-5 when no model is set anywhere", async () => {
     const provider = createSingleResponseProvider();
     const score: ScoreConfig = {
       provider,
       agents: {
         bot: {
           name: "bot",
+          system_prompt: "hi",
+          voices: [],
+        },
+      },
+    };
+    const runtime = new TuttiRuntime(score);
+
+    await runtime.run("bot", "test");
+
+    expect(provider.chat).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "claude-sonnet-5-5" }),
+    );
+  });
+
+  it("keeps an explicit retired model instead of the fallback", async () => {
+    const provider = createSingleResponseProvider();
+    const score: ScoreConfig = {
+      provider,
+      agents: {
+        bot: {
+          name: "bot",
+          model: "claude-sonnet-4-20250514",
           system_prompt: "hi",
           voices: [],
         },

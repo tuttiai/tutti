@@ -6,7 +6,7 @@ const score = defineScore({
   agents: {
     coder: {
       name: "coder",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt:
         "You are a helpful assistant with GitHub access. Use the tools to answer questions about repositories.",
       voices: [new GitHubVoice()],
