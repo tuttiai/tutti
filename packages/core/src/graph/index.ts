@@ -26,8 +26,8 @@
  * });
  *
  * const result = await graph.run("Summarize this document");
- * console.log(result.final_output);
- * console.log(result.path); // ["classifier", "writer"]
+ * const summary = result.final_output;
+ * const visited = result.path; // ["classifier", "writer"]
  * ```
  */
 
@@ -91,7 +91,7 @@ export class TuttiGraph {
    * @example
    * ```typescript
    * const unsubscribe = graph.subscribe((e) => {
-   *   if (e.type === "node:start") console.log("started", e.node_id);
+   *   if (e.type === "node:start") logger.info({ node_id: e.node_id }, "started");
    * });
    * // ... later
    * unsubscribe();
