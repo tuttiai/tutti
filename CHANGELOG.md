@@ -8,6 +8,8 @@
 
 **The test toolchain moves to vitest 5.0.5 and @vitest/coverage-v8 5.0.5, clearing two critical advisories.** vitest 3.2.7 pulled in tinypool 1.1.1, which carries GHSA-5gmw-xhrv-c9v3 and GHSA-85c8-ppgw-ccpr and kept `npm audit --audit-level=high` red. vitest 5 no longer depends on tinypool. Both packages are dev dependencies only (the root and the deploy, realtime and router workspaces), so nothing buyers install changes. vitest 5 maps v8 coverage back to the source more precisely, which put router, telemetry and the WhatsApp voice under their coverage thresholds; new tests bring them back above, and no threshold changed.
 
+**`@tuttiai/core` reads its environment through `SecretsManager`** (`@tuttiai/core`). The session store's `DATABASE_URL` fallback, the logger's `TUTTI_LOG_LEVEL` and `NODE_ENV`, and the OpenTelemetry `OTEL_SERVICE_NAME` were read straight from `process.env`, so an audit of where credentials are read had to grep the whole package. They now go through `SecretsManager.optional()`, with the same results: `memory.url` still wins over `DATABASE_URL`, the defaults stay `"info"` and `"tutti"`, only the exact value `"production"` counts as production, an empty variable is passed on as empty just as before, and the missing-URL `ScoreValidationError` keeps its message and never includes the URL. Each value is still read when it was before. No API changes.
+
 ### Fixed
 
 - Docs, examples, README and .env.example now use claude-sonnet-5-5 in place of the retired claude-sonnet-4-20250514, and the providers page no longer lists the retired claude-opus-4-20250514 and claude-haiku-4-20250514.
