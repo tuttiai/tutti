@@ -276,7 +276,53 @@ tutti.events.on("user_model:consolidated", (e) => {
 });
 ```
 
-The `UserModelStore` interface is pluggable. `InMemoryUserModelStore` ships in v0.25.0; a Postgres backend will land behind the same interface (mirroring the `UserMemoryStore` factory pattern). Tests can swap in a mock via `runtime.setUserModelStore(...)`.
+The `UserModelStore` interface is pluggable. `InMemoryUserModelStore` ships in v0.25.0 and is the default. Pass any other store, or a mock in tests, with `runtime.setUserModelStore(agent_name, store)` before the agent's first run.
+
+### Postgres user-model store
+
+`PostgresUserModelStore` keeps profiles in Postgres, so they survive a restart and every instance pointing at the same database sees the same profile. It uses the `pg` driver that ships with `@tuttiai/core`, so there is nothing extra to install.
+
+```bash title=".env"
+TUTTI_PG_URL=postgres://user:pass@localhost:5432/tutti
+```
+
+```ts
+import { PostgresUserModelStore, SecretsManager, TuttiRuntime } from "@tuttiai/core";
+
+const tutti = await TuttiRuntime.create(score);
+const profiles = new PostgresUserModelStore({
+  connection_string: SecretsManager.require("TUTTI_PG_URL"),
+});
+tutti.setUserModelStore("assistant", profiles);
+
+// On shutdown:
+await profiles.close();
+```
+
+The store creates its table with `CREATE TABLE IF NOT EXISTS` on its first call, so there is no migration to run, and it is safe to start several instances at once. The default table is `tutti_user_profiles`; pass `table` to use another name (letters, digits and underscores only). One row per user:
+
+| Column | Type | Description |
+| ------ | ---- | ----------- |
+| `user_id` | `TEXT PRIMARY KEY` | End-user identity |
+| `summary` | `TEXT` | LLM-written profile |
+| `preferences` | `JSONB` | Key/value preferences |
+| `ongoing_projects` | `TEXT[]` | Active project labels |
+| `turn_count` | `INTEGER` | Cumulative turn counter |
+| `last_consolidated_turn` | `INTEGER` | `turn_count` at the last consolidation |
+| `updated_at` | `TIMESTAMPTZ` | Last write time (not returned) |
+
+Things to know:
+
+- `upsert` replaces the whole profile and the last write wins, as in the in-memory store.
+- Postgres errors reach the caller unchanged, and the connection string never appears in them. A call waits at most 10 seconds for a connection. If the first call fails because Postgres is down, the next call tries to create the table again. Inside a run, consolidation stays fire-and-forget, so a database error is logged and the run still finishes.
+- Postgres refuses the NUL character (`\u0000`) in text, so a profile containing one is rejected.
+
+### Which store to use
+
+| Store | Use it for |
+| ----- | ---------- |
+| `InMemoryUserModelStore` (default) | Tests, local runs and single-process demos. Profiles are lost when the process stops. |
+| `PostgresUserModelStore` | Production, or whenever profiles must survive a restart or be shared across instances. |
 
 A 25-turn end-to-end demonstration with a mock LLM provider lives at [`examples/user-model.ts`](https://github.com/tuttiai/tutti/blob/main/examples/user-model.ts) — it shows the consolidator triggering at every-5-turn cadence, the profile evolving, and the final dump.
 
