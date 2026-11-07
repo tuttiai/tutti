@@ -321,7 +321,7 @@ export class TuttiRuntime {
       return new InMemorySessionStore();
     }
     if (memory.provider === "postgres") {
-      const url = memory.url ?? process.env.DATABASE_URL;
+      const url = memory.url ?? SecretsManager.optional("DATABASE_URL");
       if (!url) {
         throw new ScoreValidationError(
           "PostgreSQL session store requires a connection URL.\n" +

@@ -16,7 +16,10 @@
     "typecheck": "turbo run typecheck",
     "test:coverage": "turbo run test -- --coverage",
     "voice-manifest": "tsx scripts/build-voice-manifest.ts",
-    "voice-manifest:check": "tsx scripts/build-voice-manifest.ts --check"
+    "voice-manifest:check": "tsx scripts/build-voice-manifest.ts --check",
+    "check:integrity": "tsx scripts/check-source-integrity.mts",
+    "check:history": "tsx scripts/check-history.mts",
+    "test:integrity": "tsc -p tsconfig.integrity.json && vitest run --config vitest.integrity.config.ts --coverage"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
