@@ -299,7 +299,7 @@ tutti.setUserModelStore("assistant", profiles);
 await profiles.close();
 ```
 
-The store creates its table with `CREATE TABLE IF NOT EXISTS` on its first call, so there is no migration to run, and it is safe to start several instances at once. The default table is `tutti_user_profiles`; pass `table` to use another name (letters, digits and underscores only). One row per user:
+The store creates its table with `CREATE TABLE IF NOT EXISTS` on its first call, so there is no migration to run, and it is safe to start several instances at once. The default table is `tutti_user_profiles`; pass `table` to use another name (letters, digits and underscores only, and not starting with a digit). One row per user:
 
 | Column | Type | Description |
 | ------ | ---- | ----------- |
