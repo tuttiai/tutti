@@ -195,7 +195,7 @@ export default defineScore({
   agents: {
     triager: {
       name: "Issue Triager",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt: `You help triage GitHub issues. When asked about a repo,
 list the open issues, summarize them, and suggest priorities.`,
       voices: [new GitHubVoice()],

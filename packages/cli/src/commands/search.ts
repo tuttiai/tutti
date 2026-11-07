@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
 import { logger } from "../logger.js";
+import { parseRegistryBody } from "../registry-response.js";
+import type { RegistryEntry, RegistryResponse } from "../registry-response.js";
 
 const REGISTRY_URL =
   "https://raw.githubusercontent.com/tuttiai/voices/main/voices.json";
@@ -32,7 +34,7 @@ const BUILTIN_VOICES: VoiceEntry[] = [
     description: "Interact with GitHub repos, issues, PRs, branches, commits, and code search",
     tags: ["github", "git", "code", "issues", "pull-requests", "api"],
     official: true,
-    tools: 13,
+    tools: 23,
   },
   {
     name: "playwright",
@@ -52,38 +54,38 @@ const BUILTIN_VOICES: VoiceEntry[] = [
   },
 ];
 
-interface RegistryEntry {
-  name: string;
-  package: string;
-  description: string;
-  tags: string[];
-}
-
-/** Fetch the voice registry, falling back to the built-in list when it is unreachable. */
-export async function fetchRegistry(): Promise<VoiceEntry[]> {
+async function readRegistry(): Promise<string | undefined> {
   try {
     const res = await fetch(REGISTRY_URL);
     if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = (await res.json()) as { official?: RegistryEntry[]; community?: RegistryEntry[] };
-
-    const voices: VoiceEntry[] = [];
-    for (const entry of data.official ?? []) {
-      voices.push({ ...entry, official: true, tools: toolCount(entry.name) });
-    }
-    for (const entry of data.community ?? []) {
-      voices.push({ ...entry, official: false, tools: 0 });
-    }
-    if (voices.length === 0) throw new Error("Empty registry");
-    return voices;
+    return await res.text();
   } catch {
     logger.debug("Registry unreachable, using built-in voice list");
-    return BUILTIN_VOICES;
+    return undefined;
   }
 }
 
-function toolCount(name: string): number {
-  const counts = new Map<string, number>([["filesystem", 7], ["github", 23], ["playwright", 12], ["postgres", 8]]);
-  return counts.get(name) ?? 0;
+function toVoices(data: RegistryResponse): VoiceEntry[] {
+  // The registry's numeric tools_count wins; otherwise the built-in count, then 0.
+  const toVoice = ({ tools_count, ...entry }: RegistryEntry, official: boolean): VoiceEntry => {
+    const builtin = BUILTIN_VOICES.find((v) => v.name === entry.name)?.tools ?? 0;
+    return { ...entry, official, tools: typeof tools_count === "number" ? tools_count : builtin };
+  };
+  return [...data.official.map((e) => toVoice(e, true)), ...data.community.map((e) => toVoice(e, false))];
+}
+
+/** Fetch the voice registry, falling back to the built-in list when it is unreachable, empty or invalid. */
+export async function fetchRegistry(): Promise<VoiceEntry[]> {
+  const body = await readRegistry();
+  if (body === undefined) return BUILTIN_VOICES;
+  const parsed = parseRegistryBody(body);
+  if (!parsed.success) {
+    logger.warn({ reason: parsed.error }, "Voice registry response is invalid; using the built-in voice list");
+    return BUILTIN_VOICES;
+  }
+  const voices = toVoices(parsed.data);
+  if (voices.length === 0) logger.debug("Registry is empty, using built-in voice list");
+  return voices.length > 0 ? voices : BUILTIN_VOICES;
 }
 
 function matchesQuery(voice: VoiceEntry, query: string): boolean {
