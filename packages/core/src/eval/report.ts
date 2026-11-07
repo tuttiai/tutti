@@ -61,17 +61,48 @@ function formatTable(report: EvalReport): string {
   return lines.join("\n") + "\n";
 }
 
-/** Print a formatted results table to stdout. */
+/**
+ * Print a formatted results table for an eval report.
+ *
+ * Writes straight to `process.stdout` in one call, with ANSI colour codes,
+ * whether or not stdout is a terminal. Failed assertions and errors are
+ * listed under their row, cut to 60 and 80 characters.
+ *
+ * @param report - The report returned by `EvalRunner.run()`.
+ * @returns Nothing; the table is written to stdout.
+ *
+ * @example
+ * const report = await new EvalRunner(score).run(suite);
+ * printTable(report);
+ */
 export function printTable(report: EvalReport): void {
   process.stdout.write(formatTable(report));
 }
 
-/** Convert report to a plain JSON object for storage or CI. */
+/**
+ * Serialise an eval report as pretty-printed JSON for storage or CI.
+ *
+ * @param report - The report returned by `EvalRunner.run()`.
+ * @returns The whole report as JSON, indented by two spaces.
+ *
+ * @example
+ * await writeFile("eval-report.json", toJSON(report));
+ */
 export function toJSON(report: EvalReport): string {
   return JSON.stringify(report, null, 2);
 }
 
-/** Convert report to a GitHub-friendly markdown table. */
+/**
+ * Render an eval report as GitHub-flavoured Markdown, for example for a
+ * pull request comment or a job summary.
+ *
+ * @param report - The report returned by `EvalRunner.run()`.
+ * @returns A results table and summary line, followed by a "Failures"
+ *   section listing each failed case when there is one.
+ *
+ * @example
+ * await writeFile("eval-report.md", toMarkdown(report));
+ */
 export function toMarkdown(report: EvalReport): string {
   const { results, summary } = report;
   const lines: string[] = [];
