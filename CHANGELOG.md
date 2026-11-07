@@ -16,6 +16,7 @@
 
 ### Fixed
 
+**The core and server READMEs use `claude-sonnet-5-5`** (`@tuttiai/core`, `@tuttiai/server`). Their quick-start examples set `model: "claude-sonnet-4-20250514"`, which Anthropic retired on 15 June 2026, so code copied from them failed on its first run.
 **Agents with no model set default to `claude-sonnet-5-5`** (`@tuttiai/core`, `@tuttiai/server`). The fallback was `claude-sonnet-4-20250514`, which Anthropic retired on 15 June 2026, so every run of such an agent failed. `TuttiRuntime.run` now falls back to `claude-sonnet-5-5` when neither the agent nor the score sets a model, and the server image uses it when `TUTTI_MODEL` is unset. Scores that set the old id explicitly are unchanged and still costed.
 - Docs, examples, README and .env.example now use claude-sonnet-5-5 in place of the retired claude-sonnet-4-20250514, and the providers page no longer lists the retired claude-opus-4-20250514 and claude-haiku-4-20250514.
 
