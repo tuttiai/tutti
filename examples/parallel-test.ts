@@ -12,7 +12,7 @@ import { AgentRouter, AnthropicProvider, defineScore } from "@tuttiai/core";
 const score = defineScore({
   name: "parallel-analysts",
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   // Declarative parallel entry: `router.run(input)` fans out to both analysts.
   entry: { type: "parallel", agents: ["bull", "bear"] },
   agents: {
