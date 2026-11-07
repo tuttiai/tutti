@@ -27,7 +27,7 @@ describe("defineScore", () => {
       name: "full-score",
       description: "A full test config",
       provider: createSingleResponseProvider(),
-      default_model: "claude-sonnet-4-20250514",
+      default_model: "claude-sonnet-5-5",
       agents: {
         agent1: {
           name: "agent1",
@@ -40,7 +40,7 @@ describe("defineScore", () => {
 
     const result = defineScore(config);
     expect(result.description).toBe("A full test config");
-    expect(result.default_model).toBe("claude-sonnet-4-20250514");
+    expect(result.default_model).toBe("claude-sonnet-5-5");
     expect(result.agents.agent1.max_turns).toBe(5);
   });
 

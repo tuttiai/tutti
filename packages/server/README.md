@@ -22,7 +22,7 @@ const score = defineScore({
   agents: {
     assistant: {
       name: "assistant",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt: "You are a helpful assistant.",
       voices: [],
     },

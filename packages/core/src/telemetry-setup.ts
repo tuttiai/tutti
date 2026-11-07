@@ -3,6 +3,7 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import type { TelemetryConfig } from "@tuttiai/types";
 import { logger } from "./logger.js";
+import { SecretsManager } from "./secrets.js";
 
 let sdk: NodeSDK | undefined;
 
@@ -19,7 +20,7 @@ export function initTelemetry(config: TelemetryConfig): void {
   sdk = new NodeSDK({
     traceExporter: exporter,
     instrumentations: [getNodeAutoInstrumentations({ "@opentelemetry/instrumentation-fs": { enabled: false } })],
-    serviceName: process.env.OTEL_SERVICE_NAME ?? "tutti",
+    serviceName: SecretsManager.optional("OTEL_SERVICE_NAME", "tutti"),
   });
 
   sdk.start();
