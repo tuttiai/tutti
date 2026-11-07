@@ -285,6 +285,10 @@ Since `assertSafeUrl` refuses `localhost`, `127.0.0.1`, `::1` and every private 
 
 The default is unchanged and still refuses loopback, proven by tests at both the class and the `createEmbeddingProvider` level.
 
+### Changed
+
+**`printEvalTable` writes through `process.stdout.write` instead of `console.log`** (`@tuttiai/core`). The table is now built in one string and written to `process.stdout` in a single call. The output is unchanged byte for byte. Code that captured it by patching `console.log` must capture `process.stdout` instead. `printEvalTable`, `evalToJSON` and `evalToMarkdown` now have TSDoc. No export or signature changes.
+
 ## v0.26.2 — Fix CI build cycle in scheduled-delivery dispatcher. (2026-05-18)
 
 ### Fixed
