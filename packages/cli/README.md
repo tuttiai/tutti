@@ -339,7 +339,7 @@ Sample output:
   Agents: (1)
 
     assistant (Assistant)
-      Model:  claude-sonnet-4-20250514
+      Model:  claude-sonnet-5-5
       Voices: filesystem
       Flags:  streaming
 ```

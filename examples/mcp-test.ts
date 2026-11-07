@@ -15,7 +15,7 @@ const score = defineScore({
   agents: {
     browser: {
       name: "browser-agent",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt: "You are a browser automation agent. Use the available tools to navigate the web.",
       voices: [mcpVoice],
       permissions: ["network"],

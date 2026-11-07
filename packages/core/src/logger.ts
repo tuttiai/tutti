@@ -1,11 +1,12 @@
 import pino from "pino";
+import { SecretsManager } from "./secrets.js";
 
 export const createLogger = (name: string): pino.Logger =>
   pino({
     name,
-    level: process.env.TUTTI_LOG_LEVEL ?? "info",
+    level: SecretsManager.optional("TUTTI_LOG_LEVEL", "info"),
     transport:
-      process.env.NODE_ENV === "production"
+      SecretsManager.optional("NODE_ENV") === "production"
         ? undefined
         : {
             target: "pino-pretty",
