@@ -20,6 +20,7 @@ import {
 } from "@tuttiai/core";
 import type { ScheduleStore, ScheduleRecord } from "@tuttiai/core";
 import { logger } from "../logger.js";
+import { withDefaultModel } from "../default-model.js";
 
 function resolveStore(): ScheduleStore {
   const pgUrl = SecretsManager.optional("TUTTI_PG_URL");
@@ -159,9 +160,7 @@ export async function schedulesTriggerCommand(
       process.exit(1);
     }
 
-    const resolvedAgent = agent.model
-      ? agent
-      : { ...agent, model: score.default_model ?? "claude-sonnet-4-20250514" };
+    const resolvedAgent = withDefaultModel(agent, score.default_model);
 
     const engine = new SchedulerEngine(store, runner, events);
     await engine.schedule(id, resolvedAgent, record.config);
