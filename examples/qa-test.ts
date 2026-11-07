@@ -5,7 +5,7 @@ const playwrightVoice = new PlaywrightVoice({ headless: true });
 
 const score = defineScore({
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   entry: "orchestrator",
   agents: {
     orchestrator: {
