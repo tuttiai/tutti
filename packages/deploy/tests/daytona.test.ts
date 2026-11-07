@@ -101,7 +101,7 @@ describe("buildSnapshotsYaml", () => {
   it("warns that the schema is unverified so users do not assume it works", () => {
     const yaml = buildSnapshotsYaml();
     expect(yaml).toContain("UNVERIFIED SCHEMA");
-    expect(yaml).toContain("TODO(deploy/daytona)");
+    expect(yaml).toContain("https://github.com/tuttiai/tutti/issues/67");
   });
 });
 

@@ -124,6 +124,9 @@ export interface TuttiRuntimeOptions {
   skillStore?: SkillStore;
 }
 
+/** Model an agent runs on when neither it nor the score sets one. */
+const DEFAULT_MODEL = "claude-sonnet-5-5";
+
 export class TuttiRuntime {
   readonly events: EventBus;
   readonly semanticMemory: SemanticMemoryStore;
@@ -318,7 +321,7 @@ export class TuttiRuntime {
       return new InMemorySessionStore();
     }
     if (memory.provider === "postgres") {
-      const url = memory.url ?? process.env.DATABASE_URL;
+      const url = memory.url ?? SecretsManager.optional("DATABASE_URL");
       if (!url) {
         throw new ScoreValidationError(
           "PostgreSQL session store requires a connection URL.\n" +
@@ -373,7 +376,7 @@ export class TuttiRuntime {
     // Apply default model if agent doesn't specify one
     const resolvedAgent = agent.model
       ? agent
-      : { ...agent, model: this._score.default_model ?? "claude-sonnet-4-20250514" };
+      : { ...agent, model: this._score.default_model ?? DEFAULT_MODEL };
 
     return this._runner.run(resolvedAgent, input, session_id, options);
   }
