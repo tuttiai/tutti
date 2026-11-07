@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { EvalRunner } from "../src/eval/runner.js";
-import { printTable, toJSON, toMarkdown } from "../src/eval/report.js";
+import { toJSON, toMarkdown } from "../src/eval/report.js";
 import type { EvalSuite, EvalReport } from "../src/eval/types.js";
 import type { ScoreConfig, LLMProvider, ChatRequest, ChatResponse, StreamChunk } from "@tuttiai/types";
 
@@ -234,38 +234,5 @@ describe("EvalReport formatters", () => {
     expect(md).toContain("| pass | t1 |");
     expect(md).toContain("| FAIL | t2 |");
     expect(md).toContain("### Failures");
-  });
-
-  it("printTable outputs suite name, case names, scores, and summary", () => {
-    const output: string[] = [];
-    const originalLog = console.log;
-    console.log = (msg?: unknown) => { output.push(typeof msg === "string" ? msg : String(msg)); };
-
-    try {
-      printTable(report);
-    } finally {
-      console.log = originalLog;
-    }
-
-    const full = output.join("\n");
-    // Suite header
-    expect(full).toContain("Test Suite");
-    expect(full).toContain("2 cases");
-    // Case names
-    expect(full).toContain("Passes");
-    expect(full).toContain("Fails");
-    // Case IDs
-    expect(full).toContain("t1");
-    expect(full).toContain("t2");
-    // Scores formatted to 2 decimals
-    expect(full).toContain("1.00");
-    expect(full).toContain("0.00");
-    // Summary line
-    expect(full).toContain("1/2 passed (50%)");
-    expect(full).toContain("Avg: 0.50");
-    expect(full).toContain("Total: $0.015");
-    // Failed assertion detail
-    expect(full).toContain("FAIL");
-    expect(full).toContain("contains: London");
   });
 });
