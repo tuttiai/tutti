@@ -1,54 +1,69 @@
-/* eslint-disable no-console -- printTable is designed to output directly to stdout */
-/** Evaluation report formatting — table, JSON, Markdown. */
+/** Evaluation report formatting: table, JSON, Markdown. */
 
-import type { EvalReport } from "./types.js";
+import type { EvalReport, EvalResult, EvalSummary } from "./types.js";
 
 function pad(str: string, len: number): string {
   return str.length >= len ? str.slice(0, len) : str + " ".repeat(len - str.length);
 }
 
-/** Print a formatted results table to stdout. */
-export function printTable(report: EvalReport): void {
-  const { results, summary } = report;
+/** Format one result row, followed by a line per failed assertion and one for an error. */
+function formatResultLines(r: EvalResult): string[] {
+  const icon = r.passed ? "\x1b[32m✔\x1b[0m" : "\x1b[31m✗\x1b[0m";
+  const score = r.score.toFixed(2);
+  const cost = "$" + r.cost_usd.toFixed(3);
+  const lines = [
+    "  " + icon +
+    " " + pad(r.case_id, 10) +
+    " " + pad(r.case_name, 28) +
+    " " + pad(score, 6) +
+    " " + r.turns + " turns" +
+    "  " + cost,
+  ];
+  if (r.passed) return lines;
 
-  console.log();
-  console.log("  Eval suite: " + report.suite_name + " (" + summary.total + " cases)");
-  console.log();
-
-  for (const r of results) {
-    const icon = r.passed ? "\x1b[32m✔\x1b[0m" : "\x1b[31m✗\x1b[0m";
-    const score = r.score.toFixed(2);
-    const cost = "$" + r.cost_usd.toFixed(3);
-    const line =
-      "  " + icon +
-      " " + pad(r.case_id, 10) +
-      " " + pad(r.case_name, 28) +
-      " " + pad(score, 6) +
-      " " + r.turns + " turns" +
-      "  " + cost;
-    console.log(line);
-
-    if (!r.passed) {
-      for (const a of r.assertions) {
-        if (!a.passed) {
-          const desc = a.assertion.description ?? a.assertion.type + ": " + String(a.assertion.value);
-          console.log("    \x1b[31m↳ FAIL: " + desc + " (actual: " + String(a.actual).slice(0, 60) + ")\x1b[0m");
-        }
-      }
-      if (r.error) {
-        console.log("    \x1b[31m↳ ERROR: " + r.error.slice(0, 80) + "\x1b[0m");
-      }
+  for (const a of r.assertions) {
+    if (!a.passed) {
+      const desc = a.assertion.description ?? a.assertion.type + ": " + String(a.assertion.value);
+      lines.push("    \x1b[31m↳ FAIL: " + desc + " (actual: " + String(a.actual).slice(0, 60) + ")\x1b[0m");
     }
   }
+  if (r.error) {
+    lines.push("    \x1b[31m↳ ERROR: " + r.error.slice(0, 80) + "\x1b[0m");
+  }
+  return lines;
+}
 
+/** Format the summary line: passed count, pass rate, average score and total cost. */
+function formatSummary(summary: EvalSummary): string {
   const pct = summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 0;
-  console.log();
-  console.log(
+  return (
     "  Results: " + summary.passed + "/" + summary.total + " passed (" + pct + "%)" +
     " | Avg: " + summary.avg_score.toFixed(2) +
-    " | Total: $" + summary.total_cost_usd.toFixed(3),
+    " | Total: $" + summary.total_cost_usd.toFixed(3)
   );
-  console.log();
+}
+
+/**
+ * Build the text printTable writes. Every line ends in "\n", one per
+ * console.log call this replaced, so the output is unchanged byte for byte.
+ */
+function formatTable(report: EvalReport): string {
+  const { results, summary } = report;
+  const lines = [
+    "",
+    "  Eval suite: " + report.suite_name + " (" + summary.total + " cases)",
+    "",
+    ...results.flatMap((r) => formatResultLines(r)),
+    "",
+    formatSummary(summary),
+    "",
+  ];
+  return lines.join("\n") + "\n";
+}
+
+/** Print a formatted results table to stdout. */
+export function printTable(report: EvalReport): void {
+  process.stdout.write(formatTable(report));
 }
 
 /** Convert report to a plain JSON object for storage or CI. */
