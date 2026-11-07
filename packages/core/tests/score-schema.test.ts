@@ -29,7 +29,7 @@ describe("validateScore", () => {
         validScore({
           name: "test",
           description: "A test score",
-          default_model: "claude-sonnet-4-20250514",
+          default_model: "claude-sonnet-5-5",
           entry: "assistant",
         }),
       ),

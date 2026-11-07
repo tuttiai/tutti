@@ -40,7 +40,7 @@ export default defineScore({
   agents: {
     assistant: {
       name: "assistant",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt:
         "You are a helpful assistant. Answer clearly and concisely.",
       voices: [],
@@ -101,7 +101,7 @@ export default defineScore({
   agents: {
     assistant: {
       name: "assistant",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt: "You are a helpful assistant with filesystem access.",
       voices: [new FilesystemVoice()],
       permissions: ["filesystem"],
