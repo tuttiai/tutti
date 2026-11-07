@@ -16,6 +16,7 @@
 
 ### Fixed
 
+**`PostgresUserMemoryStore.get` and `search` return the `last_accessed_at` they just set** (`@tuttiai/core`). Both methods ran their `UPDATE ... SET last_accessed_at = NOW()` and then returned the row read before it, so a memory read for the first time came back without `last_accessed_at` and a memory read again came back with the previous time. The `UPDATE` now returns the time it wrote and the methods hand that back, as `MemoryUserMemoryStore` already did. Search ranking, the schema and every signature are unchanged. Closes #66.
 **The core and server READMEs use `claude-sonnet-5-5`** (`@tuttiai/core`, `@tuttiai/server`). Their quick-start examples set `model: "claude-sonnet-4-20250514"`, which Anthropic retired on 15 June 2026, so code copied from them failed on its first run.
 **Agents with no model set default to `claude-sonnet-5-5`** (`@tuttiai/core`, `@tuttiai/server`). The fallback was `claude-sonnet-4-20250514`, which Anthropic retired on 15 June 2026, so every run of such an agent failed. `TuttiRuntime.run` now falls back to `claude-sonnet-5-5` when neither the agent nor the score sets a model, and the server image uses it when `TUTTI_MODEL` is unset. Scores that set the old id explicitly are unchanged and still costed.
 - Docs, examples, README and .env.example now use claude-sonnet-5-5 in place of the retired claude-sonnet-4-20250514, and the providers page no longer lists the retired claude-opus-4-20250514 and claude-haiku-4-20250514.
