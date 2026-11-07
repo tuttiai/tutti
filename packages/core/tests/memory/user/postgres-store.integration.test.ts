@@ -109,7 +109,6 @@ suite("PostgresUserMemoryStore (integration)", () => {
     const m = await store.store(USER_A, "Pinpoint timestamp marker " + suffix);
     expect((await store.get(m.id))!.last_accessed_at).toBeInstanceOf(Date);
     const before = await store.get(m.id);
-    await new Promise((r) => setTimeout(r, 20));
     const hits = await store.search(USER_A, "pinpoint timestamp marker " + suffix);
     const found = hits.find((h) => h.id === m.id);
     expect(found).toBeDefined();

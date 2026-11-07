@@ -77,7 +77,7 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
  *   model: "anthropic/claude-sonnet-4",
  *   messages: [{ role: "user", content: "Hello" }],
  * });
- * console.log(result.usage.cost_usd); // populated by OpenRouter
+ * const cost = result.usage.cost_usd; // populated by OpenRouter
  * ```
  */
 export class OpenRouterProvider implements LLMProvider {

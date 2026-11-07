@@ -23,7 +23,7 @@ const provider = new AnthropicProvider({ api_key: "sk-ant-..." });
 
 **Prompt caching** is on for every request. The provider marks the end of the system prompt (or the last tool, when there is no system prompt) and the end of the latest message, so each turn of a run reads everything before it from Anthropic's prompt cache at a tenth of the input rate and pays full price only for what it adds. A prompt shorter than the model's caching minimum is simply not cached. `usage.input_tokens` counts every prompt token; `usage.cache_read_input_tokens` and `usage.cache_creation_input_tokens` say how many of them were read from and written to the cache.
 
-**Models:** `claude-sonnet-4-20250514`, `claude-opus-4-20250514`, `claude-haiku-4-20250514`
+**Models:** `claude-sonnet-5-5`
 
 ## OpenAI (GPT)
 
@@ -177,15 +177,9 @@ The `default_model` in the score applies to all agents. Individual agents can ov
 
 ```ts
 agents: {
-  fast: {
-    name: "Fast Agent",
-    model: "claude-haiku-4-20250514",  // cheap and fast
-    system_prompt: "Quick answers only.",
-    voices: [],
-  },
   smart: {
     name: "Smart Agent",
-    model: "claude-opus-4-20250514",   // expensive and thorough
+    model: "claude-sonnet-5-5",
     system_prompt: "Think deeply.",
     voices: [],
   },
@@ -198,16 +192,13 @@ Different models have different pricing. The `TokenBudget` knows about each mode
 
 | Model | Input $/M tokens | Output $/M tokens |
 | ----- | ---------------- | ----------------- |
-| `claude-sonnet-4-20250514` | $3.00 | $15.00 |
-| `claude-opus-4-20250514` | $15.00 | $75.00 |
-| `claude-haiku-4-20250514` | $0.25 | $1.25 |
 | `gpt-4o` | $2.50 | $10.00 |
 | `gemini-2.0-flash` | $0.10 | $0.40 |
 
 ```ts
 {
   assistant: {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-5-5",
     budget: { max_cost_usd: 0.50 },  // Stop at 50 cents
     // ...
   },

@@ -37,7 +37,9 @@ daytona ssh -- tutti-ai serve --score "$WORKSPACE_DIR/tutti.score.ts"
 # is normally configured via the SDK or \`daytona sandbox create\` flags,
 # not a checked-in YAML. This file is emitted because the deploy spec
 # requests it; treat it as a placeholder until the schema is confirmed.
-# TODO(deploy/daytona): move hibernation config into daytona.sh CLI flags.
+# Daytona may ignore idle_minutes_until_hibernate and auto_resume: check
+# auto-stop and hibernation in your Daytona sandbox settings.
+# Follow-up: https://github.com/tuttiai/tutti/issues/67
 idle_minutes_until_hibernate: 5
 auto_resume: true
 ",

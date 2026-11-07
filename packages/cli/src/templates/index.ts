@@ -28,7 +28,7 @@ export default defineScore({
   //   policy: "cost-optimised",
   // }),
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   agents: {
     assistant: {
       name: "Assistant",
@@ -52,7 +52,7 @@ import { GitHubVoice } from "@tuttiai/github"
 
 export default defineScore({
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   agents: {
     coder: {
       name: "Coder",
@@ -81,7 +81,7 @@ import { FilesystemVoice } from "@tuttiai/filesystem"
 
 export default defineScore({
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   agents: {
     researcher: {
       name: "Researcher",
@@ -110,7 +110,7 @@ import { PlaywrightVoice } from "@tuttiai/playwright"
 
 export default defineScore({
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   entry: "orchestrator",
   agents: {
     orchestrator: {
@@ -160,7 +160,7 @@ const logger = createLogger("dev-team")
 
 export default defineScore({
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   entry: "orchestrator",
   hooks: {
     ...createLoggingHook(logger),
