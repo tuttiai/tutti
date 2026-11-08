@@ -57,6 +57,16 @@ function nextInterrupt(harness: TestHarness): Promise<string> {
   });
 }
 
+/** Resolves with the next `interrupt:resolved` event, emitted after the store write. */
+function nextResolution(harness: TestHarness): Promise<{ interrupt_id: string; status: string }> {
+  return new Promise((resolve) => {
+    const off = harness.runtime.events.on("interrupt:resolved", (e) => {
+      off();
+      resolve(e);
+    });
+  });
+}
+
 /** The promise of the first run the route starts. */
 function firstRun(spy: { mock: { results: { value: unknown }[] } }): Promise<unknown> {
   const value = spy.mock.results[0]?.value;
@@ -95,16 +105,15 @@ describe("a caller that stops waiting", () => {
   it("aborts a /run/stream run when the client disconnects", async () => {
     harness = await pausingServer();
     const run = vi.spyOn(harness.runtime, "run");
+    const resolution = nextResolution(harness);
 
     const id = await leaveWhilePaused(harness, "/run/stream");
 
     await expect(firstRun(run)).rejects.toBeInstanceOf(RunAbortedError);
     await expect(firstRun(run)).rejects.toMatchObject({ reason: "client disconnected" });
     expect(execute).not.toHaveBeenCalled();
-    const store = harness.interruptStore;
-    await vi.waitFor(async () => {
-      expect((await store?.get(id))?.status).toBe("denied");
-    });
+    await expect(resolution).resolves.toMatchObject({ interrupt_id: id, status: "denied" });
+    expect((await harness.interruptStore?.get(id))?.status).toBe("denied");
   });
 
   it("aborts a /run run when the client disconnects", async () => {
