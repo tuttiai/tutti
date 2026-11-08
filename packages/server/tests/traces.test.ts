@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { getTuttiTracer } from "@tuttiai/core";
 
 import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
@@ -27,18 +27,20 @@ function seedTrace(): { traceId: string } {
   return { traceId: root.trace_id };
 }
 
+// No test here calls the provider, so one app serves the whole file and
+// its start-up cost is paid once, in a hook, instead of inside each test.
+let app: Awaited<ReturnType<typeof buildTestServer>>["app"];
+
+beforeAll(async () => {
+  ({ app } = await buildTestServer([textResponse("unused")]));
+});
+
+afterAll(async () => {
+  await app.close();
+});
+
 describe("GET /traces", () => {
-  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
-
-  afterEach(async () => {
-    if (app) {
-      await app.close();
-      app = undefined;
-    }
-  });
-
   it("returns 200 with a traces array containing seeded summaries", async () => {
-    ({ app } = await buildTestServer([textResponse("unused")]));
     const { traceId } = seedTrace();
 
     const res = await app.inject({
@@ -57,24 +59,13 @@ describe("GET /traces", () => {
   });
 
   it("requires authentication", async () => {
-    ({ app } = await buildTestServer([textResponse("unused")]));
     const res = await app.inject({ method: "GET", url: "/traces" });
     expect(res.statusCode).toBe(401);
   });
 });
 
 describe("GET /traces/:id", () => {
-  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
-
-  afterEach(async () => {
-    if (app) {
-      await app.close();
-      app = undefined;
-    }
-  });
-
   it("returns 200 with every span belonging to the trace", async () => {
-    ({ app } = await buildTestServer([textResponse("unused")]));
     const { traceId } = seedTrace();
 
     const res = await app.inject({
@@ -99,8 +90,6 @@ describe("GET /traces/:id", () => {
   });
 
   it("returns 404 for an unknown trace id", async () => {
-    ({ app } = await buildTestServer([textResponse("unused")]));
-
     const res = await app.inject({
       method: "GET",
       url: "/traces/no-such-trace-id-exists",
@@ -114,18 +103,7 @@ describe("GET /traces/:id", () => {
 });
 
 describe("GET /traces/stream (SSE)", () => {
-  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
-
-  afterEach(async () => {
-    if (app) {
-      await app.close();
-      app = undefined;
-    }
-  });
-
   it("requires authentication", async () => {
-    ({ app } = await buildTestServer([textResponse("unused")]));
-
     const res = await app.inject({
       method: "GET",
       url: "/traces/stream",

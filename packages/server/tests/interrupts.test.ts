@@ -7,12 +7,13 @@
  * new devDep. Same semantics as supertest for the assertions we need.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { Tool, Voice } from "@tuttiai/types";
 import type { MemoryInterruptStore } from "@tuttiai/core";
 
 import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
+import type { TestHarness } from "./helpers.js";
 
 /**
  * Build a tool voice whose execute is recorded so tests can assert
@@ -43,20 +44,16 @@ function toolUseResponse(tool_name: string, input: unknown, id = "t1") {
 }
 
 /**
- * Wait until the store has at least one pending interrupt for a
- * session. Polls with a short budget so tests stay fast.
+ * Resolves once the run pauses. AgentRunner writes the request to the
+ * store before it emits `interrupt:requested`, so the store is ready then.
  */
-async function waitForPending(
-  store: MemoryInterruptStore,
-  deadlineMs = 2000,
-): Promise<void> {
-  const stopAt = Date.now() + deadlineMs;
-  while (Date.now() < stopAt) {
-    const pending = await store.listPending();
-    if (pending.length > 0) return;
-    await new Promise((r) => setTimeout(r, 10));
-  }
-  throw new Error("Timed out waiting for a pending interrupt");
+function paused(harness: TestHarness): Promise<void> {
+  return new Promise((resolve) => {
+    const off = harness.runtime.events.on("interrupt:requested", () => {
+      off();
+      resolve();
+    });
+  });
 }
 
 describe("GET /interrupts/pending", () => {
@@ -116,25 +113,32 @@ describe("GET /interrupts/pending", () => {
 });
 
 describe("GET /sessions/:sessionId/interrupts", () => {
-  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
+  // Neither test calls the provider, so one app serves both and is built
+  // once, in a hook. They read different sessions from the shared store.
+  let harness: TestHarness;
 
-  afterEach(async () => {
-    if (app) {
-      await app.close();
-      app = undefined;
-    }
+  beforeAll(async () => {
+    harness = await buildTestServer([textResponse("unused")], { interruptStore: "memory" });
+  });
+
+  afterAll(async () => {
+    await harness.app.close();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("returns every status for the requested session, oldest first", async () => {
-    const harness = await buildTestServer([textResponse("unused")], {
-      interruptStore: "memory",
-    });
-    app = harness.app;
+    const app = harness.app;
     const store = harness.interruptStore as MemoryInterruptStore;
 
+    // A fake clock gives the two requests distinct timestamps without a sleep.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-01-01T00:00:00Z") });
     const a = await store.create({ session_id: "sess-a", tool_name: "a", tool_args: {} });
-    await new Promise((r) => setTimeout(r, 5));
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.005Z"));
     const b = await store.create({ session_id: "sess-a", tool_name: "b", tool_args: {} });
+    vi.useRealTimers();
     await store.create({ session_id: "sess-b", tool_name: "other", tool_args: {} });
     await store.resolve(a.interrupt_id, "approved", { resolved_by: "alex" });
     await store.resolve(b.interrupt_id, "denied", { denial_reason: "no" });
@@ -158,12 +162,7 @@ describe("GET /sessions/:sessionId/interrupts", () => {
   });
 
   it("returns an empty array for an unknown session", async () => {
-    const harness = await buildTestServer([textResponse("unused")], {
-      interruptStore: "memory",
-    });
-    app = harness.app;
-
-    const res = await app.inject({
+    const res = await harness.app.inject({
       method: "GET",
       url: "/sessions/never-existed/interrupts",
       headers: { authorization: `Bearer ${API_KEY}` },
@@ -197,9 +196,9 @@ describe("POST /interrupts/:id/approve — full agent-loop integration", () => {
       },
     );
     app = harness.app;
-    const store = harness.interruptStore as MemoryInterruptStore;
 
     // Start the run but don't await yet — it blocks on the interrupt.
+    const interrupted = paused(harness);
     const runPromise = app.inject({
       method: "POST",
       url: "/run",
@@ -207,8 +206,7 @@ describe("POST /interrupts/:id/approve — full agent-loop integration", () => {
       payload: { input: "please send" },
     });
 
-    // Wait for the interrupt to land in the store.
-    await waitForPending(store);
+    await interrupted;
     const pending = (
       await app.inject({
         method: "GET",
@@ -315,6 +313,7 @@ describe("POST /interrupts/:id/deny — full agent-loop integration", () => {
     app = harness.app;
     const store = harness.interruptStore as MemoryInterruptStore;
 
+    const interrupted = paused(harness);
     const runPromise = app.inject({
       method: "POST",
       url: "/run",
@@ -322,7 +321,7 @@ describe("POST /interrupts/:id/deny — full agent-loop integration", () => {
       payload: { input: "go" },
     });
 
-    await waitForPending(store);
+    await interrupted;
     const [pending] = await store.listPending();
 
     const deny = await app.inject({
