@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
 import { TuttiRuntime } from "@tuttiai/core";
@@ -170,21 +170,21 @@ describe("GET /realtime (WebSocket)", () => {
     delete process.env["OPENAI_API_KEY"];
   });
 
-  it("rejects connections without ?api_key=", async () => {
-    let port: number;
-    ({ app, port } = await startServer({ realtime: REALTIME }, "sk-test"));
-    const ws = openClient(port, "");
-    const close = await nextClose(ws);
-    expect(close.code).toBe(4401);
-    expect(close.reason).toBe("unauthorized");
-  });
+  describe("authentication", () => {
+    // Refused before any OpenAI call, so both share one server built in a hook.
+    let shared: Harness;
+    beforeAll(async () => { shared = await startServer({ realtime: REALTIME }, "sk-test"); });
+    afterAll(async () => { await shared.app.close(); });
+    it("rejects connections without ?api_key=", async () => {
+      const close = await nextClose(openClient(shared.port, ""));
+      expect(close.code).toBe(4401);
+      expect(close.reason).toBe("unauthorized");
+    });
 
-  it("rejects connections with the wrong api_key", async () => {
-    let port: number;
-    ({ app, port } = await startServer({ realtime: REALTIME }, "sk-test"));
-    const ws = openClient(port, "?api_key=bogus");
-    const close = await nextClose(ws);
-    expect(close.code).toBe(4401);
+    it("rejects connections with the wrong api_key", async () => {
+      const close = await nextClose(openClient(shared.port, "?api_key=bogus"));
+      expect(close.code).toBe(4401);
+    });
   });
 
   it("rejects when the agent has no realtime config", async () => {
