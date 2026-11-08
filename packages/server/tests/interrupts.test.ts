@@ -44,20 +44,16 @@ function toolUseResponse(tool_name: string, input: unknown, id = "t1") {
 }
 
 /**
- * Wait until the store has at least one pending interrupt for a
- * session. Polls with a short budget so tests stay fast.
+ * Resolves once the run pauses. AgentRunner writes the request to the
+ * store before it emits `interrupt:requested`, so the store is ready then.
  */
-async function waitForPending(
-  store: MemoryInterruptStore,
-  deadlineMs = 2000,
-): Promise<void> {
-  const stopAt = Date.now() + deadlineMs;
-  while (Date.now() < stopAt) {
-    const pending = await store.listPending();
-    if (pending.length > 0) return;
-    await new Promise((r) => setTimeout(r, 10));
-  }
-  throw new Error("Timed out waiting for a pending interrupt");
+function paused(harness: TestHarness): Promise<void> {
+  return new Promise((resolve) => {
+    const off = harness.runtime.events.on("interrupt:requested", () => {
+      off();
+      resolve();
+    });
+  });
 }
 
 describe("GET /interrupts/pending", () => {
@@ -200,9 +196,9 @@ describe("POST /interrupts/:id/approve — full agent-loop integration", () => {
       },
     );
     app = harness.app;
-    const store = harness.interruptStore as MemoryInterruptStore;
 
     // Start the run but don't await yet — it blocks on the interrupt.
+    const interrupted = paused(harness);
     const runPromise = app.inject({
       method: "POST",
       url: "/run",
@@ -210,8 +206,7 @@ describe("POST /interrupts/:id/approve — full agent-loop integration", () => {
       payload: { input: "please send" },
     });
 
-    // Wait for the interrupt to land in the store.
-    await waitForPending(store);
+    await interrupted;
     const pending = (
       await app.inject({
         method: "GET",
@@ -318,6 +313,7 @@ describe("POST /interrupts/:id/deny — full agent-loop integration", () => {
     app = harness.app;
     const store = harness.interruptStore as MemoryInterruptStore;
 
+    const interrupted = paused(harness);
     const runPromise = app.inject({
       method: "POST",
       url: "/run",
@@ -325,7 +321,7 @@ describe("POST /interrupts/:id/deny — full agent-loop integration", () => {
       payload: { input: "go" },
     });
 
-    await waitForPending(store);
+    await interrupted;
     const [pending] = await store.listPending();
 
     const deny = await app.inject({
