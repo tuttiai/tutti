@@ -1,6 +1,6 @@
 ---
 title: "Discord Voice"
-description: "@tuttiai/discord — give agents a bot that can read, post, and moderate messages on Discord"
+description: "@tuttiai/discord: give agents a bot that can read, post, and moderate messages on Discord"
 sidebar:
   order: 5
 ---
@@ -38,7 +38,7 @@ DISCORD_BOT_TOKEN=your_bot_token_here
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**.
 2. **Bot** → **Reset Token** → copy into `DISCORD_BOT_TOKEN` (the token is only shown once).
 3. Enable the **Server Members** and **Message Content** privileged gateway intents (needed for `list_members`, `list_messages`, `get_message`, `search_messages`).
-4. **OAuth2** → **URL Generator** — tick `bot` scope plus the permissions you need (minimum: View Channels, Send Messages, Read Message History, Add Reactions; add Manage Messages for `delete_message` on other users' messages).
+4. **OAuth2** → **URL Generator**: tick `bot` scope plus the permissions you need (minimum: View Channels, Send Messages, Read Message History, Add Reactions; add Manage Messages for `delete_message` on other users' messages).
 5. Open the generated URL and invite the bot to your server.
 
 ## Configuration

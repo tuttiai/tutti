@@ -50,7 +50,7 @@ export default defineConfig({
             { label: "Smart Routing", slug: "guides/smart-routing" },
             { label: "Memory & Sessions", slug: "guides/memory-sessions" },
             { label: "Tool Result Caching", slug: "guides/tool-caching" },
-            { label: "Inbox — Inbound Messaging", slug: "guides/inbox" },
+            { label: "Inbox: inbound messaging", slug: "guides/inbox" },
             { label: "Security", slug: "guides/security" },
             { label: "Deploying to Production", slug: "guides/deploy" },
             { label: "Self-Improving Skills", slug: "guides/skills" },

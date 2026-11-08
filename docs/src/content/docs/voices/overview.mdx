@@ -19,19 +19,19 @@ A **voice** is a pluggable package that gives agents tools and capabilities. Eac
 | [RAG](/voices/rag) | `@tuttiai/rag` | `filesystem`, `network` | ingest, chunk, embed, search | Retrieval-augmented generation over your own documents |
 | [Knowledge](/voices/knowledge) | `@tuttiai/knowledge` | `network` | 2 (read-only) | Search knowledge bases a service ingests, stores and scopes for the agent |
 | [Notion](/voices/notion) | `@tuttiai/notion` | `network` | 8 (1 destructive) | Search, read, create, append to, update and archive shared Notion pages and databases |
-| [Slack](/voices/slack) | `@tuttiai/slack` | `network` | 11 (5 destructive) | Channels, threads, DMs, reactions — Socket Mode inbound for `@tuttiai/inbox` |
-| [Discord](/voices/discord) | `@tuttiai/discord` | `network` | 11 (5 destructive) | Messages, channels, members, reactions, DMs — Gateway inbound for `@tuttiai/inbox` |
+| [Slack](/voices/slack) | `@tuttiai/slack` | `network` | 11 (5 destructive) | Channels, threads, DMs, reactions: Socket Mode inbound for `@tuttiai/inbox` |
+| [Discord](/voices/discord) | `@tuttiai/discord` | `network` | 11 (5 destructive) | Messages, channels, members, reactions, DMs: Gateway inbound for `@tuttiai/inbox` |
 | [Telegram](/voices/telegram) | `@tuttiai/telegram` | `network` | 4 (4 destructive) | Send / edit / delete messages + photo + shared bot client for `@tuttiai/inbox` |
 | [Email](/voices/email) | `@tuttiai/email` | `network` | 3 (2 destructive) | IMAP IDLE inbox + SMTP outbound with RFC 5322 threading |
-| [WhatsApp](/voices/whatsapp) | `@tuttiai/whatsapp` | `network` | 2 (2 destructive) | Meta Cloud API — text + Message Templates + signed-webhook server |
+| [WhatsApp](/voices/whatsapp) | `@tuttiai/whatsapp` | `network` | 2 (2 destructive) | Meta Cloud API: text + Message Templates + signed-webhook server |
 | [Twitter](/voices/twitter) | `@tuttiai/twitter` | `network` | 9 (3 destructive) | Tweets, threads, mentions, timeline |
 | [Postgres](/voices/postgres) | `@tuttiai/postgres` | `network` | 8 (1 destructive) | Read-only query + schema introspection + write escape hatch |
 | [Stripe](/voices/stripe) | `@tuttiai/stripe` | `network` | 27 (9 destructive) | Customers, payments, subs, invoices, balance |
 | [Sender](/voices/sender) | `@tuttiai/sender` | `network` | 14 (3 destructive) | Email marketing: subscribers, groups, campaigns |
-| [Realtime](/voices/realtime) | `@tuttiai/realtime` | `network` | 1 + audio bridge | OpenAI Realtime API — voice in / voice out with HITL gating |
+| [Realtime](/voices/realtime) | `@tuttiai/realtime` | `network` | 1 + audio bridge | OpenAI Realtime API: voice in / voice out with HITL gating |
 | [MCP Bridge](/voices/mcp) | `@tuttiai/mcp` | `network` | dynamic | Wrap any MCP server as a Tutti voice |
 
-Destructive tools (posting, deleting, sending, paying) gate behind operator approval automatically — see [HITL by default](/guides/security#human-in-the-loop).
+Destructive tools (posting, deleting, sending, paying) gate behind operator approval automatically: see [HITL by default](/guides/security#human-in-the-loop).
 
 ## Installing a voice
 
@@ -96,7 +96,7 @@ interface Voice {
 
 ## MCP Bridge
 
-The `@tuttiai/mcp` voice wraps any [MCP server](https://modelcontextprotocol.io/) as a Tutti voice. Tools are discovered dynamically at runtime — no manual tool definitions needed:
+The `@tuttiai/mcp` voice wraps any [MCP server](https://modelcontextprotocol.io/) as a Tutti voice. Tools are discovered dynamically at runtime, no manual tool definitions needed:
 
 ```ts
 import { McpVoice } from "@tuttiai/mcp";
@@ -111,4 +111,4 @@ See the [API reference](/api/overview) for full `McpVoice` options.
 
 Anyone can build and publish a voice. See [Building a Voice](/guides/building-a-voice) for a step-by-step guide.
 
-Publish your voice with `tutti-ai publish` — it handles npm publishing and opens a PR to the voice registry automatically.
+Publish your voice with `tutti-ai publish`: it handles npm publishing and opens a PR to the voice registry automatically.
