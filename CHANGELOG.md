@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- cli: ReactiveScore watcher test no longer depends on real timing (#58).
 **The score loader's "no default export" error links to tutti-ai.com/docs** (`@tuttiai/core`). It pointed to docs.tutti-ai.com; it now points to the same page at `https://tutti-ai.com/docs/getting-started/core-concepts`. No API changes.
 
 **`tutti-ai search` and `tutti-ai voices` validate the voice registry response** (`@tuttiai/cli`). The response from tuttiai/voices was cast to its expected type unchecked, so a malformed registry could crash the command or list `undefined`. It is now checked before use, and when it is malformed, partial or oversized (more than 500 voices in a list, or an entry over its field limits) the command falls back to the built-in list and logs one warning naming the failing path, never a value from the payload. The registry's `tools_count` is used when it is a number; otherwise the built-in count. The built-in github voice now lists 23 tools, the number its source registers.
