@@ -7,12 +7,13 @@
  * new devDep. Same semantics as supertest for the assertions we need.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { Tool, Voice } from "@tuttiai/types";
 import type { MemoryInterruptStore } from "@tuttiai/core";
 
 import { buildTestServer, textResponse, API_KEY } from "./helpers.js";
+import type { TestHarness } from "./helpers.js";
 
 /**
  * Build a tool voice whose execute is recorded so tests can assert
@@ -116,25 +117,32 @@ describe("GET /interrupts/pending", () => {
 });
 
 describe("GET /sessions/:sessionId/interrupts", () => {
-  let app: Awaited<ReturnType<typeof buildTestServer>>["app"] | undefined;
+  // Neither test calls the provider, so one app serves both and is built
+  // once, in a hook. They read different sessions from the shared store.
+  let harness: TestHarness;
 
-  afterEach(async () => {
-    if (app) {
-      await app.close();
-      app = undefined;
-    }
+  beforeAll(async () => {
+    harness = await buildTestServer([textResponse("unused")], { interruptStore: "memory" });
+  });
+
+  afterAll(async () => {
+    await harness.app.close();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("returns every status for the requested session, oldest first", async () => {
-    const harness = await buildTestServer([textResponse("unused")], {
-      interruptStore: "memory",
-    });
-    app = harness.app;
+    const app = harness.app;
     const store = harness.interruptStore as MemoryInterruptStore;
 
+    // A fake clock gives the two requests distinct timestamps without a sleep.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-01-01T00:00:00Z") });
     const a = await store.create({ session_id: "sess-a", tool_name: "a", tool_args: {} });
-    await new Promise((r) => setTimeout(r, 5));
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.005Z"));
     const b = await store.create({ session_id: "sess-a", tool_name: "b", tool_args: {} });
+    vi.useRealTimers();
     await store.create({ session_id: "sess-b", tool_name: "other", tool_args: {} });
     await store.resolve(a.interrupt_id, "approved", { resolved_by: "alex" });
     await store.resolve(b.interrupt_id, "denied", { denial_reason: "no" });
@@ -158,12 +166,7 @@ describe("GET /sessions/:sessionId/interrupts", () => {
   });
 
   it("returns an empty array for an unknown session", async () => {
-    const harness = await buildTestServer([textResponse("unused")], {
-      interruptStore: "memory",
-    });
-    app = harness.app;
-
-    const res = await app.inject({
+    const res = await harness.app.inject({
       method: "GET",
       url: "/sessions/never-existed/interrupts",
       headers: { authorization: `Bearer ${API_KEY}` },
