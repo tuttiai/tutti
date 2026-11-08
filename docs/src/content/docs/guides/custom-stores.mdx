@@ -74,9 +74,11 @@ sessions durably:
   `load` out.
 
 For an unknown id, `get` and `load` return `undefined` and do not throw
-(`packages/types/src/session.ts:28`). The built-in stores' `update` throws
+(`packages/types/src/session.ts:28`). The memory and file stores' `update` throws
 `Session not found: <id>` for an id they do not hold (`packages/core/src/session-store.ts:56`,
-`packages/core/src/file-session-store.ts:95`).
+`packages/core/src/file-session-store.ts:95`). `PostgresSessionStore.update` does not throw: for an
+id not in its cache it changes nothing in memory and still sends its `UPDATE` in the background
+(`packages/core/src/memory/postgres.ts:135-156`).
 
 The memory and file stores also have a `save(session)` method that inserts or replaces a session
 under its own id (`packages/core/src/session-store.ts:62-71`). Those stores add it on top; it is
@@ -389,7 +391,9 @@ async, so it needs no cache to answer.
 Test your store against each of these. Every item comes from the built-in stores.
 
 1. **Unknown ids are absence, not errors.** Session: `get` and `load` return `undefined`, and
-   `update` throws `Session not found: <id>`. Interrupt: `get` returns `null`, and `resolve`
+   `update` should throw `Session not found: <id>`, as the memory and file stores do
+   (`packages/core/src/session-store.ts:56`, `packages/core/src/file-session-store.ts:95`);
+   `PostgresSessionStore.update` does not throw. Interrupt: `get` returns `null`, and `resolve`
    throws. Checkpoint: `load` and `loadLatest` return `null`, `list` returns `[]`, and `delete`
    does nothing (`packages/core/src/checkpoint/store.ts:6-11`,
    `packages/core/src/interrupt/store.ts:17-23`).
