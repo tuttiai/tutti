@@ -22,6 +22,8 @@
 
 ### Fixed
 
+**The docs site no longer uses em dashes, and CLI flags in prose are in code formatting** (docs). Every em dash under `docs/src` and in `docs/astro.config.mjs` is now a colon, comma, parentheses, semicolon or full stop, and the Inbox guide is labelled "Inbox: inbound messaging". The `--target` hint in the deploy guide is in backticks, because the website renders a bare `--` as an en dash. Docs only, no behaviour change. No package changes.
+
 - server: HTTP and SSE tests no longer time out on a loaded host (#73).
 - core: router and process tests use fake timers or deterministic waits instead of wall-clock time (#69).
 - cli: ReactiveScore watcher test no longer depends on real timing (#58).
