@@ -1,0 +1,453 @@
+---
+title: "Writing a session, interrupt or checkpoint store"
+description: "The SessionStore, InterruptStore and CheckpointStore contracts, the built-in stores, a minimal custom store and the behaviours every store must keep"
+---
+
+Tutti keeps three kinds of state behind interfaces you can implement yourself:
+
+- **Sessions** (`SessionStore`): the conversation history of each run.
+- **Interrupts** (`InterruptStore`): tool calls waiting for a person to approve or deny them.
+- **Checkpoints** (`CheckpointStore`): turn snapshots that let a durable agent resume after a
+  crash or a restart.
+
+This page is for you if you need one of them in a backend Tutti does not ship, such as DynamoDB
+or SQLite. It gives each contract with its exact signatures, what the runtime expects of every
+method, the built-in stores to copy from, a minimal custom session store and a checklist to test
+your store against.
+
+Source references are to files in the [tutti repository](https://github.com/tuttiai/tutti), as
+`path:line`.
+
+## Plugging a store in
+
+All three interfaces are exported from `@tuttiai/core`, together with the types they use
+(`Session`, `ChatMessage`, `InterruptRequest`, `InterruptCreateInput`, `ResolveOptions`,
+`InterruptStatus`, `Checkpoint` and `SessionState`). You pass a store to the runtime through
+`TuttiRuntimeOptions` (`packages/core/src/runtime.ts:87-106`):
+
+```ts
+const tutti = new TuttiRuntime(score, {
+  sessionStore: mySessionStore,
+  interruptStore: myInterruptStore,
+  checkpointStore: myCheckpointStore,
+});
+```
+
+- `sessionStore` replaces the store the score's `memory` setting would create
+  (`packages/core/src/runtime.ts:160`).
+- `interruptStore` is required when any agent sets `requireApproval`
+  (`packages/core/src/runtime.ts:101-106`).
+- `checkpointStore` is what agents with `durable` save their turns to
+  (`packages/core/src/runtime.ts:88-93`).
+
+## SessionStore
+
+Defined in `packages/types/src/session.ts:13-31` and re-exported from `@tuttiai/core` as a type.
+
+| Method | Signature | Required |
+|---|---|---|
+| `create` | `create(agent_name: string): Session` | yes |
+| `get` | `get(id: string): Session \| undefined` | yes |
+| `update` | `update(id: string, messages: ChatMessage[]): void` | yes |
+| `load` | `load?(id: string): Promise<Session \| undefined>` | no |
+
+`create`, `get` and `update` are **synchronous**. This is the main trap when writing a store: a
+store backed by a database or a network cannot await a query inside them. It keeps the sessions
+it is using in an in-memory cache, answers `get` from that cache, and writes to the backend in the
+background, logging any failure. `PostgresSessionStore` works this way: its `update` changes the
+cached session at once and sends the `UPDATE` without awaiting it
+(`packages/core/src/memory/postgres.ts:135-156`).
+
+`load` is optional. It fetches a session that `get` does not hold, from wherever the store keeps
+sessions durably:
+
+- The runtime awaits `load` only after `get` misses, and only then throws `Session not found`
+  (`packages/core/src/agent-runner.ts:682-687`).
+- A session that `load` returns must afterwards be visible to `get` and accepted by `update`,
+  because the run that follows writes its history back through them
+  (`packages/types/src/session.ts:22-25`).
+- `TuttiRuntime.loadSession(id)` resolves a session the same way
+  (`packages/core/src/runtime.ts:476-477`), and the server routes `GET /sessions/:id`,
+  `GET /sessions/:id/turns` and `POST /sessions/:id/replay-from` go through it
+  (`packages/server/src/routes/sessions.ts:34`, `:54` and `:88`).
+- A store whose `get` already sees everything it holds, such as `InMemorySessionStore`, leaves
+  `load` out.
+
+For an unknown id, `get` and `load` return `undefined` and do not throw
+(`packages/types/src/session.ts:28`). The built-in stores' `update` throws
+`Session not found: <id>` for an id they do not hold (`packages/core/src/session-store.ts:56`,
+`packages/core/src/file-session-store.ts:95`).
+
+The memory and file stores also have a `save(session)` method that inserts or replaces a session
+under its own id (`packages/core/src/session-store.ts:62-71`). Those stores add it on top; it is
+not part of the interface.
+
+## InterruptStore
+
+Defined in `packages/core/src/interrupt/store.ts:31-41`. Every method is required and async.
+
+```ts
+create(input: InterruptCreateInput): Promise<InterruptRequest>;
+get(interrupt_id: string): Promise<InterruptRequest | null>;
+resolve(
+  interrupt_id: string,
+  status: "approved" | "denied",
+  options?: ResolveOptions,
+): Promise<InterruptRequest>;
+listPending(session_id?: string): Promise<InterruptRequest[]>;
+listBySession(session_id: string): Promise<InterruptRequest[]>;
+```
+
+- `create` persists a new request and returns it with `interrupt_id`, `requested_at` and
+  `status: "pending"` filled in. The built-in stores use `randomUUID()` for the id
+  (`packages/core/src/interrupt/memory-store.ts:23-27`).
+- `get` returns `null` for an unknown id, so callers can tell absence from an error
+  (`packages/core/src/interrupt/store.ts:17-18`).
+- `resolve` moves a request to `"approved"` or `"denied"`, sets `resolved_at`, and records
+  `resolved_by` and `denial_reason` as given. It throws for an unknown id. On a request that is
+  already resolved it returns the existing record unchanged, so a duplicate click from an
+  operator is not an error (`packages/core/src/interrupt/store.ts:19-23`,
+  `packages/core/src/interrupt/memory-store.ts:46-53`).
+- `listPending` returns every pending request, optionally for one session, and `listBySession`
+  returns every request for a session whatever its status. Both are ordered oldest first by
+  `requested_at` (`packages/core/src/interrupt/memory-store.ts:77` and `:87`).
+
+An approval resolved after a restart resumes the run from the checkpoint taken when it paused,
+so a durable interrupt store is only useful together with a durable checkpoint store. The
+runtime treats the pair as durable unless either is a `MemoryInterruptStore` or a
+`MemoryCheckpointStore` (`packages/core/src/interrupt/pause-recorder.ts:32-34`).
+
+## CheckpointStore
+
+Defined in `packages/core/src/checkpoint/store.ts:13-24`, with `Checkpoint` and `SessionState` in
+`packages/core/src/checkpoint/types.ts`. Every method is required and async.
+
+```ts
+save(checkpoint: Checkpoint): Promise<void>;
+loadLatest(session_id: string): Promise<Checkpoint | null>;
+load(session_id: string, turn: number): Promise<Checkpoint | null>;
+delete(session_id: string): Promise<void>;
+list(session_id: string): Promise<Checkpoint[]>;
+```
+
+- `save` inserts or replaces by `(session_id, turn)`: saving a turn again overwrites it rather
+  than adding a second copy.
+- `loadLatest` returns the checkpoint with the highest turn.
+- `load` and `loadLatest` return `null` when nothing matches. They do not throw.
+- `delete` removes every turn for the session, and does nothing when there are none.
+- `list` returns the session's checkpoints in ascending turn order.
+- `saved_at` is a `Date` (`packages/core/src/checkpoint/types.ts:56`) and must come back as a
+  `Date` after storage.
+- The optional fields of `SessionState` (`packages/core/src/checkpoint/types.ts:15-32`) are
+  absent from checkpoints saved before they existed, so a store must read a checkpoint that
+  lacks them.
+
+An agent with `durable: { store }` gets its store from `createCheckpointStore`
+(`packages/core/src/checkpoint/factory.ts:20-57`):
+
+| `durable.store` | Store | Needs |
+|---|---|---|
+| `"memory"` | `MemoryCheckpointStore` | nothing |
+| `"redis"` | `RedisCheckpointStore` | `TUTTI_REDIS_URL`, for example `redis://localhost:6379` |
+| `"postgres"` | `PostgresCheckpointStore` | `TUTTI_PG_URL`, for example `postgres://user:pw@localhost/tutti` |
+
+The default lifetime is `DEFAULT_CHECKPOINT_TTL_SECONDS`, 604,800 seconds or 7 days
+(`packages/core/src/checkpoint/redis.ts:10`), and `durable.ttl` overrides it. A custom checkpoint
+store is passed as `checkpointStore` instead.
+
+## The built-in stores
+
+Every store here is exported from the package named. "none" means Tutti has no such store.
+
+| Contract | Memory | File | Postgres | Redis |
+|---|---|---|---|---|
+| Session | `InMemorySessionStore` (`@tuttiai/core`) | `FileSessionStore` (`@tuttiai/core`) | `PostgresSessionStore` (`@tuttiai/core`) | none |
+| Interrupt | `MemoryInterruptStore` (`@tuttiai/core`) | `FileInterruptStore` (`@tuttiai/server`) | `PostgresInterruptStore` (`@tuttiai/core`) | none |
+| Checkpoint | `MemoryCheckpointStore` (`@tuttiai/core`, for tests) | `FileCheckpointStore` (`@tuttiai/server`) | `PostgresCheckpointStore` (`@tuttiai/core`) | `RedisCheckpointStore` (`@tuttiai/core`) |
+
+How each is constructed:
+
+```ts
+import {
+  FileSessionStore,
+  InMemorySessionStore,
+  MemoryCheckpointStore,
+  MemoryInterruptStore,
+  PostgresCheckpointStore,
+  PostgresInterruptStore,
+  PostgresSessionStore,
+  RedisCheckpointStore,
+} from "@tuttiai/core";
+import { FileCheckpointStore, FileInterruptStore } from "@tuttiai/server";
+
+new InMemorySessionStore({ max_sessions: 200 });
+new FileSessionStore("/state/sessions");
+new PostgresSessionStore("postgres://user:pw@localhost/tutti"); // then await initialize()
+
+new MemoryInterruptStore();
+new FileInterruptStore("/state/interrupts");
+new PostgresInterruptStore({ connection_string: "postgres://user:pw@localhost/tutti" });
+
+new MemoryCheckpointStore();
+new FileCheckpointStore("/state/checkpoints");
+new PostgresCheckpointStore({ connection_string: "postgres://user:pw@localhost/tutti" });
+new RedisCheckpointStore({ url: "redis://localhost:6379" });
+```
+
+What each session store shows:
+
+- **In-memory** (`packages/core/src/session-store.ts:10-21`): by default it holds at most 1,000
+  sessions (`DEFAULT_MAX_SESSIONS`) and evicts a session unused for 24 hours
+  (`DEFAULT_SESSION_IDLE_TTL_MS`); over the cap, the least recently used goes first
+  (`packages/core/src/session-lru.ts:1-15`). Everything is lost when the process exits.
+- **File** (`packages/core/src/file-session-store.ts:37-52`): one JSON file per session, written
+  through a temporary file renamed into place, with dates restored on read. Ids are limited to
+  `SESSION_ID_PATTERN`, `^[A-Za-z0-9_-]{1,128}$` (`:17`). A directory that cannot be created or
+  written is refused when the store is created (`:63-70`), and a corrupt file is logged and
+  skipped (`:142-151`).
+- **Postgres** (`packages/core/src/memory/postgres.ts:9-15`): `get` answers from its bounded
+  cache, and `load` goes to the database and caches what it finds (`:84-104`).
+
+The server image chooses between the Postgres, file and memory stores for interrupts and
+checkpoints from `TUTTI_PG_URL` and `TUTTI_STATE_DIR`; see
+[Deploying to Production](/guides/deploy/) for how.
+
+## A minimal custom session store
+
+This store keeps sessions in an asynchronous key-value backend. `MapBackend` stands in for a real
+client so the example runs as it is; replace it with your database. The store keeps a bounded
+cache so the synchronous methods can answer, writes in the background, implements `load`,
+validates ids and restores dates on read.
+
+```ts title="kv-session-store.ts"
+import { randomUUID } from "node:crypto";
+import {
+  AnthropicProvider,
+  DEFAULT_MAX_SESSIONS,
+  DEFAULT_SESSION_IDLE_TTL_MS,
+  SESSION_ID_PATTERN,
+  TuttiRuntime,
+  createLogger,
+  defineScore,
+} from "@tuttiai/core";
+import type { ChatMessage, Session, SessionStore, SessionStoreBounds } from "@tuttiai/core";
+
+const logger = createLogger("kv-session-store");
+
+/** The durable backend. Replace it with your database client. */
+export interface KeyValueBackend {
+  read(key: string): Promise<string | undefined>;
+  write(key: string, value: string): Promise<void>;
+}
+
+/** An in-process stand-in for a real backend. */
+export class MapBackend implements KeyValueBackend {
+  private readonly data = new Map<string, string>();
+
+  async read(key: string): Promise<string | undefined> {
+    return this.data.get(key);
+  }
+
+  async write(key: string, value: string): Promise<void> {
+    this.data.set(key, value);
+  }
+}
+
+interface StoredSession {
+  id: string;
+  agent_name: string;
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+function isStoredSession(value: unknown): value is StoredSession {
+  // The messages are not checked one by one: this store wrote them from ChatMessage values.
+  return (
+    typeof value === "object" && value !== null &&
+    "id" in value && typeof value.id === "string" &&
+    "agent_name" in value && typeof value.agent_name === "string" &&
+    "messages" in value && Array.isArray(value.messages) &&
+    "created_at" in value && typeof value.created_at === "string" &&
+    "updated_at" in value && typeof value.updated_at === "string"
+  );
+}
+
+function parse(raw: string): Session | undefined {
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!isStoredSession(value)) return undefined;
+    return { ...value, created_at: new Date(value.created_at), updated_at: new Date(value.updated_at) };
+  } catch {
+    return undefined;
+  }
+}
+
+export class KeyValueSessionStore implements SessionStore {
+  private readonly cache = new Map<string, { session: Session; usedAt: number }>();
+  private readonly maxSessions: number;
+  private readonly idleTtlMs: number;
+  private readonly now: () => number;
+
+  constructor(private readonly backend: KeyValueBackend, bounds: SessionStoreBounds = {}) {
+    this.maxSessions = Math.max(1, bounds.max_sessions ?? DEFAULT_MAX_SESSIONS);
+    this.idleTtlMs = bounds.idle_ttl_ms ?? DEFAULT_SESSION_IDLE_TTL_MS;
+    this.now = bounds.now ?? Date.now;
+  }
+
+  create(agent_name: string): Session {
+    const now = new Date();
+    const session: Session = { id: randomUUID(), agent_name, messages: [], created_at: now, updated_at: now };
+    this.save(session);
+    return session;
+  }
+
+  get(id: string): Session | undefined {
+    const entry = this.cache.get(id);
+    if (!entry) return undefined;
+    if (this.now() - entry.usedAt > this.idleTtlMs) {
+      this.cache.delete(id);
+      return undefined;
+    }
+    this.remember(entry.session);
+    return entry.session;
+  }
+
+  update(id: string, messages: ChatMessage[]): void {
+    const session = this.get(id);
+    if (!session) throw new Error(`Session not found: ${id}`);
+    session.messages = messages;
+    session.updated_at = new Date();
+    this.persist(session);
+  }
+
+  async load(id: string): Promise<Session | undefined> {
+    const cached = this.get(id);
+    if (cached) return cached;
+    // An id outside the pattern never reaches the backend.
+    if (!SESSION_ID_PATTERN.test(id)) return undefined;
+    const raw = await this.backend.read(id);
+    if (raw === undefined) return undefined;
+    const session = parse(raw);
+    if (!session) {
+      logger.warn({ session: id }, "Ignoring a session record that cannot be read");
+      return undefined;
+    }
+    this.remember(session);
+    return session;
+  }
+
+  /** Insert or replace a session under its own id, as the built-in stores do. Not part of the interface. */
+  save(session: Session): void {
+    if (!SESSION_ID_PATTERN.test(session.id)) {
+      throw new Error("A session id may hold only letters, digits, _ and -, at most 128 of them.");
+    }
+    this.remember(session);
+    this.persist(session);
+  }
+
+  private remember(session: Session): void {
+    this.cache.delete(session.id);
+    this.cache.set(session.id, { session, usedAt: this.now() });
+    for (const oldest of this.cache.keys()) {
+      if (this.cache.size <= this.maxSessions) break;
+      this.cache.delete(oldest);
+    }
+  }
+
+  private persist(session: Session): void {
+    // The interface is synchronous, so the write runs in the background and a failure is logged.
+    this.backend.write(session.id, JSON.stringify(session)).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ session: session.id, error: message }, "Failed to write a session");
+    });
+  }
+}
+
+const score = defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    assistant: {
+      name: "assistant",
+      model: "claude-sonnet-5-5",
+      system_prompt: "You are a helpful assistant.",
+      voices: [],
+    },
+  },
+});
+
+export const tutti = new TuttiRuntime(score, {
+  sessionStore: new KeyValueSessionStore(new MapBackend()),
+});
+```
+
+A custom interrupt or checkpoint store follows the same pattern, except that every method is
+async, so it needs no cache to answer.
+
+## Checklist: behaviours every store must keep
+
+Test your store against each of these. Every item comes from the built-in stores.
+
+1. **Unknown ids are absence, not errors.** Session: `get` and `load` return `undefined`, and
+   `update` throws `Session not found: <id>`. Interrupt: `get` returns `null`, and `resolve`
+   throws. Checkpoint: `load` and `loadLatest` return `null`, `list` returns `[]`, and `delete`
+   does nothing (`packages/core/src/checkpoint/store.ts:6-11`,
+   `packages/core/src/interrupt/store.ts:17-23`).
+2. **Data round-trips unchanged, dates included.** After a write and a read, every date field is a
+   `Date` again: `created_at` and `updated_at`, `requested_at` and `resolved_at`, and `saved_at`
+   (`packages/core/src/file-session-store.ts:172-182`,
+   `packages/server/src/state/file-interrupt-store.ts:162-170`,
+   `packages/core/src/checkpoint/redis.ts:186`). The memory checkpoint store returns
+   `structuredClone` copies, so a caller never shares an object with the store
+   (`packages/core/src/checkpoint/memory.ts:39-58`).
+3. **Writes are idempotent.** A checkpoint save replaces by `(session_id, turn)`, and resolving an
+   interrupt twice returns the first result unchanged. The Postgres interrupt store does this
+   with `UPDATE ... WHERE id = $1 AND status = 'pending'`
+   (`packages/core/src/interrupt/postgres-store.ts:114-137`).
+4. **Ordering is explicit.** Checkpoint `list` is in ascending turn order and interrupt lists are
+   oldest first. `SCAN` and `readdir` return in no fixed order, so sort, as the Redis and file
+   stores do (`packages/core/src/checkpoint/redis.ts:140`,
+   `packages/server/src/state/file-checkpoint-store.ts:113`,
+   `packages/server/src/state/file-interrupt-store.ts:149`).
+5. **Session methods stay synchronous behind a bounded cache.** The built-in session stores hold
+   at most `DEFAULT_MAX_SESSIONS` sessions and evict after `DEFAULT_SESSION_IDLE_TTL_MS` unless
+   told otherwise (`packages/core/src/session-lru.ts:1-15`). A store with no limit says why.
+6. **A session returned by `load` stays live.** `get` and `update` accept it afterwards
+   (`packages/core/src/memory/postgres.ts:98-104`).
+7. **Ids are validated before they reach a path, a key or SQL.** The file session and checkpoint
+   stores accept only `SESSION_ID_PATTERN` (`packages/core/src/file-session-store.ts:17`), the
+   Redis checkpoint store checks session ids against `^[A-Za-z0-9._-]+$`
+   (`packages/core/src/checkpoint/redis.ts:16`), the file interrupt store accepts only the UUIDs
+   it generates (`packages/server/src/state/file-interrupt-store.ts:20`), and the Postgres stores
+   check table names against `^[a-z_][a-z0-9_]*$` before putting them in SQL and pass ids as
+   query parameters (`packages/core/src/checkpoint/postgres.ts:15`,
+   `packages/core/src/interrupt/postgres-store.ts:17`).
+8. **A write never leaves half an entry.** The file stores write a temporary file and rename it
+   into place, and clear stray temporary files at start
+   (`packages/core/src/file-session-store.ts:127-140`). The Redis checkpoint store writes in a
+   pipeline and checks each command's error (`packages/core/src/checkpoint/redis.ts:68-88`). The
+   Postgres checkpoint store saves in a transaction
+   (`packages/core/src/checkpoint/postgres.ts:75-121`).
+9. **Failures surface where the caller can act.** The file stores create and test their directory
+   in the constructor, so a caller can fall back (`packages/core/src/file-session-store.ts:63-70`).
+   The Postgres checkpoint store creates its schema lazily and retries after a failure
+   (`packages/core/src/checkpoint/postgres.ts:178-188`).
+10. **A corrupt record costs only itself.** Log its id, never its content. On a single read the
+    file session and checkpoint stores treat it as absent
+    (`packages/core/src/file-session-store.ts:142-151`,
+    `packages/server/src/state/file-checkpoint-store.ts:116-124`), and while listing it is
+    skipped with a warning (`packages/server/src/state/file-interrupt-store.ts:139-149`). The
+    exception is `FileInterruptStore.get`, which throws a `TuttiError` with the code
+    `INTERRUPT_RECORD_CORRUPT` (`packages/server/src/state/file-interrupt-store.ts:134`).
+11. **Lifetime and retention are documented.** Redis and Postgres checkpoints expire after the
+    TTL, the Postgres checkpoint store keeps the last 10 turns per session
+    (`packages/core/src/checkpoint/postgres.ts:11`), and memory checkpoints are unbounded.
+12. **Concurrency is stated.** The file stores support one process per directory
+    (`packages/core/src/file-session-store.ts:45-46`), and memory stores do not work across
+    processes. The Redis `latest` pointer follows the last write, not the highest turn, when saves
+    arrive out of order (`packages/core/src/checkpoint/redis.ts:63-67`). Postgres session writes
+    are fire-and-forget, with errors logged (`packages/core/src/memory/postgres.ts:135-156`).
+13. **Pooled stores release their connections.** Every store that holds a pool or a client offers
+    `close()` for shutdown (`packages/core/src/memory/postgres.ts:163`,
+    `packages/core/src/interrupt/postgres-store.ts:172`,
+    `packages/core/src/checkpoint/redis.ts:167`). It is not part of the interfaces.
