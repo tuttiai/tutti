@@ -271,4 +271,13 @@ export interface ScoreConfig {
    * supplied). See {@link SkillsConfig}.
    */
   skills?: SkillsConfig;
+  /**
+   * Let specialists delegate in turn. When `true`, `AgentRouter` also gives
+   * the `delegate_to_agent` tool to every non-entry agent that lists
+   * `delegates[]`, and refuses at construction a score where a `delegates[]`
+   * id is unknown or the delegation graph has a cycle. Default `false`:
+   * only the entry agent delegates and a specialist's `delegates[]` is
+   * ignored, as before.
+   */
+  nested_delegation?: boolean;
 }
