@@ -13,9 +13,9 @@
     "sharp": "^0.33.0"
   },
   "devDependencies": {
-    "vitest": "3.2.4"
+    "vitest": "5.1.0"
   },
   "overrides": {
-    "@astrojs/sitemap": "3.7.0"
+    "@astrojs/sitemap": "3.7.4"
   }
 }

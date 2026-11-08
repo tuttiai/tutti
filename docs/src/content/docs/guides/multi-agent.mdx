@@ -24,7 +24,7 @@ import { FilesystemVoice } from "@tuttiai/filesystem";
 export default defineScore({
   name: "dev-team",
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   entry: "orchestrator",
   agents: {
     orchestrator: {
@@ -139,6 +139,25 @@ Give each specialist a clear, focused system prompt. The orchestrator works best
 :::caution
 Each delegation is a separate agent run with its own token usage. Set `budget` on specialists to prevent runaway costs.
 :::
+
+## Nested delegation
+
+By default only the entry agent delegates, and a specialist's `delegates[]` is ignored. Set `nested_delegation: true` on the score to let a specialist delegate in turn:
+
+```ts title="tutti.score.ts"
+export default defineScore({
+  provider: new AnthropicProvider(),
+  entry: "orchestrator",
+  nested_delegation: true,
+  agents: {
+    orchestrator: { name: "Orchestrator", system_prompt: "Route requests.", voices: [], delegates: ["lead"] },
+    lead: { name: "Tech Lead", system_prompt: "Plan the work, then hand it on.", voices: [], delegates: ["coder"] },
+    coder: { name: "Coder", system_prompt: "Write the code.", voices: [] },
+  },
+});
+```
+
+With the option on, every agent that lists `delegates[]` gets the `delegate_to_agent` tool and a prompt naming its specialists. Each delegation emits its own `delegate:start` and `delegate:end`, with `from` set to the agent that delegated. `AgentRouter` checks the whole delegation graph when it is constructed. It throws if a `delegates[]` id names no agent, or if a chain loops back on itself (for example `lead -> coder -> lead`), and the error names the id or the cycle.
 
 ## Parallel fan-out
 

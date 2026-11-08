@@ -7,6 +7,7 @@ import type {
   Tool,
   Voice,
 } from "@tuttiai/types";
+import { nestedDelegators, validateDelegationGraph } from "./delegation/delegation-graph.js";
 import { TuttiRuntime } from "./runtime.js";
 import type { EventBus } from "./event-bus.js";
 import { addUsage } from "./usage.js";
@@ -112,6 +113,8 @@ export class AgentRouter {
         );
       }
     }
+
+    if (_score.nested_delegation === true) validateDelegationGraph(_score.agents);
 
     // Create the runtime with the modified score
     const modifiedScore = this.buildRoutingScore(_score, entryId);
@@ -312,21 +315,40 @@ export class AgentRouter {
     };
   }
 
+  /**
+   * The score the runtime runs: the entry agent, and with
+   * `nested_delegation` every other agent that lists delegates, gets the
+   * `delegate_to_agent` tool and a prompt naming its specialists.
+   */
   private buildRoutingScore(
     score: ScoreConfig,
     entryId: string,
   ): ScoreConfig {
-    const entryAgent = getAgent(score.agents, entryId);
-    if (!entryAgent) {
-      throw new Error(`Entry agent "${entryId}" not found.`);
+    const ids =
+      score.nested_delegation === true
+        ? [entryId, ...nestedDelegators(score.agents, entryId)]
+        : [entryId];
+    const enhanced = Object.fromEntries(
+      ids.map((id) => [id, this.withDelegateTool(score, id)]),
+    );
+    return { ...score, agents: { ...score.agents, ...enhanced } };
+  }
+
+  private withDelegateTool(
+    score: ScoreConfig,
+    agentId: string,
+  ): ScoreConfig["agents"][string] {
+    const agent = getAgent(score.agents, agentId);
+    if (!agent) {
+      throw new Error(`Agent "${agentId}" not found.`);
     }
-    if (!entryAgent.delegates || entryAgent.delegates.length === 0) {
-      throw new Error(`Entry agent "${entryId}" has no delegates.`);
+    if (!agent.delegates || agent.delegates.length === 0) {
+      throw new Error(`Agent "${agentId}" has no delegates.`);
     }
-    const delegates = entryAgent.delegates;
+    const delegates = agent.delegates;
 
     // Build the delegate tool
-    const delegateTool = this.createDelegateTool(score, delegates, entryId);
+    const delegateTool = this.createDelegateTool(score, delegates, agentId);
 
     // Build a voice that carries the delegate tool
     const routerVoice: Voice = {
@@ -343,25 +365,17 @@ export class AgentRouter {
       })
       .join("\n");
 
-    const enhancedPrompt = `${entryAgent.system_prompt}
+    const enhancedPrompt = `${agent.system_prompt}
 
 You have the following specialist agents available via the delegate_to_agent tool:
 ${delegateDescriptions}
 
 When the user's request matches a specialist's expertise, delegate to them with a clear task description. You can delegate to multiple specialists in sequence. After receiving a specialist's response, summarize the result for the user.`;
 
-    // Return a new score with the modified entry agent
-    const enhanced: ScoreConfig["agents"][string] = {
-      ...entryAgent,
-      system_prompt: enhancedPrompt,
-      voices: [...entryAgent.voices, routerVoice],
-    };
     return {
-      ...score,
-      agents: {
-        ...score.agents,
-        [entryId]: enhanced,
-      },
+      ...agent,
+      system_prompt: enhancedPrompt,
+      voices: [...agent.voices, routerVoice],
     };
   }
 

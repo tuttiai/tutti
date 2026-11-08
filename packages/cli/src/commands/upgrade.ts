@@ -8,11 +8,12 @@
  * install command.
  */
 
-import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import chalk from "chalk";
-import ora from "ora";
+import { logger } from "../logger.js";
+import { runPackageManager } from "../package-manager.js";
+import { PACKAGE_SPEC_HINT, isValidPackageName } from "../package-spec.js";
 
 function detectPackageManager(): "npm" | "yarn" | "pnpm" {
   const cwd = process.cwd();
@@ -63,6 +64,16 @@ function getInstalledTuttiPackages(): Map<string, string> {
   }
 }
 
+/** Drop keys that are not valid npm names, naming each one, so they never reach the package manager. */
+function dropInvalidNames(installed: Map<string, string>): void {
+  for (const name of [...installed.keys()]) {
+    if (!isValidPackageName(name)) {
+      logger.warn(`Skipping ${JSON.stringify(name)}: not a valid npm package name.`);
+      installed.delete(name);
+    }
+  }
+}
+
 export function upgradeCommand(target?: string): void {
   const pkgPath = resolve(process.cwd(), "package.json");
   if (!existsSync(pkgPath)) {
@@ -73,6 +84,7 @@ export function upgradeCommand(target?: string): void {
 
   const pm = detectPackageManager();
   const installed = getInstalledTuttiPackages();
+  dropInvalidNames(installed);
 
   if (installed.size === 0) {
     console.log(chalk.dim("No @tuttiai packages found in this project."));
@@ -82,6 +94,11 @@ export function upgradeCommand(target?: string): void {
   let packages: string[];
   if (target) {
     const resolved = resolvePackageName(target);
+    if (!isValidPackageName(resolved)) {
+      logger.error(`Invalid package name: ${JSON.stringify(target)}`);
+      console.error(chalk.dim(PACKAGE_SPEC_HINT));
+      process.exit(1);
+    }
     if (!installed.has(resolved)) {
       console.error(chalk.red(resolved + " is not installed in this project."));
       console.error(chalk.dim("Installed: " + [...installed.keys()].join(", ")));
@@ -94,21 +111,14 @@ export function upgradeCommand(target?: string): void {
     console.log(chalk.cyan("  Upgrading all " + packages.length + " @tuttiai packages..."));
   }
 
-  const installCmd = pm === "yarn"
-    ? "yarn add " + packages.join(" ")
-    : pm === "pnpm"
-      ? "pnpm add " + packages.join(" ")
-      : "npm install " + packages.join(" ");
-
-  const spinner = ora("Installing...").start();
-  try {
-    execSync(installCmd, { cwd: process.cwd(), stdio: "pipe" });
-    spinner.succeed("Upgraded " + packages.length + " package(s)");
-  } catch {
-    spinner.fail("Upgrade failed");
-    console.log(chalk.dim("  Run manually: " + installCmd));
+  const args = [pm === "npm" ? "install" : "add", ...packages];
+  const result = runPackageManager(pm, args);
+  if (!result.ok) {
+    logger.error(result.error);
+    console.log(chalk.dim("  Run manually: " + [pm, ...args].join(" ")));
     process.exit(1);
   }
+  console.log(chalk.green("  ✔ Upgraded " + packages.length + " package(s)"));
 
   // Show new versions
   console.log();

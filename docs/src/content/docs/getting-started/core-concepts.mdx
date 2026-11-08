@@ -15,7 +15,7 @@ import { AnthropicProvider, defineScore } from "@tuttiai/core";
 export default defineScore({
   name: "my-project",
   provider: new AnthropicProvider(),
-  default_model: "claude-sonnet-4-20250514",
+  default_model: "claude-sonnet-5-5",
   agents: {
     assistant: { /* ... */ },
     coder: { /* ... */ },
@@ -55,7 +55,7 @@ An **agent** is an LLM-powered worker. Each agent has:
 {
   coder: {
     name: "Coder",
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-5-5",
     system_prompt: "You are a senior TypeScript developer.",
     voices: [new FilesystemVoice()],
     permissions: ["filesystem"],
@@ -378,9 +378,9 @@ Span tree:
 
 ```
 agent.run (agent.name=assistant, session.id=abc-123)
-  ├── llm.call (llm.model=claude-sonnet-4-20250514)
+  ├── llm.call (llm.model=claude-sonnet-5-5)
   ├── tool.call (tool.name=read_file)
-  ├── llm.call (llm.model=claude-sonnet-4-20250514)
+  ├── llm.call (llm.model=claude-sonnet-5-5)
   └── ...
 ```
 
