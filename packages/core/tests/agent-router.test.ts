@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { AgentRouter } from "../src/agent-router.js";
 import {
   createMockProvider,
@@ -278,7 +278,9 @@ describe("AgentRouter", () => {
   }
 
   describe("runParallel", () => {
-    it("runs agents concurrently (verified via wall-clock timing)", async () => {
+    afterEach(() => { vi.useRealTimers(); });
+    it("starts all agents before any of them finishes", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       const DELAY = 80;
       const provider = createDelayedProvider(
         [
@@ -292,22 +294,21 @@ describe("AgentRouter", () => {
         createParallelScore(provider, ["a", "b", "c"]),
       );
 
-      const start = Date.now();
-      const results = await router.runParallel([
+      const pending = router.runParallel([
         { agent_id: "a", input: "x" },
         { agent_id: "b", input: "x" },
         { agent_id: "c", input: "x" },
       ]);
-      const duration = Date.now() - start;
+      // Sequential runs would have made one call by now; parallel makes three.
+      await vi.advanceTimersByTimeAsync(DELAY - 1);
+      expect(provider.chat).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(1);
+      const results = await pending;
 
       expect(results.size).toBe(3);
       expect(results.get("a")?.output).toBe("[tag:a] ok");
       expect(results.get("b")?.output).toBe("[tag:b] ok");
       expect(results.get("c")?.output).toBe("[tag:c] ok");
-
-      // Sequential would take >= 3*DELAY = 240ms. Parallel should be < 2*DELAY.
-      // Leave generous slack for CI to avoid flakes.
-      expect(duration).toBeLessThan(DELAY * 2);
     });
 
     it("one failure does not block the other agents", async () => {
@@ -337,6 +338,7 @@ describe("AgentRouter", () => {
     });
 
     it("timeout_ms kills any agent that takes too long", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       const provider = createDelayedProvider(
         [
           { match: "tag:fast", behavior: "ok" },
@@ -348,21 +350,19 @@ describe("AgentRouter", () => {
         createParallelScore(provider, ["fast", "slow"]),
       );
 
-      const start = Date.now();
-      const results = await router.runParallel(
+      const pending = router.runParallel(
         [
           { agent_id: "fast", input: "x" },
           { agent_id: "slow", input: "x" },
         ],
         { timeout_ms: 80 },
       );
-      const duration = Date.now() - start;
+      await vi.advanceTimersByTimeAsync(80); // the timeout, not the slow 500 ms
+      const results = await pending;
 
       expect(results.get("fast")?.output).toBe("[tag:fast] ok");
       expect(results.get("slow")?.output).toContain("[error]");
       expect(results.get("slow")?.output).toMatch(/timeout/i);
-      // We should NOT wait out the slow agent's full 500ms delay.
-      expect(duration).toBeLessThan(300);
     });
 
     it("emits parallel:start and parallel:complete events", async () => {

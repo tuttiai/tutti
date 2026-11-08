@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- core: router and process tests use fake timers or deterministic waits instead of wall-clock time (#69).
 - cli: ReactiveScore watcher test no longer depends on real timing (#58).
 **The score loader's "no default export" error links to tutti-ai.com/docs** (`@tuttiai/core`). It pointed to docs.tutti-ai.com; it now points to the same page at `https://tutti-ai.com/docs/getting-started/core-concepts`. No API changes.
 
