@@ -312,9 +312,7 @@ const MD_CODE_BLOCK_RE = /```([\s\S]*?)```/g;
 const MD_CODE_INLINE_RE = /`([^`]+)`/g;
 const MD_BOLD_STARS_RE = /\*\*([^*]+)\*\*/g;
 const MD_BOLD_UNDERS_RE = /__([^_]+)__/g;
-// eslint-disable-next-line security/detect-unsafe-regex -- bounded, no nested quantifiers
 const MD_ITALIC_STAR_RE = /(?<!\*)\*([^*\n]+)\*(?!\*)/g;
-// eslint-disable-next-line security/detect-unsafe-regex -- bounded, no nested quantifiers
 const MD_ITALIC_UNDER_RE = /(?<!_)_([^_\n]+)_(?!_)/g;
 const MD_HEADING_RE = /^#{1,6}\s+/gm;
 
