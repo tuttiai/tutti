@@ -49,6 +49,7 @@ export default defineConfig({
             { label: "Providers", slug: "guides/providers" },
             { label: "Smart Routing", slug: "guides/smart-routing" },
             { label: "Memory & Sessions", slug: "guides/memory-sessions" },
+            { label: "Custom Stores", slug: "guides/custom-stores" },
             { label: "Tool Result Caching", slug: "guides/tool-caching" },
             { label: "Inbox — Inbound Messaging", slug: "guides/inbox" },
             { label: "Security", slug: "guides/security" },
