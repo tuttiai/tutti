@@ -5,7 +5,7 @@
 
   <p>
     <a href="https://tutti-ai.com">Website</a> ·
-    <a href="https://docs.tutti-ai.com">Docs</a> ·
+    <a href="https://tutti-ai.com/docs/">Docs</a> ·
     <a href="https://github.com/tuttiai/tutti/issues">Issues</a> ·
     <a href="https://discord.gg/tuttiai">Discord</a>
   </p>
@@ -422,7 +422,7 @@ npm run test:coverage       # with v8 coverage
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [contributing docs](https://docs.tutti-ai.com/contributing/overview/).
+See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [contributing docs](https://tutti-ai.com/docs/contributing/overview/).
 
 ```bash
 git clone https://github.com/tuttiai/tutti.git
