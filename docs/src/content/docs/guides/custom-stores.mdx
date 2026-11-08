@@ -423,7 +423,7 @@ Test your store against each of these. Every item comes from the built-in stores
    Redis checkpoint store checks session ids against `^[A-Za-z0-9._-]+$`
    (`packages/core/src/checkpoint/redis.ts:16`), the file interrupt store accepts only the UUIDs
    it generates (`packages/server/src/state/file-interrupt-store.ts:20`), and the Postgres stores
-   check table names against `^[a-z_][a-z0-9_]*$` before putting them in SQL and pass ids as
+   check table names against `/^[a-z_][a-z0-9_]*$/i` (case-insensitive) before putting them in SQL and pass ids as
    query parameters (`packages/core/src/checkpoint/postgres.ts:15`,
    `packages/core/src/interrupt/postgres-store.ts:17`).
 8. **A write never leaves half an entry.** The file stores write a temporary file and rename it
