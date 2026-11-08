@@ -73,6 +73,8 @@ A `SessionStore` may implement an optional `load(id)`, which the runtime awaits 
 misses and before it reports a session as not found. `PostgresSessionStore` uses it to read a
 session from its table; `runtime.loadSession(id)` resolves a session the same way.
 
+To write your own store, see [Writing a session, interrupt or checkpoint store](/guides/custom-stores/).
+
 ### PostgreSQL store
 
 Sessions persist across process restarts:
