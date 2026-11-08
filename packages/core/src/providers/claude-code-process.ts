@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 
+import { claudeCodeEnv } from "./claude-code-env.js";
+
 /** What one `claude -p` invocation produced. */
 export interface ClaudeCodeRunResult {
   /** Process exit code, or `null` when it was killed by a signal. */
@@ -24,7 +26,11 @@ export interface ClaudeCodeInvocation {
   cwd: string;
   /** Kills the process when aborted. One already aborted means it is never started. */
   signal?: AbortSignal;
-  /** Variables set on top of the server's own environment. Absent, the CLI inherits that environment unchanged. */
+  /**
+   * Variables set on top of the allowlisted part of the server's environment,
+   * winning over it. Absent, the CLI gets only that allowlisted part, never
+   * the whole of the server's environment.
+   */
   env?: Readonly<Record<string, string>>;
 }
 
@@ -58,9 +64,8 @@ export function runClaudeCode(
       cwd: invocation.cwd,
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
-      // The CLI reads its login and config from the environment, so it gets the
-      // whole of the server's, as a spawn without `env` would, plus the additions.
-      ...(invocation.env && { env: { ...process.env, ...invocation.env } }),
+      // Always set: a spawn without `env` would pass the whole server environment.
+      env: claudeCodeEnv(invocation.env),
     });
     const out: Buffer[] = [];
     const err: Buffer[] = [];
