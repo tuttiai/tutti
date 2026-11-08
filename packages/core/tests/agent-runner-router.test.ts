@@ -17,7 +17,7 @@ import { AgentRunner } from "../src/agent-runner.js";
 import { EventBus } from "../src/event-bus.js";
 import { InMemorySessionStore } from "../src/session-store.js";
 import { getTuttiTracer } from "../src/telemetry.js";
-import { simpleAgent, textResponse } from "./helpers/mock-provider.js";
+import { createMockProvider, simpleAgent, textResponse } from "./helpers/mock-provider.js";
 
 interface RouterDecisionPayload {
   tier: string;
@@ -359,7 +359,6 @@ describe("AgentRunner router-event wiring", () => {
   });
 
   it("skips preview entirely for non-Smart providers (back-compat: no router events emitted)", async () => {
-    const { createMockProvider } = await import("./helpers/mock-provider.js");
     const provider = createMockProvider([textResponse("plain")]);
     const events = new EventBus();
     const seen: TuttiEvent[] = [];
@@ -381,7 +380,6 @@ describe("AgentRunner router-event wiring", () => {
 
   it("does not emit router events for non-router providers", async () => {
     // Use the standard mock-provider helper — no `name` marker.
-    const { createMockProvider } = await import("./helpers/mock-provider.js");
     const provider = createMockProvider([textResponse("plain")]);
     const events = new EventBus();
     const seen: TuttiEvent[] = [];

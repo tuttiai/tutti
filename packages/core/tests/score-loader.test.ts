@@ -52,6 +52,26 @@ describe("ScoreLoader", () => {
     );
   });
 
+  it("links the no default export error to tutti-ai.com/docs", async () => {
+    const path = writeTmpFile(
+      "no-default-link.mjs",
+      `export const foo = 42;`,
+    );
+
+    const error = await ScoreLoader.load(path).then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    const message = error instanceof Error ? error.message : "";
+    expect(message).toContain("has no default export");
+    expect(message).toContain(
+      "See https://tutti-ai.com/docs/getting-started/core-concepts",
+    );
+    expect(message).not.toContain("docs.tutti-ai.com");
+  });
+
   it("throws a Zod validation error for an invalid score", async () => {
     const path = writeTmpFile(
       "invalid.mjs",
