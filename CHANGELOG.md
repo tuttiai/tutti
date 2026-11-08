@@ -20,6 +20,7 @@
 ### Fixed
 
 - core: router and process tests use fake timers or deterministic waits instead of wall-clock time (#69).
+
 **`tutti-ai search` and `tutti-ai voices` validate the voice registry response** (`@tuttiai/cli`). The response from tuttiai/voices was cast to its expected type unchecked, so a malformed registry could crash the command or list `undefined`. It is now checked before use, and when it is malformed, partial or oversized (more than 500 voices in a list, or an entry over its field limits) the command falls back to the built-in list and logs one warning naming the failing path, never a value from the payload. The registry's `tools_count` is used when it is a number; otherwise the built-in count. The built-in github voice now lists 23 tools, the number its source registers.
 **The Daytona bundle's `snapshots.yaml` no longer carries a bare TODO** (`@tuttiai/deploy`). The generated `.daytona/snapshots.yaml` ended in `# TODO(deploy/daytona): move hibernation config into daytona.sh CLI flags.`, a leftover note in a file users commit. It now says Daytona may ignore `idle_minutes_until_hibernate` and `auto_resume`, tells the user to check auto-stop and hibernation in their Daytona sandbox settings, and links the follow-up, [#67](https://github.com/tuttiai/tutti/issues/67). The keys and values are unchanged, and `daytona.sh` is unchanged.
 - **cli:** New project templates and schedules now default to `claude-sonnet-5-5` instead of the retired `claude-sonnet-4-20250514`. Cost lookups for it need the `@tuttiai/core` release that prices it (#62).
