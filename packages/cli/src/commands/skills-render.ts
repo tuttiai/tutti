@@ -17,7 +17,6 @@ import type { Skill, SkillCandidate } from "@tuttiai/skills";
 
 /** Visible width of an ANSI-coloured string. */
 function visibleLen(s: string): number {
-  // eslint-disable-next-line no-control-regex
   return s.replace(/\[[0-9;]*m/g, "").length;
 }
 
