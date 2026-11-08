@@ -98,7 +98,37 @@ Listen to these events to track the flow:
 | Event | Fields | When |
 | ----- | ------ | ---- |
 | `delegate:start` | `from`, `to`, `task` | Orchestrator delegates to a specialist |
+| `delegate:delta` | `tool_call_id`, `from`, `to`, `text`, `session_id`, `parent_session_id`, `root_session_id`, `path`, `depth` | A streaming specialist produced a chunk of output |
 | `delegate:end` | `from`, `to`, `output` | Specialist returns its result |
+
+## Stream a specialist's output
+
+While a `delegate_to_agent` call runs, a specialist with `streaming: true` has each chunk of its output forwarded onto the router's event stream as a `delegate:delta` event. You can show the specialist's work live from the same stream, with no second subscription:
+
+```ts title="stream.ts"
+import { AgentRouter } from "@tuttiai/core";
+import score from "./tutti.score.js"; // set `streaming: true` on the specialists
+
+const router = new AgentRouter(score);
+const panels = new Map<string, string>();
+
+router.events.on("delegate:delta", (e) => {
+  // One panel per tool call, so parallel delegations stay apart.
+  panels.set(e.tool_call_id, (panels.get(e.tool_call_id) ?? "") + e.text);
+  process.stdout.write(`[${e.to} ${e.tool_call_id}] ${e.text}\n`);
+});
+
+const result = await router.run("Write a function that reverses a string");
+console.log(result.output);
+```
+
+To follow one run among several on a shared runtime, keep the deltas whose `root_session_id` is that run's session id.
+
+- **Order.** A call's deltas arrive after its `delegate:start` and before its `delegate:end`, in the order the specialist wrote them. On success, joining them gives the specialist's output. Parallel calls can interleave, and `tool_call_id` tells them apart.
+- **Nesting.** When a specialist delegates in turn, its own specialist's deltas reach the same stream. `path` lists the tool call ids from the top-level call down to the one that produced the text, and `depth` is its length: 1 for a direct specialist, 2 for its specialist. `parent_session_id` is the session of the agent that made the call.
+- **Errors and aborts.** When a specialist fails, or the run's `AbortSignal` fires, its deltas stop and none arrives after the call ends. The text already sent is not taken back. As before, no `delegate:end` is sent in either case.
+- **Specialists that do not stream** send no deltas; their output arrives in `delegate:end` as before.
+- **Redaction.** Each chunk goes through `SecretsManager` redaction before it is emitted. Redaction works chunk by chunk, so a secret split across two chunks is not caught.
 
 ## Tips
 

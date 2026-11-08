@@ -29,6 +29,7 @@ import type { EventBus } from "./event-bus.js";
 import { SecretsManager } from "./secrets.js";
 import { askForFinalAnswer, stoppedMidWork } from "./final-answer.js";
 import { abortable, abortError, raceAbort, throwIfAborted, withSignal } from "./run-abort.js";
+import { scopeFor, toolCallScope } from "./delegation/tool-call-scope.js";
 import { toolInputSchema } from "./tool-schema.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
@@ -1993,7 +1994,7 @@ export class AgentRunner {
         throwIfAborted(signal);
 
         let result = await this.executeWithTimeout(
-          () => tool.execute(parsed, context),
+          () => toolCallScope.run(scopeFor(block.id, context.session_id, signal), () => tool.execute(parsed, context)),
           timeoutMs,
           block.name,
         );

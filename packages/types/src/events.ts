@@ -15,6 +15,34 @@ export type TuttiEvent =
   | { type: "turn:end"; agent_name: string; session_id: string; turn: number }
   | { type: "delegate:start"; from: string; to: string; task: string }
   | { type: "delegate:end"; from: string; to: string; output: string }
+  /**
+   * One chunk of a specialist's streamed output, forwarded onto the parent's
+   * event stream while its `delegate_to_agent` call runs. Sent only when the
+   * specialist has `streaming: true`; every delta of a call arrives after its
+   * `delegate:start` and before its `delegate:end`, and none after the call
+   * fails or the run is aborted. `text` is redacted by `SecretsManager`.
+   */
+  | {
+      type: "delegate:delta";
+      /** Session of the run that made the `delegate_to_agent` call. */
+      parent_session_id: string;
+      /** Session of the top-level run, so one filter covers every depth. */
+      root_session_id: string;
+      /** Id of the `delegate_to_agent` tool_use block in the parent run. */
+      tool_call_id: string;
+      /** The caller, same value as `delegate:start.from`. */
+      from: string;
+      /** The specialist, same value as `delegate:start.to`. */
+      to: string;
+      /** The specialist's own session. */
+      session_id: string;
+      /** Tool call ids from the top-level call down to `tool_call_id`. */
+      path: string[];
+      /** Nesting level: 1 for a direct specialist, 2 for its own delegate. Equals `path.length`. */
+      depth: number;
+      /** One redacted chunk of the specialist's output. Never empty. */
+      text: string;
+    }
   | { type: "parallel:start"; agents: string[] }
   | { type: "parallel:complete"; results: string[] }
   | { type: "cache:hit"; agent_name: string; tool: string }

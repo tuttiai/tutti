@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type {
   AgentResult,
   ParallelAgentResult,
@@ -12,6 +11,7 @@ import { nestedDelegators, validateDelegationGraph } from "./delegation/delegati
 import { TuttiRuntime } from "./runtime.js";
 import type { EventBus } from "./event-bus.js";
 import { addUsage } from "./usage.js";
+import { buildDelegateTool, type DelegateInput } from "./delegation/delegate-tool.js";
 
 /** Safe lookup into score.agents by dynamic key. */
 function getAgent(
@@ -383,55 +383,15 @@ When the user's request matches a specialist's expertise, delegate to them with 
     score: ScoreConfig,
     delegateIds: string[],
     entryId: string,
-  ): Tool<{ agent_id: string; task: string }> {
-    const runtime = (): TuttiRuntime => this.runtime;
-    const events = (): EventBus => this.runtime.events;
-    const entryName = getAgent(score.agents, entryId)?.name ?? "orchestrator";
-
-    const parameters = z.object({
-      agent_id: z
-        .enum(delegateIds as [string, ...string[]])
-        .describe("Which specialist agent to delegate to"),
-      task: z
-        .string()
-        .describe("The specific task description to pass to the specialist"),
-    });
-
-    return {
-      name: "delegate_to_agent",
-      description:
-        "Delegate a task to a specialist agent. The specialist will complete the task and return the result.",
-      parameters,
-      execute: async (input) => {
-        events().emit({
-          type: "delegate:start",
-          from: entryName,
-          to: input.agent_id,
-          task: input.task,
-        });
-
-        try {
-          const result = await runtime().run(input.agent_id, input.task);
-
-          events().emit({
-            type: "delegate:end",
-            from: entryName,
-            to: input.agent_id,
-            output: result.output,
-          });
-
-          return {
-            content: result.output || "(specialist returned no output)",
-          };
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          return {
-            content: `Delegation to "${input.agent_id}" failed: ${message}`,
-            is_error: true,
-          };
-        }
+  ): Tool<DelegateInput> {
+    return buildDelegateTool(
+      {
+        runtime: () => this.runtime,
+        score,
+        callerId: entryId,
+        callerName: getAgent(score.agents, entryId)?.name ?? "orchestrator",
       },
-    };
+      delegateIds,
+    );
   }
 }
