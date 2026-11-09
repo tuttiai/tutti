@@ -95,3 +95,13 @@ export type {
   CostAgentBudget,
   CostBudgetsResponse,
 } from "./cost-api.js";
+
+export {
+  InterruptWireSchema,
+  InterruptsPendingResponseSchema,
+} from "./interrupts-api.js";
+
+export type {
+  InterruptWire,
+  InterruptsPendingResponse,
+} from "./interrupts-api.js";
