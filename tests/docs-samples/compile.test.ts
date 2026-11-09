@@ -26,7 +26,9 @@ describe("virtualPath", () => {
   });
 });
 
-describe("compileSamples", () => {
+// Each test builds a real program with the lib and @types/node declarations: seconds, not ms, and
+// the timeout sits here so a root `npx vitest run`, without this suite's config, allows for it too.
+describe("compileSamples", { timeout: 60_000 }, () => {
   it("passes a sample that type-checks, with node types and top-level await", () => {
     const code = 'import { join } from "node:path";\nconst p: string = join("a", "b");\nawait Promise.resolve(p);';
     const outcome = compileSamples(ts, ROOT, [sample(1, code)]);

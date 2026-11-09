@@ -25,7 +25,8 @@ async function runOn(tree: FakeTree, root: string = ROOT): Promise<{ code: numbe
 
 const USAGE = { file: PAGE, heading: "usage", index: 1, reason: "partial snippet: uses run and score (TS2304)" };
 
-describe("run", () => {
+// Most tests build a real program, which takes seconds; see the note in compile.test.ts.
+describe("run", { timeout: 60_000 }, () => {
   it("exits 0 when every sample passes or is skipped", async () => {
     const result = await runOn({ [PAGE]: MDX, [SKIP_LIST]: skip(USAGE) });
     expect(result).toEqual({ code: EXIT_PASS, out: ["docs:check-samples: 2 checked, 1 passed, 1 skipped, 0 failed, 0 stale"], err: [] });
