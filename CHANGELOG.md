@@ -27,6 +27,8 @@
 
 ### Fixed
 
+**`@tuttiai/sandbox` is described as a per-session working directory, not "secure" or "isolated"** (`@tuttiai/sandbox`, docs). The package description, the voice's `description` string and TSDoc, the voice manifest and the sandbox docs page now say "per-session working directory" and that it is not a security boundary, matching `utils/child-env.ts` and the sandbox-voice guide. The docs tool table's Destructive column now reads "no" for every tool, because no sandbox tool sets `destructive`. "Writing a Sandbox Voice" is added to the Guides sidebar after "Building a Voice". Docs and wording only, no behaviour change.
+
 **The docs site no longer uses em dashes, and CLI flags in prose are in code formatting** (docs). Every em dash under `docs/src` and in `docs/astro.config.mjs` is now a colon, comma, parentheses, semicolon or full stop, and the Inbox guide is labelled "Inbox: inbound messaging". The `--target` hint in the deploy guide is in backticks, because the website renders a bare `--` as an en dash. Docs only, no behaviour change. No package changes.
 
 - server: HTTP and SSE tests no longer time out on a loaded host (#73).
