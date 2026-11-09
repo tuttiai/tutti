@@ -53,6 +53,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The cost and interrupts commands now validate server responses and, when a response is malformed, exit with a clear error naming the endpoint instead of crashing.
+
 ### Minor Changes
 
 - New cost-analysis commands that talk to a running `tutti-ai serve` process:
