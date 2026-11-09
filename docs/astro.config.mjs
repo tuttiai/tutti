@@ -47,6 +47,7 @@ export default defineConfig({
             { label: "Multi-Agent Orchestration", slug: "guides/multi-agent" },
             { label: "Adding Voices", slug: "guides/adding-voices" },
             { label: "Building a Voice", slug: "guides/building-a-voice" },
+            { label: "Writing a Sandbox Voice", slug: "guides/writing-a-sandbox-voice" },
             { label: "Providers", slug: "guides/providers" },
             { label: "Smart Routing", slug: "guides/smart-routing" },
             { label: "Memory & Sessions", slug: "guides/memory-sessions" },

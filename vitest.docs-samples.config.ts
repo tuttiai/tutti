@@ -6,8 +6,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/docs-samples/**/*.test.ts"],
-    // The compile tests build real TypeScript programs, which takes a few seconds each.
-    testTimeout: 60_000,
     coverage: {
       provider: "v8",
       reporter: ["text-summary"],
