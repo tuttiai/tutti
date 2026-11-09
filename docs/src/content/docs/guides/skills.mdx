@@ -5,7 +5,7 @@ sidebar:
   order: 9
 ---
 
-A skill is a tool the agent has earned the right to call. After an agent has solved the same shape of problem several times — fetch this, read that, post the other — Tutti's trajectory observer notices, the proposer drafts a single replacement tool, and an operator decides whether to approve it. From the next run on, the agent invokes one `review_pr` call where it used to orchestrate three.
+A skill is a tool the agent has earned the right to call. After an agent has solved the same shape of problem several times (fetch this, read that, post the other), Tutti's trajectory observer notices, the proposer drafts a single replacement tool, and an operator decides whether to approve it. From the next run on, the agent invokes one `review_pr` call where it used to orchestrate three.
 
 The runnable example lives at [`examples/self-improving-skills/`](https://github.com/tuttiai/tutti/tree/main/examples/self-improving-skills).
 
@@ -18,7 +18,7 @@ The runnable example lives at [`examples/self-improving-skills/`](https://github
 ```
 
 - **`TrajectoryObserver`** runs inside the runtime. After every successful agent run it records the `(tool, input_hash, succeeded, duration_ms)` tuples and pushes the trajectory onto a `SkillStore`.
-- **`SkillProposer`** wakes up when an agent crosses `auto_propose_threshold` similar trajectories. It asks the score's LLM to summarise the shape into a `SkillCandidate` — name, description, constituent tools, and an inner system prompt.
+- **`SkillProposer`** wakes up when an agent crosses `auto_propose_threshold` similar trajectories. It asks the score's LLM to summarise the shape into a `SkillCandidate`: name, description, constituent tools, and an inner system prompt.
 - **Operator review** is the gate. `tutti-ai skills proposed` lists pending candidates; `tutti-ai skills review` walks each one. Nothing reaches the agent until you say yes.
 - **`SkillExecutor`** projects approved skills into callable `Tool`s. Permissions are the union of constituents' `required_permissions`, checked at run start.
 
@@ -54,7 +54,7 @@ export default defineScore({
 export const skillStore = new InMemorySkillStore();
 ```
 
-`InMemorySkillStore` is the reference implementation — fine for local dev, lost on process restart. For multi-process or durable use, implement `SkillStore` against Postgres.
+`InMemorySkillStore` is the reference implementation: fine for local dev, lost on process restart. For multi-process or durable use, implement `SkillStore` against Postgres.
 
 ## The CLI
 
@@ -109,7 +109,7 @@ All flow through `redactObject`, so secrets in tool inputs never reach the bus.
 - **Threshold tuning.** `auto_propose_threshold: 5` is the default. Lower it for tighter loops (test fixtures, demos), raise it for production agents where you want stronger signal. Below 3 the proposer fires on coincidence; above 10 you rarely see a candidate.
 - **Use a persistent store.** `InMemorySkillStore` is for development. Back it with Postgres in production.
 - **Approve narrowly.** A skill that says "do a thing" should do exactly that thing. Edit the system prompt before approving, or reject and let the proposer try again with more evidence.
-- **Audit `skill:invoked`.** Subscribe to the event and send it to your trace store — that's the attribution line for every reduced turn count.
+- **Audit `skill:invoked`.** Subscribe to the event and send it to your trace store: that's the attribution line for every reduced turn count.
 
 ## What's deliberately not in v0.26
 

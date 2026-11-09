@@ -56,6 +56,8 @@ SecretsManager.redact("Key is sk-ant-api03-abcdef...")
 // → "Key is [REDACTED]"
 ```
 
+See [How Tutti keeps secrets out of the model](/guides/secrets-and-the-model/) for what is and isn't covered.
+
 ## Path traversal protection
 
 The filesystem voice blocks access to system paths:
@@ -75,8 +77,8 @@ It also enforces a maximum file size on reads (default 10MB).
 
 The Playwright voice blocks dangerous URL schemes:
 
-- `file:`, `javascript:`, `data:` — local file access, script injection
-- Private network ranges (`10.x`, `172.16-31.x`, `192.168.x`) — SSRF prevention
+- `file:`, `javascript:`, `data:`: local file access, script injection
+- Private network ranges (`10.x`, `172.16-31.x`, `192.168.x`): SSRF prevention
 
 ## Prompt injection defense
 
@@ -100,7 +102,7 @@ tutti.events.on("security:injection_detected", (e) => {
 ```
 
 :::note
-The PromptGuard does not block content — it wraps it with markers that instruct the LLM to treat it as data, not instructions. The original content is preserved.
+The PromptGuard does not block content: it wraps it with markers that instruct the LLM to treat it as data, not instructions. The original content is preserved.
 :::
 
 ## Budgets
@@ -130,7 +132,7 @@ Two enforcement modes:
 | `max_cost_usd_per_day` | Hard | Throws with `scope: 'day'`. Requires a `RunCostStore` on the runtime. |
 | `max_cost_usd_per_month` | Hard | Throws with `scope: 'month'`. Requires a `RunCostStore` on the runtime. |
 
-Daily/monthly caps query a `RunCostStore` at run start and add this run's accumulating cost to the snapshot. Use `PostgresRunCostStore` in any deployment with more than one worker so every process shares the same total — `InMemoryRunCostStore` is for dev and tests.
+Daily/monthly caps query a `RunCostStore` at run start and add this run's accumulating cost to the snapshot. Use `PostgresRunCostStore` in any deployment with more than one worker so every process shares the same total: `InMemoryRunCostStore` is for dev and tests.
 
 ```ts
 import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
@@ -143,8 +145,8 @@ const runtime = new TuttiRuntime(score, {
 ```
 
 Events:
-- `budget:warning` — emitted when usage crosses `warn_at_percent`. Carries `scope: 'run' | 'day' | 'month'` and numeric `limit`.
-- `budget:exceeded` — emitted on breach. Same `scope` / `limit` fields. The hard-throw caps additionally throw `BudgetExceededError` (catch it on `runtime.run()`).
+- `budget:warning`: emitted when usage crosses `warn_at_percent`. Carries `scope: 'run' | 'day' | 'month'` and numeric `limit`.
+- `budget:exceeded`: emitted on breach. Same `scope` / `limit` fields. The hard-throw caps additionally throw `BudgetExceededError` (catch it on `runtime.run()`).
 
 ```ts
 import { BudgetExceededError } from "@tuttiai/core";
@@ -194,12 +196,12 @@ export default defineScore({
       name: "Assistant",
       system_prompt: "You are a customer-support agent.",
       voices: [],
-      // Input guardrails — run before the first LLM call
+      // Input guardrails: run before the first LLM call
       beforeRun: [
         profanityFilter({ on_match: "block" }),
         piiDetector({ on_match: "redact" }),
       ],
-      // Output guardrails — run after the agent's final response
+      // Output guardrails: run after the agent's final response
       afterRun: [
         topicBlocker({ topics: ["legal advice", "medical diagnosis"] }),
       ],
@@ -216,7 +218,7 @@ Each factory returns a `GuardrailHook`. Three built-in factories ship with `@tut
 | `piiDetector(opts)` | Detect / redact emails, phone numbers, SSNs, credit cards | `{ on_match, patterns? }` |
 | `topicBlocker(opts)` | Refuse to answer prompts about listed topics | `{ topics: string[], on_match }` |
 
-You can also write your own by implementing the `GuardrailHook` contract — any `(context) => Promise<GuardrailResult>` function with `action: "allow" | "block" | "rewrite"`. See [Guardrails](/guides/guardrails) for the full API.
+You can also write your own by implementing the `GuardrailHook` contract: any `(context) => Promise<GuardrailResult>` function with `action: "allow" | "block" | "rewrite"`. See [Guardrails](/guides/guardrails) for the full API.
 
 ## Approval gates (HITL)
 
@@ -253,7 +255,7 @@ Pending approvals survive a restart of the server image when `TUTTI_PG_URL` is s
 - A record that cannot be read answers 500 `interrupt_record_corrupt` naming only its id, and is left out of `GET /interrupts/pending`; the other approvals keep working.
 
 :::tip[Routing impact]
-When the [smart router](./smart-routing) is enabled, agents with destructive tools loaded automatically bias toward larger, safer models. The cost of an LLM mistake on a destructive call (a posted tweet, a voided invoice, a deleted message) is far higher than the cost of using a smarter model for that turn — `SmartProvider` factors this into every routing decision.
+When the [smart router](./smart-routing) is enabled, agents with destructive tools loaded automatically bias toward larger, safer models. The cost of an LLM mistake on a destructive call (a posted tweet, a voided invoice, a deleted message) is far higher than the cost of using a smarter model for that turn: `SmartProvider` factors this into every routing decision.
 :::
 
 ## Score validation
@@ -270,8 +272,8 @@ Run `npx tutti-ai check` to validate without running.
 
 ## Best practices
 
-1. **Least privilege** — only grant the permissions each agent actually needs
-2. **Set budgets** — always set `max_tokens` or `max_cost_usd` in production
-3. **Monitor events** — subscribe to `security:injection_detected` and `budget:warning`
-4. **Keep .env out of git** — the `.gitignore` template already excludes it
-5. **Pin dependencies** — all Tutti packages pin exact dependency versions
+1. **Least privilege**: only grant the permissions each agent actually needs
+2. **Set budgets**: always set `max_tokens` or `max_cost_usd` in production
+3. **Monitor events**: subscribe to `security:injection_detected` and `budget:warning`
+4. **Keep .env out of git**: the `.gitignore` template already excludes it
+5. **Pin dependencies**: all Tutti packages pin exact dependency versions

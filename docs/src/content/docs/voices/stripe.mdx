@@ -1,6 +1,6 @@
 ---
 title: "Stripe Voice"
-description: "@tuttiai/stripe — broad coverage of the Stripe API, with HITL gates on every write"
+description: "@tuttiai/stripe: broad coverage of the Stripe API, with HITL gates on every write"
 sidebar:
   order: 8
 ---
@@ -25,7 +25,7 @@ permissions: ["network"]
 
 | Var | Description |
 | --- | ----------- |
-| `STRIPE_SECRET_KEY` | Stripe secret key — strongly prefer `sk_test_...` while developing |
+| `STRIPE_SECRET_KEY` | Stripe secret key: strongly prefer `sk_test_...` while developing |
 
 Add to your `.env`:
 
@@ -88,7 +88,7 @@ new StripeVoice({ api_key: "sk_test_..." })
 | ---- | :---------: | ----------- |
 | `list_refunds` | no | List refunds, filter by charge/payment_intent. |
 | `get_refund` | no | One refund. |
-| `create_refund` | yes | **Refund a charge or intent — moves money back to the customer.** |
+| `create_refund` | yes | **Refund a charge or intent: moves money back to the customer.** |
 
 ### Subscriptions (3)
 
@@ -134,7 +134,7 @@ export default defineScore({
       name: "support",
       model: "claude-sonnet-5-5",
       system_prompt:
-        "You handle billing-related support tickets. Look up customers, summarise charges and subscriptions, and propose refunds — never execute a refund without explicit human approval.",
+        "You handle billing-related support tickets. Look up customers, summarise charges and subscriptions, and propose refunds. Never execute a refund without explicit human approval.",
       voices: [new StripeVoice()],
       permissions: ["network"],
     },

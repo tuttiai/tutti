@@ -62,7 +62,7 @@ const provider = new GeminiProvider({ api_key: "AIza..." });
 **Models:** `gemini-2.0-flash` (default), `gemini-2.0-pro`
 
 :::caution
-Gemini requires an API key — it will throw at construction time if neither `api_key` nor `GEMINI_API_KEY` is set.
+Gemini requires an API key: it will throw at construction time if neither `api_key` nor `GEMINI_API_KEY` is set.
 :::
 
 ## OpenRouter (300+ models, one API key)
@@ -92,9 +92,9 @@ const provider = new OpenRouterProvider({
 | `route` | unset | `'fallback'` enables OpenRouter's cross-provider retry |
 | `models` | unset | Ordered list of fallback model ids |
 
-**Models:** namespaced — e.g. `anthropic/claude-sonnet-4`, `openai/gpt-4o`, `google/gemini-2.0-flash`, `meta-llama/llama-3.3-70b-instruct`. See [openrouter.ai/models](https://openrouter.ai/models) for the live catalogue.
+**Models:** namespaced, e.g. `anthropic/claude-sonnet-4`, `openai/gpt-4o`, `google/gemini-2.0-flash`, `meta-llama/llama-3.3-70b-instruct`. See [openrouter.ai/models](https://openrouter.ai/models) for the live catalogue.
 
-**Cost reporting:** OpenRouter returns per-call USD cost inline via its `usage: { include: true }` extension. The cost is surfaced on `ChatResponse.usage.cost_usd` and `StreamChunk.usage.cost_usd` — no second `/generation` round trip required. Your `RunCostStore`-backed daily/monthly budgets work identically to the native providers.
+**Cost reporting:** OpenRouter returns per-call USD cost inline via its `usage: { include: true }` extension. The cost is surfaced on `ChatResponse.usage.cost_usd` and `StreamChunk.usage.cost_usd`, no second `/generation` round trip required. Your `RunCostStore`-backed daily/monthly budgets work identically to the native providers.
 
 **Errors:** 401 → `AuthenticationError`, 429 → `RateLimitError` (with `Retry-After` parsing), other HTTP errors → `ProviderError` with `status` preserved. Same shape as the other providers, so retry/backoff policy is unchanged.
 
