@@ -225,6 +225,8 @@ Each voice now exports a `*VoiceConfigSchema` from its index: `GitHubVoiceConfig
 
 No behaviour changes. No voice reads its schema yet, no constructor validates, and nothing is removed: the existing options interfaces are untouched and every voice accepts exactly what it accepted before.
 
+**A guide to writing a session, interrupt or checkpoint store** (docs). `docs/src/content/docs/guides/custom-stores.mdx` gives the `SessionStore` (with its optional `load`), `InterruptStore` and `CheckpointStore` contracts with their exact signatures, the built-in memory, file, Postgres and Redis stores, a minimal custom session store and a checklist of the behaviours every store must keep. It is linked from the Guides sidebar and from Memory & Sessions (docs only, no behaviour change).
+
 ### Security
 
 **`undici` goes from 6.28.1 to 6.29.1 under the Discord voice.** `discord.js` 14.27.0 in `@tuttiai/discord` pulls in `undici`, and 6.28.1 carried three high advisories ([GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-2m5v-pch6-74hx](https://github.com/advisories/GHSA-2m5v-pch6-74hx), [GHSA-qrxm-fqhp-jwvm](https://github.com/advisories/GHSA-qrxm-fqhp-jwvm)) and two moderate ones ([GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685), [GHSA-9fm3-97px-rjf6](https://github.com/advisories/GHSA-9fm3-97px-rjf6)). `discord.js` already asks for `^6.27.0`, so only the lockfile moves, and a fresh install of `@tuttiai/discord` already resolves the patched version. No public API changes.
