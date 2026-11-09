@@ -19,12 +19,20 @@ const SKIPPED = new Set(["node_modules", "dist", ".astro"]);
 /** The workspace globs in the root package.json. */
 const WORKSPACE_DIRS = ["packages", "voices"];
 
-async function walk(fs: SamplesFs, root: string, dir: string, found: string[]): Promise<void> {
-  for (const entry of await fs.readdir(join(root, dir))) {
+/** What a directory walk reads from: the file system and the repository root. */
+interface WalkContext {
+  readonly fs: SamplesFs;
+  readonly root: string;
+}
+
+async function walk(context: WalkContext, dir: string): Promise<string[]> {
+  const found: string[] = [];
+  for (const entry of await context.fs.readdir(join(context.root, dir))) {
     const path = `${dir}/${entry.name}`;
-    if (entry.isDirectory() && !SKIPPED.has(entry.name)) await walk(fs, root, path, found);
+    if (entry.isDirectory() && !SKIPPED.has(entry.name)) found.push(...(await walk(context, path)));
     else if (entry.isFile() && entry.name.endsWith(".mdx")) found.push(path);
   }
+  return found;
 }
 
 /**
@@ -36,9 +44,7 @@ async function walk(fs: SamplesFs, root: string, dir: string, found: string[]): 
  * @returns Paths relative to the root, with forward slashes, sorted.
  */
 export async function listMdxFiles(root: string, fs: SamplesFs): Promise<string[]> {
-  const found: string[] = [];
-  await walk(fs, root, "docs", found);
-  return found.sort();
+  return (await walk({ fs, root }, "docs")).sort();
 }
 
 function typesOf(text: string): string | null {
