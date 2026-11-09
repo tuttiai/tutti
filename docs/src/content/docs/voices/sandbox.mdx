@@ -1,11 +1,11 @@
 ---
 title: "Sandbox Voice"
-description: "@tuttiai/sandbox: secure code execution with per-session filesystem isolation for TypeScript, Python, and Bash"
+description: "@tuttiai/sandbox: code execution in a per-session working directory for TypeScript, Python, and Bash"
 sidebar:
   order: 11
 ---
 
-The Sandbox voice gives agents secure code execution with per-session filesystem isolation, supporting TypeScript, Python 3, and Bash.
+The Sandbox voice gives agents code execution in a per-session working directory, supporting TypeScript, Python 3, and Bash. It is not a security boundary: code runs as the server's own user.
 
 ## Installation
 
@@ -46,10 +46,10 @@ new SandboxVoice({
 | Tool | Destructive | Description |
 | ---- | :---------: | ----------- |
 | `repo_map` | no | A ranked map of a repository's key files and definitions with line numbers, within a token budget. Call it first, then read only the lines you need. |
-| `execute_code` | yes | Execute a snippet in `typescript` / `python` / `bash`. Returns stdout, stderr, exit code. |
-| `write_file` | yes | Write a file to the per-session sandbox dir. |
+| `execute_code` | no | Execute a snippet in `typescript` / `python` / `bash`. Returns stdout, stderr, exit code. |
+| `write_file` | no | Write a file to the per-session sandbox dir. |
 | `read_file` | no | Read a file from the sandbox dir, whole or by `start_line` / `end_line`. |
-| `install_package` | yes | Install a package from the configured allowlist (npm or pip). |
+| `install_package` | no | Install a package from the configured allowlist (npm or pip). |
 
 ### `repo_map`
 
