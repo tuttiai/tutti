@@ -78,12 +78,9 @@ export interface RagVoiceOptions {
  * permission check.
  *
  * @example
- * import { SecretsManager } from "@tuttiai/core";
- * import { RagVoice } from "@tuttiai/rag";
- *
  * const voice = RagVoice({
  *   collection: "product-docs",
- *   embeddings: { provider: "openai", api_key: SecretsManager.require("OPENAI_API_KEY") },
+ *   embeddings: { provider: "openai", api_key: process.env.OPENAI_API_KEY! },
  *   storage: { provider: "memory" },
  * });
  */
