@@ -50,8 +50,7 @@ export class GraphBuilder {
   private readonly entrypoint: string;
   private readonly nodes: GraphNode[] = [];
   private readonly edges: GraphEdge[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private stateSchema?: ZodType<unknown, any, any>;
+  private stateSchema?: GraphConfig["state"];
 
   constructor(entrypoint: string) {
     this.entrypoint = entrypoint;
