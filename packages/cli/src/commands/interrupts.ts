@@ -21,6 +21,13 @@ import chalk from "chalk";
 import Enquirer from "enquirer";
 import { SecretsManager } from "@tuttiai/core";
 import type { InterruptRequest } from "@tuttiai/core";
+import {
+  InterruptWireSchema,
+  InterruptsPendingResponseSchema,
+  type InterruptWire,
+} from "@tuttiai/types";
+
+import { expectShape, readServerJson, type ResponseSource } from "../server-response.js";
 
 import {
   renderApproved,
@@ -68,24 +75,18 @@ function explainConnectionError(err: unknown, baseUrl: string): never {
  * {@link InterruptRequest} shape (`Date` objects). The render
  * functions expect `Date`s so they can compute relative-time strings.
  */
-function reviveInterrupt(wire: Record<string, unknown>): InterruptRequest {
+function reviveInterrupt(wire: InterruptWire): InterruptRequest {
   const req: InterruptRequest = {
-    interrupt_id: wire["interrupt_id"] as string,
-    session_id: wire["session_id"] as string,
-    tool_name: wire["tool_name"] as string,
-    tool_args: wire["tool_args"],
-    requested_at: new Date(wire["requested_at"] as string),
-    status: wire["status"] as InterruptRequest["status"],
+    interrupt_id: wire.interrupt_id,
+    session_id: wire.session_id,
+    tool_name: wire.tool_name,
+    tool_args: wire.tool_args,
+    requested_at: new Date(wire.requested_at),
+    status: wire.status,
   };
-  if (typeof wire["resolved_at"] === "string") {
-    req.resolved_at = new Date(wire["resolved_at"]);
-  }
-  if (typeof wire["resolved_by"] === "string") {
-    req.resolved_by = wire["resolved_by"];
-  }
-  if (typeof wire["denial_reason"] === "string") {
-    req.denial_reason = wire["denial_reason"];
-  }
+  if (wire.resolved_at !== undefined) req.resolved_at = new Date(wire.resolved_at);
+  if (wire.resolved_by !== undefined) req.resolved_by = wire.resolved_by;
+  if (wire.denial_reason !== undefined) req.denial_reason = wire.denial_reason;
   return req;
 }
 
@@ -93,39 +94,48 @@ function reviveInterrupt(wire: Record<string, unknown>): InterruptRequest {
 /*  HTTP helpers                                                       */
 /* ------------------------------------------------------------------ */
 
-async function httpJson<T>(
-  opts: InterruptsOptions,
-  method: "GET" | "POST",
-  path: string,
-  body?: Record<string, unknown>,
-): Promise<{ status: number; body: T }> {
+/** One request to the server. */
+interface HttpRequest {
+  method: "GET" | "POST";
+  /** Path sent to the server, with any id filled in. */
+  path: string;
+  /** Method and path pattern named in errors, e.g. `POST /interrupts/:id/approve`. */
+  endpoint: string;
+  body?: Record<string, unknown>;
+}
+
+/** A reply: where it came from, its status, and its body parsed as JSON (or `null`). */
+interface HttpReply extends ResponseSource {
+  body: unknown;
+}
+
+async function httpJson(opts: InterruptsOptions, req: HttpRequest): Promise<HttpReply> {
   const baseUrl = resolveUrl(opts);
-  const url = baseUrl.replace(/\/$/, "") + path;
+  const url = baseUrl.replace(/\/$/, "") + req.path;
   let res: Response;
   try {
     res = await fetch(url, {
-      method,
+      method: req.method,
       headers: {
         "Content-Type": "application/json",
         ...resolveAuthHeader(opts),
       },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      ...(req.body !== undefined ? { body: JSON.stringify(req.body) } : {}),
     });
   } catch (err) {
     explainConnectionError(err, baseUrl);
   }
-  // Empty-body 204 never happens here but guard anyway.
-  const text = await res.text();
-  const parsed = (text === "" ? null : JSON.parse(text)) as T;
-  return { status: res.status, body: parsed };
+  const body = await readServerJson(res, req.endpoint);
+  return { endpoint: req.endpoint, status: res.status, body };
 }
 
 async function fetchPending(opts: InterruptsOptions): Promise<InterruptRequest[]> {
-  const { status, body } = await httpJson<{ interrupts: Record<string, unknown>[] } | { error: string; message: string }>(
-    opts,
-    "GET",
-    "/interrupts/pending",
-  );
+  const reply = await httpJson(opts, {
+    method: "GET",
+    path: "/interrupts/pending",
+    endpoint: "GET /interrupts/pending",
+  });
+  const { status } = reply;
   if (status === 401) {
     console.error(chalk.red("Unauthorized — set --api-key or TUTTI_API_KEY."));
     process.exit(1);
@@ -139,11 +149,11 @@ async function fetchPending(opts: InterruptsOptions): Promise<InterruptRequest[]
     );
     process.exit(1);
   }
-  if (status < 200 || status >= 300 || !("interrupts" in body)) {
+  if (status < 200 || status >= 300) {
     console.error(chalk.red("Unexpected server response: " + status));
     process.exit(1);
   }
-  return body.interrupts.map(reviveInterrupt);
+  return expectShape(reply.body, InterruptsPendingResponseSchema, reply).interrupts.map(reviveInterrupt);
 }
 
 async function postResolve(
@@ -152,12 +162,13 @@ async function postResolve(
   action: "approve" | "deny",
   payload: Record<string, unknown>,
 ): Promise<InterruptRequest> {
-  const { status, body } = await httpJson<Record<string, unknown>>(
-    opts,
-    "POST",
-    "/interrupts/" + encodeURIComponent(interruptId) + "/" + action,
-    payload,
-  );
+  const reply = await httpJson(opts, {
+    method: "POST",
+    path: "/interrupts/" + encodeURIComponent(interruptId) + "/" + action,
+    endpoint: "POST /interrupts/:id/" + action,
+    body: payload,
+  });
+  const { status, body } = reply;
   if (status === 401) {
     console.error(chalk.red("Unauthorized — set --api-key or TUTTI_API_KEY."));
     process.exit(1);
@@ -179,7 +190,7 @@ async function postResolve(
     console.error(chalk.red(serverMessage(body) ?? "Unexpected server response: " + status));
     process.exit(1);
   }
-  return reviveInterrupt(body);
+  return reviveInterrupt(expectShape(body, InterruptWireSchema, reply));
 }
 
 /**
