@@ -1,11 +1,11 @@
 ---
-title: "Inbox — Inbound Messaging"
+title: "Inbox: inbound messaging"
 description: "Wire Telegram, Slack, Discord, email and WhatsApp inbound messages to a Tutti agent with @tuttiai/inbox"
 sidebar:
   order: 11
 ---
 
-`@tuttiai/inbox` turns a Tutti agent into something users can actually message — Telegram, Slack, Discord, email and WhatsApp all ship in v0.25.0; Twitter follows once its voice's shared client lands. It's a thin orchestrator on top of platform adapters: every adapter dispatches inbound messages to one score-defined agent, the agent's reply is shipped back through the same adapter, and the orchestrator applies allow-list, rate-limit, queue, and error policy uniformly.
+`@tuttiai/inbox` turns a Tutti agent into something users can actually message: Telegram, Slack, Discord, email and WhatsApp all ship in v0.25.0; Twitter follows once its voice's shared client lands. It's a thin orchestrator on top of platform adapters: every adapter dispatches inbound messages to one score-defined agent, the agent's reply is shipped back through the same adapter, and the orchestrator applies allow-list, rate-limit, queue, and error policy uniformly.
 
 ## Quick start (Telegram)
 
@@ -46,7 +46,7 @@ The CLI loads your score, builds adapters from `score.inbox.adapters`, construct
 
 ## Platforms shipped
 
-The platform integration model in Tutti is **a platform = a voice**. Each voice owns a token-keyed shared client wrapper (`*ClientWrapper.forToken(token)`); the inbox's per-platform adapter consumes that wrapper. A score that uses a voice for outbound tools AND the inbox adapter for inbound on the same token ends up with one platform connection — Discord's Gateway API rejects two simultaneous bot sessions per token, so this is a correctness requirement.
+The platform integration model in Tutti is **a platform = a voice**. Each voice owns a token-keyed shared client wrapper (`*ClientWrapper.forToken(token)`); the inbox's per-platform adapter consumes that wrapper. A score that uses a voice for outbound tools AND the inbox adapter for inbound on the same token ends up with one platform connection: Discord's Gateway API rejects two simultaneous bot sessions per token, so this is a correctness requirement.
 
 | Platform | Adapter | Voice it consumes | Tokens |
 |---|---|---|---|
@@ -60,7 +60,7 @@ Twitter follows once its voice's shared client lands.
 
 ### Slack (Socket Mode)
 
-Slack's inbox uses [@slack/socket-mode](https://www.npmjs.com/package/@slack/socket-mode) — no public webhook required. You'll need an app with Socket Mode enabled, the `connections:write` scope on the app-level token, and the usual bot scopes (`chat:write`, `channels:history`, …) on the bot token. See the [@tuttiai/slack docs](/voices/slack/) for setup steps.
+Slack's inbox uses [@slack/socket-mode](https://www.npmjs.com/package/@slack/socket-mode), no public webhook required. You'll need an app with Socket Mode enabled, the `connections:write` scope on the app-level token, and the usual bot scopes (`chat:write`, `channels:history`, …) on the bot token. See the [@tuttiai/slack docs](/voices/slack/) for setup steps.
 
 ```ts
 inbox: {
@@ -110,13 +110,13 @@ inbox: {
 }
 ```
 
-Three secrets resolve from env: `WHATSAPP_ACCESS_TOKEN` (System User token), `WHATSAPP_VERIFY_TOKEN` (random string), `WHATSAPP_APP_SECRET` (Meta App Secret — used to verify HMAC-SHA256 signatures on inbound).
+Three secrets resolve from env: `WHATSAPP_ACCESS_TOKEN` (System User token), `WHATSAPP_VERIFY_TOKEN` (random string), `WHATSAPP_APP_SECRET` (Meta App Secret: used to verify HMAC-SHA256 signatures on inbound).
 
 **24h customer-service window**: WhatsApp only allows free-form replies within 24h of the user's last inbound. Outside that window, only pre-approved Message Templates work. The voice's `send_text_message` surfaces error 131047 with a clear hint pointing at `send_template_message` (which sends pre-approved templates). Group chats and outbound media are not supported on the Cloud API for two-way bots in v0.25.
 
 ### Email (IMAP IDLE + SMTP)
 
-Email is the trickiest of the four. Inbound goes through IMAP IDLE — server-pushed, no polling — and outbound through SMTP. The adapter handles RFC 5322 threading automatically: it caches the inbound `Message-ID`, `References` chain, sender and subject keyed by the inbound chat_id (which is the Message-ID itself), and the orchestrator's reply gets `In-Reply-To` + extended `References` so Gmail / Outlook / Apple Mail thread the conversation. Subject is also concatenated into the agent's input as `Subject: …\\n\\n<body>` so the agent sees it as conversation context.
+Email is the trickiest of the four. Inbound goes through IMAP IDLE (server-pushed, no polling) and outbound through SMTP. The adapter handles RFC 5322 threading automatically: it caches the inbound `Message-ID`, `References` chain, sender and subject keyed by the inbound chat_id (which is the Message-ID itself), and the orchestrator's reply gets `In-Reply-To` + extended `References` so Gmail / Outlook / Apple Mail thread the conversation. Subject is also concatenated into the agent's input as `Subject: …\\n\\n<body>` so the agent sees it as conversation context.
 
 ```ts
 inbox: {
@@ -211,9 +211,9 @@ tutti-ai inbox start
 | Per-user rate limit | 30 msg / 60 s, burst 10 | A public bot endpoint is a DoS surface. Don't burn the agent budget on a spammer. |
 | Per-chat serial queue | depth 10 | Reply for message N must ship before message N+1 runs. Excess depth is dropped, not buffered indefinitely. |
 | Allow-list | off (every sender accepted) | Off-by-default. Set `inbox.allowedUsers.telegram` to lock down. |
-| `inbox:message_received` | text length only | The message text is **not** in the event — subscribe to the adapter directly if you need it. Prevents accidental PII leakage into traces. |
+| `inbox:message_received` | text length only | The message text is **not** in the event: subscribe to the adapter directly if you need it. Prevents accidental PII leakage into traces. |
 
-Errors at any stage emit `inbox:error` (with a `SecretsManager`-redacted message) and call the optional `onError` callback. The inbox itself never crashes — adapters keep listening.
+Errors at any stage emit `inbox:error` (with a `SecretsManager`-redacted message) and call the optional `onError` callback. The inbox itself never crashes: adapters keep listening.
 
 ## Score-level configuration
 
@@ -240,14 +240,14 @@ inbox: {
 
 The orchestrator emits four typed events on `runtime.events`:
 
-- `inbox:message_received` — passed allow-list + rate-limit + queue, about to dispatch. Carries `text_length` rather than the message body.
-- `inbox:message_replied` — agent run completed and reply handed to the adapter for delivery. Includes `duration_ms` and `session_id`.
-- `inbox:message_blocked` — dropped before dispatch. `reason` is `"not_allowlisted"`, `"rate_limited"`, `"queue_full"` or `"empty_text"`.
-- `inbox:error` — caught error at any stage. The inbox keeps running.
+- `inbox:message_received`: passed allow-list + rate-limit + queue, about to dispatch. Carries `text_length` rather than the message body.
+- `inbox:message_replied`: agent run completed and reply handed to the adapter for delivery. Includes `duration_ms` and `session_id`.
+- `inbox:message_blocked`: dropped before dispatch. `reason` is `"not_allowlisted"`, `"rate_limited"`, `"queue_full"` or `"empty_text"`.
+- `inbox:error`: caught error at any stage. The inbox keeps running.
 
 ## Identity & cross-platform sessions
 
-Identity is keyed as `${platform}:${platform_user_id}`. The default `InMemoryIdentityStore` is a union-find — `link("telegram:42", "slack:U7")` makes both sides resolve to the same Tutti session, so a user who connects on Telegram and later authenticates on Slack sees one continuous conversation regardless of where the next message arrives. Swap in a Postgres- or Redis-backed store for multi-process deployments.
+Identity is keyed as `${platform}:${platform_user_id}`. The default `InMemoryIdentityStore` is a union-find: `link("telegram:42", "slack:U7")` makes both sides resolve to the same Tutti session, so a user who connects on Telegram and later authenticates on Slack sees one continuous conversation regardless of where the next message arrives. Swap in a Postgres- or Redis-backed store for multi-process deployments.
 
 ## Optional peer dependencies
 
@@ -271,8 +271,8 @@ Each adapter dynamic-imports its voice and surfaces a friendly "install `@tuttia
 | Telegram | **Shipped** (v0.25.0) |
 | Slack | **Shipped** (v0.25.0) |
 | Discord | **Shipped** (v0.25.0) |
-| Email | **Shipped** (v0.25.0) — IMAP IDLE + SMTP with RFC 5322 threading |
-| WhatsApp | **Shipped** (v0.25.0) — Meta Cloud API with HMAC-signed webhooks; requires a public tunnel |
+| Email | **Shipped** (v0.25.0): IMAP IDLE + SMTP with RFC 5322 threading |
+| WhatsApp | **Shipped** (v0.25.0): Meta Cloud API with HMAC-signed webhooks; requires a public tunnel |
 | Twitter | Planned once a `voices/twitter` shared client lands. |
 
 See [`@tuttiai/inbox` README](https://github.com/tuttiai/tutti/blob/main/packages/inbox/README.md) for the full API.

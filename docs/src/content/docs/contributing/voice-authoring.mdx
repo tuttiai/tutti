@@ -39,7 +39,7 @@ interface Tool<T = unknown> {
 | ----- | ------- |
 | `name` | Unique identifier the LLM calls (e.g. `read_file`) |
 | `description` | Tells the LLM what the tool does |
-| `parameters` | Zod schema — validated before `execute` is called |
+| `parameters` | Zod schema: validated before `execute` is called |
 | `execute` | The actual implementation |
 
 ### Tool naming conventions
@@ -56,17 +56,17 @@ Always return `{ content: string, is_error?: boolean }`.
 // Success
 return { content: "Created file: hello.txt (42 bytes)" };
 
-// Error — sent back to the LLM as context, not thrown
+// Error: sent back to the LLM as context, not thrown
 return { content: "File not found: hello.txt", is_error: true };
 ```
 
 :::tip
-Prefer returning `is_error: true` over throwing exceptions. This gives the LLM a chance to recover (e.g. try a different file path). Thrown exceptions also work — they're caught by the runner and converted to error results.
+Prefer returning `is_error: true` over throwing exceptions. This gives the LLM a chance to recover (e.g. try a different file path). Thrown exceptions also work: they're caught by the runner and converted to error results.
 :::
 
 ### Zod parameter schemas
 
-Use descriptive `.describe()` on every field — these become the tool descriptions the LLM sees:
+Use descriptive `.describe()` on every field. These become the tool descriptions the LLM sees:
 
 ```ts
 const parameters = z.object({
@@ -94,7 +94,7 @@ type Permission = "network" | "filesystem" | "shell" | "browser";
 | `shell` | Executing shell commands |
 | `browser` | Automating a browser |
 
-Be honest — only request what you actually need. Users see these permissions in their score file.
+Be honest: only request what you actually need. Users see these permissions in their score file.
 
 ## Testing voices
 

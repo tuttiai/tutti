@@ -1,6 +1,6 @@
 ---
 title: "Sandbox Voice"
-description: "@tuttiai/sandbox — secure code execution with per-session filesystem isolation for TypeScript, Python, and Bash"
+description: "@tuttiai/sandbox: secure code execution with per-session filesystem isolation for TypeScript, Python, and Bash"
 sidebar:
   order: 11
 ---
@@ -38,7 +38,7 @@ new SandboxVoice({
 | `allowed_packages` | all | Allowlist for `install_package`. |
 | `timeout_ms` | `30_000` | Default execution timeout. |
 | `max_file_size_bytes` | `1_048_576` (1 MB) | Max file size for `write_file`. |
-| `env` | — | Extra env vars passed to child processes. |
+| `env` | - | Extra env vars passed to child processes. |
 | `install_timeout_ms` | `60_000` | Timeout for package installs. |
 
 ## Tool reference
@@ -65,8 +65,8 @@ Modelled on Aider's repo map: definitions and references are extracted with tree
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `code` | `string` | — | Source code to execute |
-| `language` | `"typescript" \| "python" \| "bash"` | — | Runtime |
+| `code` | `string` | - | Source code to execute |
+| `language` | `"typescript" \| "python" \| "bash"` | - | Runtime |
 | `timeout_ms` | `number` | `30_000` | Wall-clock timeout (max 120 000) |
 
 ## Example

@@ -1,11 +1,11 @@
 ---
 title: "Playwright Voice"
-description: "@tuttiai/playwright — browser automation, screenshots, and page interaction"
+description: "@tuttiai/playwright: browser automation, screenshots, and page interaction"
 sidebar:
   order: 4
 ---
 
-The Playwright voice gives agents full browser control — navigate pages, click elements, fill forms, take screenshots, and extract content.
+The Playwright voice gives agents full browser control: navigate pages, click elements, fill forms, take screenshots, and extract content.
 
 ## Installation
 
@@ -45,7 +45,7 @@ new PlaywrightVoice({
 | Option | Type | Default | Description |
 | ------ | ---- | ------- | ----------- |
 | `headless` | `boolean` | `true` | Run browser without a visible window |
-| `slowMo` | `number` | — | Milliseconds between actions |
+| `slowMo` | `number` | - | Milliseconds between actions |
 | `timeout` | `number` | `10000` | Default timeout in ms |
 
 ## Tool reference
@@ -57,7 +57,7 @@ new PlaywrightVoice({
 | `type` | Type text into an input | `selector`, `text`, `clear` |
 | `screenshot` | Take a screenshot | `path`, `full_page` |
 | `get_text` | Get text content | `selector` |
-| `get_page_content` | Get full page URL, title, and text | — |
+| `get_page_content` | Get full page URL, title, and text | - |
 | `wait_for` | Wait for an element or condition | `selector`, `state`, `timeout` |
 | `select_option` | Select from a dropdown | `selector`, `value` |
 | `check_element` | Check if element exists and is visible | `selector` |
@@ -69,27 +69,27 @@ new PlaywrightVoice({
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `url` | `string` | — | Full URL (must be `http://` or `https://`) |
+| `url` | `string` | - | Full URL (must be `http://` or `https://`) |
 | `wait_until` | `"load" \| "domcontentloaded" \| "networkidle"` | `"load"` | Navigation complete condition |
 
 ### screenshot
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `path` | `string` | — | File path to save the screenshot |
+| `path` | `string` | - | File path to save the screenshot |
 | `full_page` | `boolean` | `false` | Capture the full scrollable page |
 
 ### type
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `selector` | `string` | — | CSS selector of the input |
-| `text` | `string` | — | Text to type |
+| `selector` | `string` | - | CSS selector of the input |
+| `text` | `string` | - | Text to type |
 | `clear` | `boolean` | `false` | Clear the field first |
 
 ## Security
 
-- **URL sanitization** — blocks `file:`, `javascript:`, `data:` schemes and private network ranges (`10.x`, `172.16-31.x`, `192.168.x`)
+- **URL sanitization**: blocks `file:`, `javascript:`, `data:` schemes and private network ranges (`10.x`, `172.16-31.x`, `192.168.x`)
 - Requires both `network` and `browser` permissions
 
 ## Teardown
