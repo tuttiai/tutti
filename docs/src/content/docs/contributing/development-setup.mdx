@@ -26,14 +26,14 @@ This installs all dependencies for all packages in the monorepo (npm workspaces)
 ```
 tutti/
 ├── packages/
-│   ├── types/          # @tuttiai/types — shared TypeScript interfaces
-│   ├── core/           # @tuttiai/core — runtime, providers, security
-│   ├── cli/            # @tuttiai/cli — CLI commands (init, run, add, check)
-│   └── tutti-ai/       # tutti-ai — the npm bin wrapper
+│   ├── types/          # @tuttiai/types: shared TypeScript interfaces
+│   ├── core/           # @tuttiai/core: runtime, providers, security
+│   ├── cli/            # @tuttiai/cli: CLI commands (init, run, add, check)
+│   └── tutti-ai/       # tutti-ai: the npm bin wrapper
 ├── voices/
-│   ├── filesystem/     # @tuttiai/filesystem — 7 file tools
-│   ├── github/         # @tuttiai/github — 15 GitHub tools
-│   └── playwright/     # @tuttiai/playwright — 12 browser tools
+│   ├── filesystem/     # @tuttiai/filesystem: 7 file tools
+│   ├── github/         # @tuttiai/github: 15 GitHub tools
+│   └── playwright/     # @tuttiai/playwright: 12 browser tools
 ├── examples/           # Example score files
 ├── docs/               # Documentation site (Astro Starlight)
 └── .github/workflows/  # CI pipeline
@@ -48,7 +48,7 @@ tutti/
                 ← @tuttiai/playwright
 ```
 
-`@tuttiai/types` is the leaf — every other package depends on it. `@tuttiai/core` depends on types. Voices depend on types. The CLI depends on core.
+`@tuttiai/types` is the leaf: every other package depends on it. `@tuttiai/core` depends on types. Voices depend on types. The CLI depends on core.
 
 ## Build
 
@@ -86,7 +86,7 @@ Runs `tsc --noEmit` in all packages via Turborepo.
 ### TypeScript
 
 - Strict mode (`"strict": true`)
-- ESM only — all packages use `"type": "module"`
+- ESM only: all packages use `"type": "module"`
 - `.js` extensions in imports (e.g. `import { Foo } from "./foo.js"`)
 - No `any` unless absolutely necessary
 

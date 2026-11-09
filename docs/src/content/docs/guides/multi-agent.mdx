@@ -199,7 +199,7 @@ for (const [agentId, result] of results) {
 ```
 
 - All agents start at once via `Promise.all`; each gets its own session.
-- If one agent fails, the others still complete — the failure is surfaced as a synthetic `[error]` result in the returned map (so callers can see which agent broke).
+- If one agent fails, the others still complete: the failure is surfaced as a synthetic `[error]` result in the returned map (so callers can see which agent broke).
 - `timeout_ms` caps wall-clock time for any single agent and cancels stragglers.
 
 For the full aggregate (merged output + total usage + total cost + duration) use `runParallelWithSummary`, which returns a `ParallelAgentResult`.
