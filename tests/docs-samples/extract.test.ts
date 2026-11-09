@@ -75,7 +75,9 @@ describe("extractSamples", () => {
   });
 
   it("takes indented fences in lists and JSX, removing the fence's indent", () => {
-    const text = mdx("<Tabs>", "  <TabItem label=\"A\">", "    " + BT + "ts title=\"a.ts\"", "    const a = 1;", "      nested();", "    " + BT, "  </TabItem>", "</Tabs>", "1. Step", "   " + BT + "typescript", "   b();", "   " + BT);
+    const tabs = ["<Tabs>", '  <TabItem label="A">', `    ${BT}ts title="a.ts"`, "    const a = 1;", "      nested();", `    ${BT}`];
+    const list = ["  </TabItem>", "</Tabs>", "1. Step", `   ${BT}typescript`, "   b();", `   ${BT}`];
+    const text = mdx(...tabs, ...list);
     expect(extractSamples(FILE, text)).toMatchObject([
       { index: 1, indent: 4, startLine: 4, code: "const a = 1;\n  nested();" },
       { index: 2, indent: 3, startLine: 11, code: "b();" },
