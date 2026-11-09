@@ -52,6 +52,7 @@ export default defineConfig({
             { label: "Tool Result Caching", slug: "guides/tool-caching" },
             { label: "Inbox — Inbound Messaging", slug: "guides/inbox" },
             { label: "Security", slug: "guides/security" },
+            { label: "Secrets and the Model", slug: "guides/secrets-and-the-model" },
             { label: "Deploying to Production", slug: "guides/deploy" },
             { label: "Self-Improving Skills", slug: "guides/skills" },
           ],
