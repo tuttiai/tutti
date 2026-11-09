@@ -3,6 +3,7 @@ import type { Tool, ToolResult } from "@tuttiai/types";
 import { execute } from "../executor.js";
 import type { ExecOptions, Language } from "../executor.js";
 import type { SessionSandbox } from "../sandbox.js";
+import { redactPaths } from "../utils/sanitize.js";
 
 /** Options for {@link createExecuteCodeTool}. */
 export interface ExecuteCodeOptions {
@@ -15,6 +16,10 @@ export interface ExecuteCodeOptions {
 }
 
 const ALL_LANGUAGES: [Language, ...Language[]] = ["typescript", "python", "bash"];
+
+/** Fix hint that ends every execute_code error. */
+const RUN_ERROR_HINT =
+  "Check the code is valid for the chosen language and finishes within the time limit.";
 
 /**
  * Build the Zod parameters schema. When `allowed_languages` is set,
@@ -101,7 +106,11 @@ export function createExecuteCodeTool(
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
-          content: "Execution failed: " + message,
+          content:
+            "Execution failed: " +
+            redactPaths(message, sandbox?.root ?? defaults.working_dir ?? "") +
+            "\n" +
+            RUN_ERROR_HINT,
           is_error: true,
         };
       }

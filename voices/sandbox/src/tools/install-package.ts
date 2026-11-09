@@ -2,9 +2,14 @@ import { z } from "zod";
 import type { Tool, ToolResult } from "@tuttiai/types";
 import { execute } from "../executor.js";
 import type { SessionSandbox } from "../sandbox.js";
+import { redactPaths } from "../utils/sanitize.js";
 
 /** Regex: a package name must be printable and not contain shell meta-characters. */
 const SAFE_NAME_RE = /^[a-zA-Z0-9@_./-]+$/;
+
+/** Fix hint that ends every install_package error. */
+const INSTALL_ERROR_HINT =
+  "Check the package name is spelt correctly and is allowed in this sandbox.";
 
 const parameters = z.object({
   name: z
@@ -107,7 +112,8 @@ export function createInstallPackageTool(
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return { content: "Install failed: " + message, is_error: true };
+        const content = "Install failed: " + redactPaths(message, sandbox.root);
+        return { content: content + "\n" + INSTALL_ERROR_HINT, is_error: true };
       }
     },
   };
