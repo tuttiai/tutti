@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-Tool result caching short-circuits identical tool calls — same tool, same input — within a TTL window. It's opt-in per agent and it's safe by default: known write / side-effect tools are never cached.
+Tool result caching short-circuits identical tool calls (same tool, same input) within a TTL window. It's opt-in per agent and it's safe by default: known write / side-effect tools are never cached.
 
 ## Quick start
 
@@ -43,8 +43,8 @@ cache: {
 
 These rules apply regardless of configuration:
 
-- **Built-in write tools**: `write_file`, `delete_file`, `move_file`, `create_issue`, `comment_on_issue` — caching would stale-serve mutations.
-- **Errored results** (`is_error: true`) — pinning a transient failure for 5 minutes would be worse than retrying.
+- **Built-in write tools**: `write_file`, `delete_file`, `move_file`, `create_issue`, `comment_on_issue`; caching would stale-serve mutations.
+- **Errored results** (`is_error: true`): pinning a transient failure for 5 minutes would be worse than retrying.
 
 The exclusion list is exported as `DEFAULT_WRITE_TOOLS`. Add your own via `cache.excluded_tools`.
 
@@ -78,7 +78,7 @@ class RedisToolCache implements ToolCache {
 }
 ```
 
-Keys are derived per-implementation — `InMemoryToolCache` uses `sha256(tool + '|' + JSON.stringify(input))`. Follow the same convention for cross-process consistency.
+Keys are derived per-implementation: `InMemoryToolCache` uses `sha256(tool + '|' + JSON.stringify(input))`. Follow the same convention for cross-process consistency.
 
 :::caution
 Cache keys are derived from the *parsed* (post-Zod) tool input, so equivalent but differently-typed inputs (e.g. `{ path: "a" }` vs `{ path: "a", extra: undefined }`) may hash differently. Prefer canonical schemas.

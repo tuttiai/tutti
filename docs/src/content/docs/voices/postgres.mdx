@@ -1,6 +1,6 @@
 ---
 title: "Postgres Voice"
-description: "@tuttiai/postgres — read-only Postgres access, with a separate destructive execute tool for writes"
+description: "@tuttiai/postgres: read-only Postgres access, with a separate destructive execute tool for writes"
 sidebar:
   order: 7
 ---
@@ -63,7 +63,7 @@ new PostgresVoice({
 | ------ | ------- | ----- |
 | `connection_string` | env | Overrides `DATABASE_URL` / `POSTGRES_URL`. |
 | `statement_timeout_ms` | `30_000` | Server-side per-statement timeout. SQLSTATE `57014` is mapped to a clear error when exceeded. |
-| `max_connections` | `5` | Pool size. Most managed Postgres providers cap connections aggressively — keep this low. |
+| `max_connections` | `5` | Pool size. Most managed Postgres providers cap connections aggressively: keep this low. |
 
 ## Tool reference
 
