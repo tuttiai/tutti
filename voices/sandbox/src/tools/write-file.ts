@@ -3,9 +3,14 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import type { Tool, ToolResult } from "@tuttiai/types";
 import type { SessionSandbox } from "../sandbox.js";
+import { redactPaths } from "../utils/sanitize.js";
 
 /** Default max file size: 1 MB. */
 const DEFAULT_MAX_BYTES = 1_048_576;
+
+/** Fix hint that ends every write_file error. */
+const WRITE_ERROR_HINT =
+  "Check the path is inside the sandbox and its parent folder exists and can be written to.";
 
 const parameters = z.object({
   path: z
@@ -53,7 +58,7 @@ export function createWriteFileTool(
         return { content: "Wrote " + input.path + " (" + bytes + " bytes)" };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return { content: message, is_error: true };
+        return { content: redactPaths(message, sandbox.root) + "\n" + WRITE_ERROR_HINT, is_error: true };
       }
     },
   };
