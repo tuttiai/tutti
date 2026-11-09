@@ -1,6 +1,6 @@
 ---
 title: "Filesystem Voice"
-description: "@tuttiai/filesystem — read, write, search, and manage local files"
+description: "@tuttiai/filesystem: read, write, search, and manage local files"
 sidebar:
   order: 2
 ---
@@ -41,7 +41,7 @@ Reads the contents of a file.
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `path` | `string` | — | File path (absolute or relative) |
+| `path` | `string` | - | File path (absolute or relative) |
 | `encoding` | `"utf-8" \| "base64"` | `"utf-8"` | Encoding |
 
 ### write_file
@@ -50,8 +50,8 @@ Writes content to a file. Creates the file if it doesn't exist.
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `path` | `string` | — | File path |
-| `content` | `string` | — | Content to write |
+| `path` | `string` | - | File path |
+| `content` | `string` | - | Content to write |
 | `append` | `boolean` | `false` | Append instead of overwrite |
 
 ### list_directory
@@ -60,9 +60,9 @@ Lists files and directories with optional glob filtering.
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `path` | `string` | — | Directory path |
+| `path` | `string` | - | Directory path |
 | `recursive` | `boolean` | `false` | List recursively |
-| `pattern` | `string?` | — | Glob filter (e.g. `"*.ts"`) |
+| `pattern` | `string?` | - | Glob filter (e.g. `"*.ts"`) |
 
 ### search_files
 
@@ -70,15 +70,15 @@ Searches file contents for a text pattern across a directory.
 
 | Input | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `directory` | `string` | — | Directory to search |
-| `pattern` | `string` | — | Text pattern to find |
-| `file_pattern` | `string?` | — | Glob to filter files (e.g. `"*.ts"`) |
+| `directory` | `string` | - | Directory to search |
+| `pattern` | `string` | - | Text pattern to find |
+| `file_pattern` | `string?` | - | Glob to filter files (e.g. `"*.ts"`) |
 | `case_sensitive` | `boolean` | `false` | Case-sensitive search |
 
 ## Security
 
-- **Path traversal protection** — blocks access to `/etc/passwd`, `~/.ssh`, `/proc`, `/sys`, `/dev`, and other system paths
-- **Max file size** — reads are limited to 10MB by default
+- **Path traversal protection**: blocks access to `/etc/passwd`, `~/.ssh`, `/proc`, `/sys`, `/dev`, and other system paths
+- **Max file size**: reads are limited to 10MB by default
 
 ## Example
 

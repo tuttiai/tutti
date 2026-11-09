@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://docs.tutti-ai.com/sitemap.xml
+Sitemap: https://tutti-ai.com/docs/sitemap-index.xml

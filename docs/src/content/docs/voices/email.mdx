@@ -1,11 +1,11 @@
 ---
 title: "Email Voice"
-description: "@tuttiai/email — give agents IMAP IDLE inbound + SMTP outbound with proper RFC 5322 threading"
+description: "@tuttiai/email: give agents IMAP IDLE inbound + SMTP outbound with proper RFC 5322 threading"
 sidebar:
   order: 8
 ---
 
-The Email voice gives agents the ability to read incoming mail (via IMAP IDLE — server-pushed, not polled) and send outgoing mail with proper threading headers. It also exports the shared `EmailClientWrapper` that [`@tuttiai/inbox`](/guides/inbox/)'s email adapter consumes.
+The Email voice gives agents the ability to read incoming mail (via IMAP IDLE: server-pushed, not polled) and send outgoing mail with proper threading headers. It also exports the shared `EmailClientWrapper` that [`@tuttiai/inbox`](/guides/inbox/)'s email adapter consumes.
 
 Three tools ship: `send_email` and `send_reply` are marked `destructive: true`; `list_inbox` is read-only.
 
@@ -29,7 +29,7 @@ permissions: ["network"]
 | `TUTTI_EMAIL_IMAP_PASSWORD` | IMAP-only override. |
 | `TUTTI_EMAIL_SMTP_PASSWORD` | SMTP-only override. |
 
-For Gmail / Outlook with 2FA, basic auth is disabled — generate an [app-specific password](https://support.google.com/accounts/answer/185833).
+For Gmail / Outlook with 2FA, basic auth is disabled: generate an [app-specific password](https://support.google.com/accounts/answer/185833).
 
 ## Score example
 
@@ -61,11 +61,11 @@ export default defineScore({
 |---|---|
 | `send_email` | Send a fresh email. Single string or array of recipients; cc / bcc supported. |
 | `send_reply` | Reply with proper `In-Reply-To` and `References` headers. The `in_reply_to` Message-ID comes from `list_inbox` (or from the inbox event payload). The tool appends the parent to `References` if you didn't already include it. |
-| `list_inbox` | Read-only summary of recent messages — Message-ID, from, subject, date. Defaults to UNSEEN, capped at 50 entries. |
+| `list_inbox` | Read-only summary of recent messages: Message-ID, from, subject, date. Defaults to UNSEEN, capped at 50 entries. |
 
 ## Inbound (inbox)
 
-The wrapper exposes `subscribeMessage(handler)` powered by **IMAP IDLE** — the server pushes new mail; no polling loop. [`@tuttiai/inbox`](/guides/inbox/)'s `EmailInboxAdapter` consumes this. A score that wires both the voice (outbound tools) and the inbox adapter (inbound) shares one `EmailClientWrapper` via `EmailClientWrapper.forKey("host:port:user", …)` — one IMAP connection, one SMTP transporter.
+The wrapper exposes `subscribeMessage(handler)` powered by **IMAP IDLE**: the server pushes new mail; no polling loop. [`@tuttiai/inbox`](/guides/inbox/)'s `EmailInboxAdapter` consumes this. A score that wires both the voice (outbound tools) and the inbox adapter (inbound) shares one `EmailClientWrapper` via `EmailClientWrapper.forKey("host:port:user", …)`: one IMAP connection, one SMTP transporter.
 
 ```ts
 inbox: {
@@ -83,9 +83,9 @@ inbox: {
 
 When the inbox adapter delivers a reply, it sets:
 
-- `In-Reply-To: <inbound-message-id>` — the message it's replying to.
-- `References: <existing-chain> <inbound-message-id>` — full chain for multi-turn threads.
-- `Subject: Re: <original>` — idempotent (no double `Re:` if already present).
+- `In-Reply-To: <inbound-message-id>`: the message it's replying to.
+- `References: <existing-chain> <inbound-message-id>`: full chain for multi-turn threads.
+- `Subject: Re: <original>`: idempotent (no double `Re:` if already present).
 
 This is what mail clients use to render threaded conversations; without it, every reply shows up as an unrelated email.
 
@@ -94,9 +94,9 @@ This is what mail clients use to render threaded conversations; without it, ever
 | Surface | Default |
 |---|---|
 | Oversized body filter (IMAP `SIZE` flag, applied **before** parsing) | drop at > 1 MB plaintext (configurable via `maxBodyChars`) |
-| Inbound text redaction (`SecretsManager.redact`) | on by default — strings shaped like `sk-…`, AWS keys, etc. are stripped before the agent ever sees them. Opt out via `inboxRedactRawText: false` for agents that legitimately need to handle credentials. |
+| Inbound text redaction (`SecretsManager.redact`) | on by default: strings shaped like `sk-…`, AWS keys, etc. are stripped before the agent ever sees them. Opt out via `inboxRedactRawText: false` for agents that legitimately need to handle credentials. |
 | Bounded threading cache | LRU, 1000 entries, in-memory. Older threads can't be replied to via the inbox adapter; agents that need older threads should use `send_email` with the recipient address explicitly. |
 
 ## Lifecycle
 
-The IMAP connection is established lazily on the first `subscribeMessage` / `list_inbox` / explicit `launch()` call, and stays open with IDLE-driven push. SMTP transports are pooled by nodemailer and created on first send. Call `voice.teardown()` (or `TuttiRuntime.teardown()`) on shutdown — both connections are closed cleanly.
+The IMAP connection is established lazily on the first `subscribeMessage` / `list_inbox` / explicit `launch()` call, and stays open with IDLE-driven push. SMTP transports are pooled by nodemailer and created on first send. Call `voice.teardown()` (or `TuttiRuntime.teardown()`) on shutdown: both connections are closed cleanly.
