@@ -77,3 +77,21 @@ export type {
   HookContext,
   TuttiHooks,
 } from "./hooks.js";
+
+export {
+  CostRunSchema,
+  CostRunsResponseSchema,
+  CostToolUsageSchema,
+  CostToolsResponseSchema,
+  CostAgentBudgetSchema,
+  CostBudgetsResponseSchema,
+} from "./cost-api.js";
+
+export type {
+  CostRun,
+  CostRunsResponse,
+  CostToolUsage,
+  CostToolsResponse,
+  CostAgentBudget,
+  CostBudgetsResponse,
+} from "./cost-api.js";
