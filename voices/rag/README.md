@@ -13,7 +13,7 @@ npm install @tuttiai/rag
 Wire the voice into a score with an embedding provider and a vector store:
 
 ```ts
-import { TuttiRuntime, AnthropicProvider, defineScore } from "@tuttiai/core";
+import { TuttiRuntime, AnthropicProvider, defineScore, SecretsManager } from "@tuttiai/core";
 import { RagVoice } from "@tuttiai/rag";
 
 const score = defineScore({
@@ -30,7 +30,7 @@ const score = defineScore({
           collection: "product-docs",
           embeddings: {
             provider: "openai",
-            api_key: process.env.OPENAI_API_KEY!,
+            api_key: SecretsManager.require("OPENAI_API_KEY"),
           },
           storage: { provider: "memory" },
         }),
@@ -77,10 +77,10 @@ interface RagVoiceOptions {
 
 ```ts
 // OpenAI — text-embedding-3-small, batches up to 2048.
-embeddings: { provider: "openai", api_key: process.env.OPENAI_API_KEY! }
+embeddings: { provider: "openai", api_key: SecretsManager.require("OPENAI_API_KEY") }
 
 // Voyage AI (via Anthropic-owned Voyage API) — voyage-3-lite.
-embeddings: { provider: "anthropic", api_key: process.env.VOYAGE_API_KEY! }
+embeddings: { provider: "anthropic", api_key: SecretsManager.require("VOYAGE_API_KEY") }
 
 // Ollama-compatible local server — any model that supports /api/embeddings.
 embeddings: {
@@ -146,6 +146,7 @@ Callers can enable hybrid retrieval per-query by passing `hybrid: true` to `sear
 The voice is a thin wrapper over primitives you can also use directly:
 
 ```ts
+import { SecretsManager } from "@tuttiai/core";
 import {
   ingestDocument,
   createEmbeddingProvider,
@@ -156,7 +157,7 @@ import {
 
 const embeddings = createEmbeddingProvider({
   collection: "x",
-  embeddings: { provider: "openai", api_key: process.env.OPENAI_API_KEY! },
+  embeddings: { provider: "openai", api_key: SecretsManager.require("OPENAI_API_KEY") },
 });
 const store = createVectorStore({ collection: "x" });
 const engine = new SearchEngine({ embeddings, store });

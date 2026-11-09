@@ -38,7 +38,7 @@ RagVoice({
   collection: "product-docs",
   embeddings: {
     provider: "openai",
-    api_key: process.env.OPENAI_API_KEY!,
+    api_key: SecretsManager.require("OPENAI_API_KEY"),
   },
   storage: { provider: "memory" },
   default_top_k: 5,
@@ -59,7 +59,7 @@ RagVoice({
 // Postgres pgvector: persistent, production-ready
 storage: {
   provider: "pgvector",
-  connection_string: process.env.DATABASE_URL!,
+  connection_string: SecretsManager.require("DATABASE_URL"),
 }
 
 // In-memory: fast, ephemeral, single-process
@@ -80,7 +80,7 @@ All tool results are JSON-encoded strings so downstream agents can parse them di
 ## Example
 
 ```ts title="tutti.score.ts"
-import { defineScore, AnthropicProvider } from "@tuttiai/core";
+import { defineScore, AnthropicProvider, SecretsManager } from "@tuttiai/core";
 import { RagVoice } from "@tuttiai/rag";
 
 export default defineScore({
@@ -96,7 +96,7 @@ export default defineScore({
           collection: "product-docs",
           embeddings: {
             provider: "openai",
-            api_key: process.env.OPENAI_API_KEY!,
+            api_key: SecretsManager.require("OPENAI_API_KEY"),
           },
           storage: { provider: "memory" },
         }),
