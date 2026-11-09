@@ -1,0 +1,5 @@
+{
+  // The checker runs from the root install, which has no astro, so it must not inherit
+  // docs/tsconfig.json (astro/tsconfigs/strict). Vitest, tsx and editors read this one instead.
+  "extends": "../../tsconfig.docs-samples.json"
+}
