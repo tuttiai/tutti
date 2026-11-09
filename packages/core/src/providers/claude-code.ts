@@ -46,8 +46,8 @@ export interface ClaudeCodeProviderOptions {
   /**
    * Run the CLI with `CLAUDE_CONFIG_DIR` set to this directory, which is
    * where it keeps its login state, settings and session files. Absent, the
-   * CLI inherits the server's environment unchanged and uses whatever
-   * `CLAUDE_CONFIG_DIR` says there, or `~/.claude`.
+   * CLI uses the server's own `CLAUDE_CONFIG_DIR`, which is on the short list
+   * of variables it inherits, or `~/.claude`.
    */
   config_dir?: string;
   /** Replaces the process runner. For tests. */
@@ -62,6 +62,9 @@ export interface ClaudeCodeProviderOptions {
  * the CLI in yourself: `claude` then `/login`, or set `CLAUDE_CODE_OAUTH_TOKEN`
  * from `claude setup-token`. If `ANTHROPIC_API_KEY` is set, Claude Code uses
  * it instead and bills the API.
+ *
+ * The CLI inherits only an allowlist of the server's environment: paths,
+ * locale, proxy and TLS settings, and its own login and config variables.
  *
  * Meant for running your own agents on your own machine. Serving other
  * people through a personal Claude subscription is not permitted by

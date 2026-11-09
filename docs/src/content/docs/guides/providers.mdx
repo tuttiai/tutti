@@ -121,7 +121,7 @@ const provider = new ClaudeCodeProvider({
 | `reuse_sessions` | `true` | Resume the session that holds a conversation and send only what is new. `false` keeps nothing on disk and sends the whole transcript every turn |
 | `runner` | spawns the CLI | Replace the process runner, for tests |
 
-**Signing in:** Tutti never reads or stores a credential for this provider. Sign the CLI in yourself, either interactively (`claude`, then `/login`) or, in a container, with a long-lived token: run `claude setup-token` once and pass the result as `CLAUDE_CODE_OAUTH_TOKEN`. **If `ANTHROPIC_API_KEY` is set, Claude Code uses it and bills the API**, and the provider logs a warning saying so.
+**Signing in:** Tutti never reads or stores a credential for this provider. Sign the CLI in yourself, either interactively (`claude`, then `/login`) or, in a container, with a long-lived token: run `claude setup-token` once and pass the result as `CLAUDE_CODE_OAUTH_TOKEN`. **If `ANTHROPIC_API_KEY` is set, Claude Code uses it and bills the API**, and the provider logs a warning saying so. The CLI inherits only an allowlist of the server's environment, so a variable such as `CLAUDE_CODE_USE_BEDROCK` must be passed through your own `runner`; see [Claude Code provider environment](./security#claude-code-provider-environment).
 
 **How tools work:** every Claude Code built-in tool, MCP server, hook, plugin and `CLAUDE.md` is switched off (`--tools "" --safe-mode --strict-mcp-config`), so the CLI behaves as a plain model. The model answers through structured output, either with its final text or with calls to your agent's tools, which Tutti's runner then executes exactly as it does for any other provider. Tool names are constrained to the ones offered.
 

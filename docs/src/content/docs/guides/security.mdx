@@ -270,6 +270,59 @@ Score files are Zod-validated when loaded. Common mistakes are caught early:
 
 Run `npx tutti-ai check` to validate without running.
 
+## Claude Code provider environment
+
+`ClaudeCodeProvider` starts the Claude Code CLI as a child process. The child does not inherit the server's environment. It gets only these variables, by exact name and only when they are set, read through `SecretsManager`:
+
+| Group | Variables |
+|---|---|
+| System | `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TMP`, `TEMP`, `TERM` |
+| Locale | `LANG`, `LANGUAGE`, `TZ`, `LC_ALL`, `LC_CTYPE`, `LC_MESSAGES`, `LC_NUMERIC`, `LC_TIME`, `LC_COLLATE`, `LC_MONETARY` |
+| Network and TLS | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `http_proxy`, `https_proxy`, `no_proxy`, `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `SSL_CERT_DIR` |
+| CLI login and config | `CLAUDE_CONFIG_DIR`, `XDG_CONFIG_HOME`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL` |
+
+When `config_dir` is set, `CLAUDE_CONFIG_DIR` is set to it on top of the list.
+
+Everything else stays behind, including `TUTTI_PG_URL`, `TUTTI_VOICES` and every other `TUTTI_*` variable, other providers' keys, `GITHUB_TOKEN`, `NODE_OPTIONS` (its `--require` can inject code), `NODE_ENV`, and the cloud credentials `AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX` and `ANTHROPIC_VERTEX_PROJECT_ID`. There is no wildcard: `LC_PAPER` or `CLAUDE_CODE_MAX_OUTPUT_TOKENS` is not passed either. MCP servers the CLI starts inherit from the CLI, so they see only the list too.
+
+The CLI runs with no built-in tools (`--tools ""`), so this is defence in depth: a prompt injection that one day reaches a shell tool in the CLI still cannot print the server's database URL or voice tokens.
+
+**Passing a variable through.** To give the CLI a variable that is not on the list, such as the Bedrock settings, supply your own `runner`. It receives each invocation, including `invocation.env` (the `config_dir` value, when set), and decides the child's environment itself:
+
+```ts
+import { spawn } from "node:child_process";
+import { ClaudeCodeProvider, type ClaudeCodeRunner } from "@tuttiai/core";
+
+const runner: ClaudeCodeRunner = (invocation) =>
+  new Promise((resolve) => {
+    const child = spawn(invocation.command, invocation.args, {
+      cwd: invocation.cwd,
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: process.env.HOME ?? "",
+        ...invocation.env,
+        CLAUDE_CODE_USE_BEDROCK: "1",
+        AWS_REGION: "eu-west-1",
+      },
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    child.on("error", (spawn_error) => resolve({ exit_code: null, stdout, stderr, spawn_error, timed_out: false }));
+    child.on("close", (exit_code) => resolve({ exit_code, stdout, stderr, timed_out: false }));
+    child.stdin.end(invocation.stdin);
+  });
+
+const provider = new ClaudeCodeProvider({ runner });
+```
+
+This sketch leaves out `timeout_ms` and `signal`, which the built-in runner honours; add them if you rely on either.
+
+**What is still exposed.** The CLI needs its login, so `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN`, and any password in a proxy URL, still reach the child and can be read by anything it runs. Use a key or token issued for this purpose only. The child also runs as the server's own user, so this is not isolation.
+
+**Windows.** Names are matched case-sensitively, so Windows variables such as `Path`, `SystemRoot` and `PATHEXT` are not passed. Run the CLI on Linux or macOS, or pass them through your own `runner`.
+
 ## Best practices
 
 1. **Least privilege**: only grant the permissions each agent actually needs
