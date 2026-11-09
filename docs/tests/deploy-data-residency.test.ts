@@ -7,6 +7,8 @@ const guide = readFileSync(guidesDir + "deploy.mdx", "utf8");
 
 const RESIDENCY = "## Data residency";
 const LIMITS = "## What's not yet shipped";
+/** U+2014, built from its code point so this file carries no em dash itself. */
+const EM_DASH = String.fromCharCode(0x2014);
 
 /** The text of the h2 section that starts with `heading`, up to the next h2, or "" when absent. */
 function section(heading: string): string {
@@ -115,7 +117,7 @@ describe("deploy guide: data residency", () => {
   });
 
   describe("scope and wording guard", () => {
-    it.each(["Tutti Cloud", "Cloudflare", "GDPR", "price", "pricing", "fully private", "—"])(
+    it.each(["Tutti Cloud", "Cloudflare", "GDPR", "price", "pricing", "fully private", EM_DASH])(
       "does not contain %s",
       (term) => {
         expect(residency.toLowerCase()).not.toContain(term.toLowerCase());
