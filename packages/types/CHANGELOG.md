@@ -24,6 +24,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Zod schemas and inferred types for the server's cost runs, cost tools, cost budgets and interrupts responses (`CostRunsResponseSchema`, `CostToolsResponseSchema`, `CostBudgetsResponseSchema`, `InterruptWireSchema`, `InterruptsPendingResponseSchema`).
+
 ### Patch Changes
 
 - `BudgetConfig` gains optional `max_cost_usd_per_day` and `max_cost_usd_per_month`. Enforced by the runtime against a `RunCostStore` (UTC calendar buckets); breaches throw `BudgetExceededError` with `scope: 'day' | 'month'`.
