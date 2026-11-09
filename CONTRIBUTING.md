@@ -45,6 +45,8 @@ npm test -- --filter=cli         # run only @tuttiai/cli tests
 cd packages/core && npx vitest   # watch mode for core
 ```
 
+The TypeScript code blocks in `docs/` are type-checked against the built packages. After `npm run build`, run `npm run docs:check-samples`. A sample that fails is printed at its line in the `.mdx` file. Fix it, or, for a deliberate fragment, add it to `docs/code-samples.skip.json` with the file, heading and index the output names and a reason. Remove an entry once its sample passes: the check fails on entries it no longer needs.
+
 ## Project Structure
 
 ```
