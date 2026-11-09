@@ -2,6 +2,10 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import type { Tool, ToolResult } from "@tuttiai/types";
 import type { SessionSandbox } from "../sandbox.js";
+import { redactPaths } from "../utils/sanitize.js";
+
+/** Fix hint that ends every read_file error. */
+const READ_ERROR_HINT = "Check the path is inside the sandbox and the file exists.";
 
 const parameters = z.object({
   path: z
@@ -75,7 +79,7 @@ export function createReadFileTool(
         return { content: ranged ? sliceLines(content, input.start_line, input.end_line) : content };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        return { content: message, is_error: true };
+        return { content: redactPaths(message, sandbox.root) + "\n" + READ_ERROR_HINT, is_error: true };
       }
     },
   };
