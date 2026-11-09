@@ -1,6 +1,6 @@
 ---
 title: "WhatsApp Voice"
-description: "@tuttiai/whatsapp — send and receive WhatsApp messages via Meta's official Cloud API"
+description: "@tuttiai/whatsapp: send and receive WhatsApp messages via Meta's official Cloud API"
 sidebar:
   order: 9
 ---
@@ -9,17 +9,17 @@ The WhatsApp voice gives agents the ability to send WhatsApp messages via Meta's
 
 Two tools ship, both `destructive: true`:
 
-- `send_text_message` — free-form text. Only valid within the **24h customer-service window**.
-- `send_template_message` — pre-approved Message Templates. Required for re-engagement outside the 24h window.
+- `send_text_message`: free-form text. Only valid within the **24h customer-service window**.
+- `send_template_message`: pre-approved Message Templates. Required for re-engagement outside the 24h window.
 
 ## Why Cloud API and not whatsapp-web.js?
 
 This voice uses **Meta's official Cloud API** (Graph API v21+). It does NOT use `whatsapp-web.js` or any unofficial WhatsApp Web automation:
 
-- **ToS** — automating WhatsApp Web violates WhatsApp's terms; accounts can be banned.
-- **Stability** — unofficial libraries break on every WhatsApp update; the Cloud API is contracted.
-- **Auth** — Cloud API uses System User access tokens; no QR codes, no phone-pairing.
-- **Reliability** — webhooks are delivered with retries; web-automation pipelines silently drop on disconnect.
+- **ToS**: automating WhatsApp Web violates WhatsApp's terms; accounts can be banned.
+- **Stability**: unofficial libraries break on every WhatsApp update; the Cloud API is contracted.
+- **Auth**: Cloud API uses System User access tokens; no QR codes, no phone-pairing.
+- **Reliability**: webhooks are delivered with retries; web-automation pipelines silently drop on disconnect.
 
 ## Installation
 
@@ -41,7 +41,7 @@ permissions: ["network"]
 | `WHATSAPP_VERIFY_TOKEN` | Any random string (e.g. `openssl rand -hex 32`). Configure both this env var AND the matching value in Meta App → WhatsApp → Configuration → Verify token. |
 | `WHATSAPP_APP_SECRET` | Meta App → Settings → Basic → App Secret. Used to verify HMAC-SHA256 signatures on every inbound webhook. |
 
-The `phoneNumberId` is NOT a secret — it's an opaque identifier visible in the Meta App dashboard. It stays in the score.
+The `phoneNumberId` is NOT a secret: it's an opaque identifier visible in the Meta App dashboard. It stays in the score.
 
 ## Score example
 
@@ -61,15 +61,15 @@ export default defineScore({
 });
 ```
 
-## The webhook tunnel — main UX wart
+## The webhook tunnel: main UX wart
 
 The Cloud API requires Meta to POST inbound messages to a **public HTTPS endpoint**. The voice spins up a Fastify server on port 3848 (configurable) hosting `GET /webhook` (verify) and `POST /webhook` (inbound). You need to expose that port to the internet:
 
 ```bash
-# Cloudflare Tunnel — recommended for production
+# Cloudflare Tunnel: recommended for production
 cloudflared tunnel --url http://localhost:3848
 
-# ngrok — fine for dev
+# ngrok: fine for dev
 ngrok http 3848
 
 # Or run a proper reverse proxy (nginx, Caddy) in front of port 3848
@@ -81,7 +81,7 @@ Then in **Meta App → WhatsApp → Configuration**:
 - Verify token: the value you set in `WHATSAPP_VERIFY_TOKEN`
 - Subscribe to the `messages` webhook field (delivery-status events are silently ignored).
 
-Send a test WhatsApp message from your personal phone to the configured business number — it should arrive in your agent within seconds.
+Send a test WhatsApp message from your personal phone to the configured business number: it should arrive in your agent within seconds.
 
 ## The 24-hour customer-service window
 
@@ -91,23 +91,23 @@ WhatsApp's most surprising rule: outside of 24 hours since the user's last inbou
 
 ## Limitations in v0.25
 
-- **Group chats** — not supported by the Cloud API for two-way bots; Meta does not deliver group messages over webhooks. Direct messages only.
-- **Outbound media** — text only in v0.25. Inbound media (image / audio / video / document) is surfaced as `[image]` / `[image] caption` / etc. with the resolved Cloud API URL on the inbox message's `raw` object. Adding a typed `attachments` field to the canonical `InboxMessage` shape is a deliberate cross-platform design pass deferred to v0.26.
-- **Polling fallback** — there isn't one. Webhooks are mandatory; the tunnel requirement is real.
+- **Group chats**: not supported by the Cloud API for two-way bots; Meta does not deliver group messages over webhooks. Direct messages only.
+- **Outbound media**: text only in v0.25. Inbound media (image / audio / video / document) is surfaced as `[image]` / `[image] caption` / etc. with the resolved Cloud API URL on the inbox message's `raw` object. Adding a typed `attachments` field to the canonical `InboxMessage` shape is a deliberate cross-platform design pass deferred to v0.26.
+- **Polling fallback**: there isn't one. Webhooks are mandatory; the tunnel requirement is real.
 
 ## Inbound (inbox)
 
-The `WhatsAppClientWrapper` exposes `subscribeMessage(handler)` so [`@tuttiai/inbox`](/guides/inbox/)'s WhatsApp adapter consumes the same Fastify server (one webhook listener regardless of whether the voice + adapter are both active). Sharing happens via `WhatsAppClientWrapper.forKey(phoneNumberId, …)` — keyed by the bot identity.
+The `WhatsAppClientWrapper` exposes `subscribeMessage(handler)` so [`@tuttiai/inbox`](/guides/inbox/)'s WhatsApp adapter consumes the same Fastify server (one webhook listener regardless of whether the voice + adapter are both active). Sharing happens via `WhatsAppClientWrapper.forKey(phoneNumberId, …)`: keyed by the bot identity.
 
 Defence-in-depth on every POST:
 
 | Surface | Default |
 |---|---|
-| HMAC-SHA256 signature check | Mandatory. Rejected (401) without the correct `X-Hub-Signature-256` header. Constant-time comparison (`crypto.timingSafeEqual`) — no length-leak timing attack. |
+| HMAC-SHA256 signature check | Mandatory. Rejected (401) without the correct `X-Hub-Signature-256` header. Constant-time comparison (`crypto.timingSafeEqual`), no length-leak timing attack. |
 | 200 ack BEFORE handler dispatch | Mandatory. Meta retries non-2xx within ~20s. |
 | Inbound text redaction (`SecretsManager.redact`) | On by default. Opt out via `redactRawText: false`. |
 | Body size limit | 5 MB. Configurable via `bodyLimit`. |
 
 ## Lifecycle
 
-The wrapper builds the Fastify instance immediately on construction (so tests can use `app.inject(...)` without binding to a port). The actual `listen()` call happens in `launch()` — called by the inbox adapter's `start()`. `destroy()` closes the Fastify server and clears subscribers.
+The wrapper builds the Fastify instance immediately on construction (so tests can use `app.inject(...)` without binding to a port). The actual `listen()` call happens in `launch()`, called by the inbox adapter's `start()`. `destroy()` closes the Fastify server and clears subscribers.

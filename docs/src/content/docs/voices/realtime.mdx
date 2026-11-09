@@ -1,6 +1,6 @@
 ---
 title: "Realtime Voice"
-description: "@tuttiai/realtime — OpenAI Realtime API client + tool bridge with HITL gating and SecretsManager redaction"
+description: "@tuttiai/realtime: OpenAI Realtime API client + tool bridge with HITL gating and SecretsManager redaction"
 sidebar:
   order: 12
 ---
@@ -21,7 +21,7 @@ required_permissions: ["network"]
 
 ## Score wiring
 
-Two places to set up: the agent gets a `realtime` block, and the score includes `RealtimeVoice()` in its voices list. Both are required — the `realtime` block is what the server checks before accepting the WebSocket; the voice is what loads the `start_realtime_session` tool.
+Two places to set up: the agent gets a `realtime` block, and the score includes `RealtimeVoice()` in its voices list. Both are required: the `realtime` block is what the server checks before accepting the WebSocket; the voice is what loads the `start_realtime_session` tool.
 
 ```ts title="tutti.score.ts"
 import { defineScore, AnthropicProvider } from "@tuttiai/core";
@@ -75,7 +75,7 @@ JSON-encoded both ways.
 | `type` | Payload | Description |
 | --- | --- | --- |
 | `audio` | `{ data: base64 }` | One PCM chunk. Append to the audio buffer. |
-| `audio_commit` | — | End-of-turn marker. Server kicks off response generation. |
+| `audio_commit` | - | End-of-turn marker. Server kicks off response generation. |
 | `text` | `{ text }` | Send a typed message instead of audio. |
 | `interrupt:resolve` | `{ id, decision: "approved" \| "denied", reason? }` | Operator response to an HITL pause. |
 
@@ -89,8 +89,8 @@ JSON-encoded both ways.
 | `tool:call` | `{ tool, args }` | Tool invocation about to execute. Args are already secret-redacted. |
 | `tool:result` | `{ tool, content, is_error? }` | Tool completed. |
 | `interrupt` | `{ id, tool, args }` | Destructive tool call awaiting approval. |
-| `error` | `{ code, message }` | Fatal error — connection will close. |
-| `end` | — | Session closed cleanly. |
+| `error` | `{ code, message }` | Fatal error: connection will close. |
+| `end` | - | Session closed cleanly. |
 
 ## How tool calls work mid-session
 
@@ -98,7 +98,7 @@ JSON-encoded both ways.
 
 1. **Intercepts** `response.function_call_arguments.done`.
 2. **Redacts** the arguments through `SecretsManager.redactObject` before the call appears in any log or event.
-3. **Gates** if `requireApproval` matches the tool name or the tool is marked `destructive: true` — emits `interrupt` to the WebSocket and waits for `interrupt:resolve`.
+3. **Gates** if `requireApproval` matches the tool name or the tool is marked `destructive: true`: emits `interrupt` to the WebSocket and waits for `interrupt:resolve`.
 4. **Executes** the tool through the standard Tutti runtime (so permission scopes, prompt-injection guards, and tool-result truncation all still apply).
 5. **Writes back** `conversation.item.create` with the result + `response.create` so the model can continue.
 
@@ -124,6 +124,6 @@ If the tool throws, the bridge writes back `{ is_error: true, content: "<message
 
 ## What's not yet shipped
 
-- **Provider parity** — only OpenAI's Realtime API is supported. Anthropic and Gemini realtime equivalents will be added when their public APIs stabilise.
-- **Multi-modal** — text + audio. Vision is not yet plumbed.
-- **Recording** — the bridge does not durably save audio. Transcripts pass through the standard event stream and can be persisted there; raw PCM is fire-and-forget.
+- **Provider parity**: only OpenAI's Realtime API is supported. Anthropic and Gemini realtime equivalents will be added when their public APIs stabilise.
+- **Multi-modal**: text + audio. Vision is not yet plumbed.
+- **Recording**: the bridge does not durably save audio. Transcripts pass through the standard event stream and can be persisted there; raw PCM is fire-and-forget.

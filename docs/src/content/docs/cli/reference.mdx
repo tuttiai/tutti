@@ -30,18 +30,18 @@ message.
 
 ## Command groups
 
-- **Project lifecycle** — [`init`](#tutti-ai-init-project-name), [`templates`](#tutti-ai-templates), [`check`](#tutti-ai-check-score) / [`doctor`](#tutti-ai-doctor-score), [`info`](#tutti-ai-info-score)
-- **Running agents** — [`run`](#tutti-ai-run-score), [`serve`](#tutti-ai-serve-score), [`studio`](#tutti-ai-studio-score), [`inbox start`](#tutti-ai-inbox-start-score), [`resume`](#tutti-ai-resume-session-id), [`replay`](#tutti-ai-replay-session-id)
-- **Deployment** — [`deploy`](#tutti-ai-deploy), [`deploy verify-hibernate`](#tutti-ai-deploy-verify-hibernate)
-- **Voices** — [`add`](#tutti-ai-add-voice), [`voices`](#tutti-ai-voices), [`search`](#tutti-ai-search-query), [`publish`](#tutti-ai-publish)
-- **Packages** — [`update`](#tutti-ai-update), [`outdated`](#tutti-ai-outdated), [`upgrade`](#tutti-ai-upgrade-voice)
-- **Scheduling** — [`schedule`](#tutti-ai-schedule-score), [`schedules`](#tutti-ai-schedules)
-- **Observability** — [`traces`](#tutti-ai-traces)
-- **Cost analysis** — [`analyze costs`](#tutti-ai-analyze-costs), [`report costs`](#tutti-ai-report-costs), [`budgets`](#tutti-ai-budgets)
-- **Memory** — [`memory`](#tutti-ai-memory)
-- **Evaluation** — [`eval`](#tutti-ai-eval)
-- **Human-in-the-loop** — [`interrupts`](#tutti-ai-interrupts) / [`approve`](#tutti-ai-approve)
-- **Skills** — [`skills`](#tutti-ai-skills)
+- **Project lifecycle**: [`init`](#tutti-ai-init-project-name), [`templates`](#tutti-ai-templates), [`check`](#tutti-ai-check-score) / [`doctor`](#tutti-ai-doctor-score), [`info`](#tutti-ai-info-score)
+- **Running agents**: [`run`](#tutti-ai-run-score), [`serve`](#tutti-ai-serve-score), [`studio`](#tutti-ai-studio-score), [`inbox start`](#tutti-ai-inbox-start-score), [`resume`](#tutti-ai-resume-session-id), [`replay`](#tutti-ai-replay-session-id)
+- **Deployment**: [`deploy`](#tutti-ai-deploy), [`deploy verify-hibernate`](#tutti-ai-deploy-verify-hibernate)
+- **Voices**: [`add`](#tutti-ai-add-voice), [`voices`](#tutti-ai-voices), [`search`](#tutti-ai-search-query), [`publish`](#tutti-ai-publish)
+- **Packages**: [`update`](#tutti-ai-update), [`outdated`](#tutti-ai-outdated), [`upgrade`](#tutti-ai-upgrade-voice)
+- **Scheduling**: [`schedule`](#tutti-ai-schedule-score), [`schedules`](#tutti-ai-schedules)
+- **Observability**: [`traces`](#tutti-ai-traces)
+- **Cost analysis**: [`analyze costs`](#tutti-ai-analyze-costs), [`report costs`](#tutti-ai-report-costs), [`budgets`](#tutti-ai-budgets)
+- **Memory**: [`memory`](#tutti-ai-memory)
+- **Evaluation**: [`eval`](#tutti-ai-eval)
+- **Human-in-the-loop**: [`interrupts`](#tutti-ai-interrupts) / [`approve`](#tutti-ai-approve)
+- **Skills**: [`skills`](#tutti-ai-skills)
 
 ---
 
@@ -89,7 +89,7 @@ Sample output:
 ```
   Available Templates
 
-  minimal           One agent, no voices — the simplest starting point
+  minimal           One agent, no voices: the simplest starting point
   coding-agent      TypeScript developer with filesystem + GitHub access
   research-agent    Researcher that saves structured notes to files
   qa-pipeline       Orchestrator + QA specialist with browser testing and HITL
@@ -137,7 +137,7 @@ Checking tutti.score.ts...
 3. Provider API key is set in the environment
 4. Voices that need env vars (e.g. `GITHUB_TOKEN`) have them set
 
-Exits non-zero on any failure — safe to use as a CI gate.
+Exits non-zero on any failure, safe to use as a CI gate.
 
 ### `tutti-ai doctor [score]`
 
@@ -150,7 +150,7 @@ tutti-ai doctor ./path/to/score.ts
 
 ### `tutti-ai info [score]`
 
-Show project information — agents, voices, models, installed package versions, schedule configs, and feature flags. Useful for confirming your local setup matches what the score expects.
+Show project information: agents, voices, models, installed package versions, schedule configs, and feature flags. Useful for confirming your local setup matches what the score expects.
 
 ```bash
 tutti-ai info
@@ -178,7 +178,7 @@ tutti-ai info ./path/to/score.ts
       Flags:  streaming
 ```
 
-**Package versions** are read from `node_modules/<name>/package.json`, so what you see is what your project will actually run — not the `*` / `^0.18.0` / `workspace:*` spec from `package.json`. When a package isn't installed, the spec string is shown as a fallback.
+**Package versions** are read from `node_modules/<name>/package.json`, so what you see is what your project will actually run, not the `*` / `^0.18.0` / `workspace:*` spec from `package.json`. When a package isn't installed, the spec string is shown as a fallback.
 
 **Agent flags:**
 
@@ -211,12 +211,12 @@ tutti-ai run -p "What is 2 + 2?"     # one-shot, prints result, exits
 | Flag | Description |
 | ---- | ----------- |
 | `-w, --watch` | Reload the score and rebuild the runtime whenever the score file (or any file in its directory tree) changes on disk. Session history survives across reloads. |
-| `-p, --prompt <text>` | Run a single turn against the default `assistant` agent, print the result to stdout, and exit. Streaming is forced off so stdout contains only the final output — safe to pipe. Non-zero exit on error. |
+| `-p, --prompt <text>` | Run a single turn against the default `assistant` agent, print the result to stdout, and exit. Streaming is forced off so stdout contains only the final output, safe to pipe. Non-zero exit on error. |
 
 #### Interactive REPL
 
 ```
-Tutti REPL — type "exit" to quit
+Tutti REPL: type "exit" to quit
 
 > Hello!
 Running agent: assistant
@@ -233,17 +233,17 @@ Goodbye!
 - Validates the API key for the detected provider
 - Maintains a session across REPL turns
 - Shows tool usage, errors, security warnings, and budget events
-- **Streaming output** — tokens print to the terminal as they arrive (spinner until first token)
+- **Streaming output**: tokens print to the terminal as they arrive (spinner until first token)
 - Tool calls shown inline: `[using: tool_name]` / `[done: tool_name]`
-- `exit`, `quit`, or Ctrl+C leave gracefully — stdin raw mode and the cursor are restored so the shell prompt redraws cleanly
+- `exit`, `quit`, or Ctrl+C leave gracefully: stdin raw mode and the cursor are restored so the shell prompt redraws cleanly
 
 #### Watch mode
 
 `--watch` reloads the score (and any file in the score's directory tree, excluding `node_modules`, `dist`, and dotfiles) whenever it changes. Changes are debounced 200ms so editor saves that touch the file multiple times collapse into a single reload.
 
 - **Changes take effect at turn boundaries**, never mid-tool-call.
-- **Session history is preserved** across reloads — the REPL's `session_id` carries over.
-- **Syntax errors are recovered** — if the reload fails to parse or validate, the error is printed and the REPL keeps using the previous config.
+- **Session history is preserved** across reloads: the REPL's `session_id` carries over.
+- **Syntax errors are recovered**: if the reload fails to parse or validate, the error is printed and the REPL keeps using the previous config.
 - **Trade-off**: runtime-internal caches (tool cache, semantic memory) reset on reload.
 
 #### One-shot mode (`-p` / `--prompt`)
@@ -260,11 +260,11 @@ $ tutti-ai run --prompt "explain TypeScript generics in one sentence"
 TypeScript generics let you write reusable code parameterized by types.
 ```
 
-Always targets the agent keyed `assistant` in the score. Streaming and pino logs are silenced so stdout is clean. The REPL (readline, spinner, file watcher) is bypassed entirely — stdin is never read, so it's safe inside non-TTY contexts (cron, CI, shell subprocesses).
+Always targets the agent keyed `assistant` in the score. Streaming and pino logs are silenced so stdout is clean. The REPL (readline, spinner, file watcher) is bypassed entirely: stdin is never read, so it's safe inside non-TTY contexts (cron, CI, shell subprocesses).
 
 ### `tutti-ai serve [score]`
 
-Start the Tutti HTTP server — exposes your score as a REST API with SSE streaming.
+Start the Tutti HTTP server: exposes your score as a REST API with SSE streaming.
 
 ```bash
 tutti-ai serve                       # defaults to ./tutti.score.ts
@@ -297,7 +297,7 @@ GET   /cost/runs        # last 100 runs with cost (requires RunCostStore)
 GET   /cost/budgets     # per-agent budget config + current spend
 GET   /cost/tools       # per-tool call counts from the live tracer window
 
-GET   /realtime         # WebSocket — proxies the OpenAI Realtime API (--realtime only)
+GET   /realtime         # WebSocket: proxies the OpenAI Realtime API (--realtime only)
 GET   /realtime-demo    # public mic-capture demo page (--realtime only)
 ```
 
@@ -337,7 +337,7 @@ SIGINT/SIGTERM drain in-flight requests before exit. See the [server docs](/guid
 
 ### `tutti-ai studio [score]`
 
-Launch Tutti Studio — a local web UI for inspecting agent runs at `localhost:4747`.
+Launch Tutti Studio: a local web UI for inspecting agent runs at `localhost:4747`.
 
 ```bash
 tutti-ai studio                      # defaults to ./tutti.score.ts
@@ -347,16 +347,16 @@ PORT=8080 tutti-ai studio            # custom port via env var
 
 Opens the browser automatically. Four panels:
 
-1. **Agent graph** — SVG visualisation of the score's agents and their delegation edges
-2. **Live event stream** — SSE feed of every `llm:request`, `llm:response`, `tool:start`, `tool:end`, `budget:*`, `hitl:*` event
-3. **Session browser** — sortable table of sessions with drill-down to message history
-4. **Token usage** — running total of input/output tokens and cost estimate
+1. **Agent graph**: SVG visualisation of the score's agents and their delegation edges
+2. **Live event stream**: SSE feed of every `llm:request`, `llm:response`, `tool:start`, `tool:end`, `budget:*`, `hitl:*` event
+3. **Session browser**: sortable table of sessions with drill-down to message history
+4. **Token usage**: running total of input/output tokens and cost estimate
 
 Also exposes a REST API for programmatic access: `/api/score`, `/api/sessions`, `/api/run`.
 
 ### `tutti-ai inbox start [score]`
 
-Start the inbound messaging orchestrator — wires platform adapters declared on `score.inbox.adapters` to the agent named in `score.inbox.agent`, and runs until SIGINT/SIGTERM. Telegram, Slack, Discord, email, and WhatsApp ship in v0.25.0; Twitter follows once its voice's shared client lands.
+Start the inbound messaging orchestrator: wires platform adapters declared on `score.inbox.adapters` to the agent named in `score.inbox.agent`, and runs until SIGINT/SIGTERM. Telegram, Slack, Discord, email, and WhatsApp ship in v0.25.0; Twitter follows once its voice's shared client lands.
 
 ```bash
 tutti-ai inbox start                    # defaults to ./tutti.score.ts
@@ -394,8 +394,8 @@ export default defineScore({
 - Loads the score, builds adapters from `score.inbox.adapters`, constructs `TuttiInbox`, and calls `.start()`.
 - Each adapter logs a "connected" line on start.
 - `inbox:message_received` / `inbox:message_replied` / `inbox:message_blocked` / `inbox:error` events stream through the runtime's event bus.
-- SIGINT/SIGTERM trigger parallel adapter teardown — every platform connection (Telegram poll, Slack Socket Mode socket, Discord Gateway, IMAP IDLE, WhatsApp Fastify webhook server) is closed cleanly before exit.
-- The `buildAdapter` switch is exhaustively typed — adding a new platform to the `InboxAdapterConfig` union without updating the CLI fails the typecheck.
+- SIGINT/SIGTERM trigger parallel adapter teardown: every platform connection (Telegram poll, Slack Socket Mode socket, Discord Gateway, IMAP IDLE, WhatsApp Fastify webhook server) is closed cleanly before exit.
+- The `buildAdapter` switch is exhaustively typed: adding a new platform to the `InboxAdapterConfig` union without updating the CLI fails the typecheck.
 
 **Required env vars (per platform):**
 
@@ -428,15 +428,15 @@ tutti-ai resume 811b3b38-9a1d-4b98-ab7d-57e4acaecdea --store postgres
 | Flag | Default | Description |
 | ---- | ------- | ----------- |
 | `--store <backend>` | `redis` | Which durable store the checkpoint was written to (`redis` or `postgres`). |
-| `-s, --score <path>` | `./tutti.score.ts` | Score file to load — must match the one the original run used. |
+| `-s, --score <path>` | `./tutti.score.ts` | Score file to load: must match the one the original run used. |
 | `-a, --agent <name>` | `score.entry` or first agent | Agent to resume. |
 | `-y, --yes` | false | Skip the confirmation prompt. |
 
-Prints a checkpoint summary and asks `Resume from turn N? (y/n)` before handing off. On confirm, loads the score, reattaches the checkpoint store, seeds the session, and calls the runtime — picking up exactly where the previous run left off.
+Prints a checkpoint summary and asks `Resume from turn N? (y/n)` before handing off. On confirm, loads the score, reattaches the checkpoint store, seeds the session, and calls the runtime, picking up exactly where the previous run left off.
 
 ### `tutti-ai replay <session-id>`
 
-Time-travel debugger — navigate and replay a session from PostgreSQL. Lets you step forwards and backwards through every turn, inspect state at each point, and branch a new run from any historical turn.
+Time-travel debugger: navigate and replay a session from PostgreSQL. Lets you step forwards and backwards through every turn, inspect state at each point, and branch a new run from any historical turn.
 
 ```bash
 export TUTTI_PG_URL=postgres://localhost/tutti
@@ -458,7 +458,7 @@ Interactive controls: `n` (next turn), `p` (prev turn), `b` (branch from here), 
 
 ### `tutti-ai deploy`
 
-Bundle your score and ship it to a hosting platform. The CLI ships bundlers for five targets — `docker`, `railway`, `fly`, `modal`, `daytona` — generated from a `DeployConfig` block on the agent.
+Bundle your score and ship it to a hosting platform. The CLI ships bundlers for five targets (`docker`, `railway`, `fly`, `modal`, `daytona`) generated from a `DeployConfig` block on the agent.
 
 ```bash
 tutti-ai deploy --target docker                # generate Docker bundle in ./tutti-deploy/
@@ -473,7 +473,7 @@ tutti-ai deploy --target railway --dry-run     # print the plan without executin
 
 | Flag | Default | Description |
 | ---- | ------- | ----------- |
-| `--target <platform>` | (required) | One of `docker`, `railway`, `fly`, `modal`, `daytona`. `cloudflare` is accepted on the score's `DeployTarget` union but the CLI errors loudly — its bundler is a follow-up. |
+| `--target <platform>` | (required) | One of `docker`, `railway`, `fly`, `modal`, `daytona`. `cloudflare` is accepted on the score's `DeployTarget` union but the CLI errors loudly: its bundler is a follow-up. |
 | `--dry-run` | false | Print the plan + generated files without invoking the platform CLI. |
 | `-s, --score <path>` | `./tutti.score.ts` | Score file to load. |
 | `-o, --out <dir>` | `./tutti-deploy` | Output directory for generated bundle. |
@@ -534,7 +534,7 @@ tutti-ai deploy rollback
 
 ### `tutti-ai deploy verify-hibernate`
 
-Check a score against the serverless-hibernation contract before a `--target modal` (or any scale-to-zero) deploy. Flags long-lived in-memory stores and background timers outside the scheduler — anything that wouldn't survive the next cold start.
+Check a score against the serverless-hibernation contract before a `--target modal` (or any scale-to-zero) deploy. Flags long-lived in-memory stores and background timers outside the scheduler: anything that wouldn't survive the next cold start.
 
 ```bash
 tutti-ai deploy verify-hibernate
@@ -632,7 +632,7 @@ tutti-ai update
 
 ### `tutti-ai outdated`
 
-Show a table of installed `@tuttiai/*` packages with current vs latest versions. Does **not** install anything — just reports.
+Show a table of installed `@tuttiai/*` packages with current vs latest versions. Does **not** install anything, just reports.
 
 ```bash
 tutti-ai outdated
@@ -649,7 +649,7 @@ Sample output:
 
 ### `tutti-ai upgrade [voice]`
 
-Upgrade a specific voice — or all installed `@tuttiai/*` packages — to their latest versions.
+Upgrade a specific voice, or all installed `@tuttiai/*` packages, to their latest versions.
 
 ```bash
 tutti-ai upgrade                  # upgrade all @tuttiai packages
@@ -663,7 +663,7 @@ tutti-ai upgrade @tuttiai/rag     # full package name also works
 
 ### `tutti-ai schedule [score]`
 
-Start the scheduler daemon — reads the score, registers every agent with a `schedule` block, and runs on their configured triggers (cron, interval, or one-shot datetime) until killed.
+Start the scheduler daemon: reads the score, registers every agent with a `schedule` block, and runs on their configured triggers (cron, interval, or one-shot datetime) until killed.
 
 ```bash
 tutti-ai schedule                      # defaults to ./tutti.score.ts
@@ -700,7 +700,7 @@ Emits `schedule:triggered`, `schedule:completed`, and `schedule:error` events to
 
 #### Scheduled delivery
 
-v0.26 adds optional `deliver` + `deliver_format` to a schedule block — when set, the scheduler dispatches the agent's final text reply to a platform after every successful run. Per-platform paths: Slack `chat.postMessage`, Discord `channels.fetch(...).send(...)`, Telegram `sendMessage` (with `parse_mode: "MarkdownV2"` when `deliver_format === "markdown"`), email `EmailClientWrapper.send`, WhatsApp `sendText` (markdown stripped before send — `logger.warn` makes the loss visible).
+v0.26 adds optional `deliver` + `deliver_format` to a schedule block. When set, the scheduler dispatches the agent's final text reply to a platform after every successful run. Per-platform paths: Slack `chat.postMessage`, Discord `channels.fetch(...).send(...)`, Telegram `sendMessage` (with `parse_mode: "MarkdownV2"` when `deliver_format === "markdown"`), email `EmailClientWrapper.send`, WhatsApp `sendText` (markdown stripped before send; `logger.warn` makes the loss visible).
 
 ```ts
 schedule: {
@@ -711,11 +711,11 @@ schedule: {
 }
 ```
 
-`ScheduleDeliveryTarget` is a discriminated union over `platform` and carries addressing only — no tokens. Credentials are read from `SecretsManager` per the existing per-voice convention (`SLACK_BOT_TOKEN`, `DISCORD_BOT_TOKEN`, `TELEGRAM_BOT_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `TUTTI_EMAIL_SMTP_*` / `TUTTI_EMAIL_FROM`). Each voice's `forToken` / `forKey` cache means a delivery reuses whichever wrapper the agent's matching voice already initialised. Delivery failures are absorbed in the engine — they never crash the schedule timer — and surface as `schedule:delivery_failed`; success fires `schedule:delivered` with the dispatched payload length.
+`ScheduleDeliveryTarget` is a discriminated union over `platform` and carries addressing only, no tokens. Credentials are read from `SecretsManager` per the existing per-voice convention (`SLACK_BOT_TOKEN`, `DISCORD_BOT_TOKEN`, `TELEGRAM_BOT_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `TUTTI_EMAIL_SMTP_*` / `TUTTI_EMAIL_FROM`). Each voice's `forToken` / `forKey` cache means a delivery reuses whichever wrapper the agent's matching voice already initialised. Delivery failures are absorbed in the engine (they never crash the schedule timer) and surface as `schedule:delivery_failed`; success fires `schedule:delivered` with the dispatched payload length.
 
 ### `tutti-ai schedules`
 
-Manage registered schedules — list, enable/disable, trigger manually, and view run history.
+Manage registered schedules: list, enable/disable, trigger manually, and view run history.
 
 ```bash
 tutti-ai schedules list                        # show all registered schedules
@@ -758,7 +758,7 @@ tutti-ai traces tail                   # live-tail spans (Ctrl+C to exit)
 | `-u, --url <url>` | `http://127.0.0.1:3847` | Server URL. |
 | `-k, --api-key <key>` | `TUTTI_API_KEY` env | Bearer token. |
 
-`traces show` renders every span as an indented tree with duration, status, and attributes — ideal for spotting slow tool calls or flaky providers. `traces tail` streams spans live via SSE.
+`traces show` renders every span as an indented tree with duration, status, and attributes, ideal for spotting slow tool calls or flaky providers. `traces tail` streams spans live via SSE.
 
 ---
 
@@ -809,12 +809,12 @@ Top tools (live window)
   search_repo             8         800             6.4k
 
 Hints
-• Agent "triage" is burning $0.1234/day on average — at this rate the monthly $5.00 cap will be hit in ~28.4 days.
-• Tool "read_file" was called 47 times in the live tracer window (since 2026-05-05T14:00). Repeated identical calls — consider enabling `cache: { enabled: true }` on the agent.
+• Agent "triage" is burning $0.1234/day on average: at this rate the monthly $5.00 cap will be hit in ~28.4 days.
+• Tool "read_file" was called 47 times in the live tracer window (since 2026-05-05T14:00). Repeated identical calls: consider enabling `cache: { enabled: true }` on the agent.
 • 78% of recent tool-driven turns ran on small inputs (<800 avg tokens/call). Consider `model: 'auto'` plus a SmartProvider so cheap turns route to a smaller tier.
 ```
 
-The "Top tools" section and the last two hints come from the in-memory tracer (`/cost/tools`), which is bounded to ~1000 spans and lost on server restart — the live-window line names the boundary so the numbers can't be misread as authoritative all-time totals. The "burning $X/day" hint comes from the persistent `RunCostStore` and is accurate over the full `--last` window.
+The "Top tools" section and the last two hints come from the in-memory tracer (`/cost/tools`), which is bounded to ~1000 spans and lost on server restart: the live-window line names the boundary so the numbers can't be misread as authoritative all-time totals. The "burning $X/day" hint comes from the persistent `RunCostStore` and is accurate over the full `--last` window.
 
 ### `tutti-ai report costs`
 
@@ -926,7 +926,7 @@ tutti-ai interrupts deny <interrupt-id>     # deny directly
 | `-u, --url <url>` | `http://127.0.0.1:3847` | Server URL. |
 | `-k, --api-key <key>` | `TUTTI_API_KEY` env | Bearer token. |
 
-The interactive TUI shows each pending interrupt (agent, tool, input, reason) and accepts `a` (approve), `d` (deny), `s` (skip), or `q` (quit). `list` prints a plain table and exits — useful in shell scripts.
+The interactive TUI shows each pending interrupt (agent, tool, input, reason) and accepts `a` (approve), `d` (deny), `s` (skip), or `q` (quit). `list` prints a plain table and exits, useful in shell scripts.
 
 ### `tutti-ai approve`
 
@@ -961,10 +961,10 @@ tutti-ai skills reject <candidate-id> --reason "..."
 
 The interactive review screen shows the candidate's name, agent (resolved from its first evidence trajectory), input/output signature, constituent tools, computed `is_destructive` flag, the union of `required_permissions`, and a sample of evidence trajectories. The action prompt accepts:
 
-- `a` — approve with the synthesiser's description as the system prompt
-- `e` — edit the system prompt, then approve
-- `r` — reject (prompts for a free-text reason)
-- `s` — skip to the next candidate
+- `a`: approve with the synthesiser's description as the system prompt
+- `e`: edit the system prompt, then approve
+- `r`: reject (prompts for a free-text reason)
+- `s`: skip to the next candidate
 
 **Constituent-tool resolution.** Approval computes `is_destructive` as the union of each constituent tool's `destructive` flag and `required_permissions` as the union of the owning voices' permissions. If any constituent tool no longer resolves against the loaded score (typically because the voice was removed since the candidate was proposed), approval is blocked with an actionable error pointing at `tutti-ai skills reject`. Reviewers should add the voice back to an agent in the score or reject the candidate.
 
@@ -972,4 +972,4 @@ The interactive review screen shows the candidate's name, agent (resolved from i
 
 ## Error handling
 
-The CLI installs global handlers for `unhandledRejection` and `uncaughtException`, ensuring a clean error message and exit code 1 on unexpected failures. All user-facing error messages are redacted through `SecretsManager` before printing — secrets (API keys, tokens, DB URLs) never appear in output.
+The CLI installs global handlers for `unhandledRejection` and `uncaughtException`, ensuring a clean error message and exit code 1 on unexpected failures. All user-facing error messages are redacted through `SecretsManager` before printing: secrets (API keys, tokens, DB URLs) never appear in output.

@@ -1,11 +1,11 @@
 ---
 title: "MCP Bridge Voice"
-description: "@tuttiai/mcp — wrap any Model Context Protocol server as a Tutti voice"
+description: "@tuttiai/mcp: wrap any Model Context Protocol server as a Tutti voice"
 sidebar:
   order: 13
 ---
 
-The MCP voice wraps any [Model Context Protocol](https://modelcontextprotocol.io) server as a Tutti voice, exposing its tools to your agents — zero glue code per server.
+The MCP voice wraps any [Model Context Protocol](https://modelcontextprotocol.io) server as a Tutti voice, exposing its tools to your agents: zero glue code per server.
 
 ## Installation
 
@@ -25,7 +25,7 @@ permissions: ["network"]
 
 ```ts
 new McpVoice({
-  // Full shell command for the MCP server — split on whitespace.
+  // Full shell command for the MCP server: split on whitespace.
   // First token is the executable, the rest are arguments.
   server: "npx -y @modelcontextprotocol/server-filesystem /tmp",
 })
@@ -75,7 +75,7 @@ tutti-ai run assistant "List the files in the sandbox dir"
 
 ## Bridging multiple MCP servers
 
-Add multiple `McpVoice` instances to the same agent — each shows up as its own voice with its own tools:
+Add multiple `McpVoice` instances to the same agent: each shows up as its own voice with its own tools:
 
 ```ts
 voices: [

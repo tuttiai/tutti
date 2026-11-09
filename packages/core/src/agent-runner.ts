@@ -5,7 +5,6 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import type {
   AgentConfig,
   AgentResult,
-  AgentUserMemoryConfig,
   ChatMessage,
   ChatRequest,
   ChatResponse,
@@ -34,29 +33,16 @@ import { toolInputSchema } from "./tool-schema.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
+import type { AgentRunOptions, UserMemoryStore } from "./memory/user/types.js";
+import type { UserModelStore } from "./memory/user-model.js";
+import { RunnerMemoryRegistry } from "./runner/memory-registry.js";
+import { injectMemories } from "./runner/memory-prompt.js";
 import {
-  MemoryEnforcer,
-  createMemoryHelpers,
-  createMemoryTools,
-  DEFAULT_MAX_ENTRIES_PER_AGENT,
-} from "./memory/curated.js";
-import { createUserMemoryStore } from "./memory/user/index.js";
-import { MemoryUserMemoryStore } from "./memory/user/memory-store.js";
-import type {
-  AgentRunOptions,
-  StoreOptions,
-  UserMemory,
-  UserMemoryStore,
-} from "./memory/user/types.js";
-import {
-  InMemoryUserModelStore,
-  type UserModelStore,
-  type UserProfile,
-} from "./memory/user-model.js";
-import {
-  UserModelConsolidator,
-  type UserModelConsolidatorOptions,
-} from "./memory/consolidator.js";
+  attachMemoryHelpers,
+  curatedToolsFor,
+  inferUserMemories,
+  resolveSemanticMemory,
+} from "./runner/memory-run.js";
 import type { TrajectoryObserver } from "./skills/observer.js";
 import { hashToolInput } from "./skills/observer.js";
 import type { SkillExecutor } from "./skills/executor.js";
@@ -234,27 +220,11 @@ async function withRetry<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise
 export class AgentRunner {
   private pendingHitl = new Map<string, (answer: string) => void>();
   /**
-   * Lazily-constructed user-memory stores keyed by agent name. One store
-   * per agent so different agents can pick different backends. Tests
-   * pre-populate via {@link setUserMemoryStore} to inject mocks.
+   * Per-agent user-memory stores and user-model wiring. Assigned in the
+   * constructor body, not as a field initialiser, because it needs
+   * `provider` and `events`.
    */
-  private userMemoryStores = new Map<string, UserMemoryStore>();
-  /**
-   * Per-agent dialectic-user-model wiring. The consolidator is the live
-   * object the runtime calls; the store is exposed alongside so the
-   * runtime's profile-inject path and tests share one state surface.
-   * Built lazily from `agent.memory.user_model` on first use.
-   */
-  private userModelWiring = new Map<
-    string,
-    { store: UserModelStore; consolidator: UserModelConsolidator }
-  >();
-  /**
-   * Test-seam overrides for {@link UserModelStore}, keyed by agent name.
-   * Set via {@link setUserModelStore} before a run; read by
-   * {@link getUserModelConsolidator} when wiring the consolidator.
-   */
-  private userModelStoreOverrides = new Map<string, UserModelStore>();
+  private memory: RunnerMemoryRegistry;
   /**
    * In-memory resolvers for interrupts waiting on operator approval.
    * Keyed by `interrupt_id`. Populated in {@link awaitApproval} before
@@ -287,6 +257,7 @@ export class AgentRunner {
     private trajectoryObserver?: TrajectoryObserver,
     private skillExecutor?: SkillExecutor,
   ) {
+    this.memory = new RunnerMemoryRegistry(provider, events);
     this.installRouterEventHooks();
   }
 
@@ -553,25 +524,7 @@ export class AgentRunner {
    * useful for callers who want to share one store across multiple agents.
    */
   setUserMemoryStore(agent_name: string, store: UserMemoryStore): void {
-    this.userMemoryStores.set(agent_name, store);
-  }
-
-  /**
-   * Resolve the user-memory store for an agent, constructing it lazily
-   * from `agent.memory.user_memory` config on first use. Returns
-   * `undefined` when the agent has no user-memory configuration.
-   */
-  private getUserMemoryStore(
-    agent: AgentConfig,
-  ): { store: UserMemoryStore; cfg: AgentUserMemoryConfig } | undefined {
-    const cfg = agent.memory?.user_memory;
-    if (!cfg) return undefined;
-    let store = this.userMemoryStores.get(agent.name);
-    if (!store) {
-      store = createUserMemoryStore(cfg);
-      this.userMemoryStores.set(agent.name, store);
-    }
-    return { store, cfg };
+    this.memory.setUserMemoryStore(agent_name, store);
   }
 
   /**
@@ -580,59 +533,7 @@ export class AgentRunner {
    * a custom or shared store across runs.
    */
   setUserModelStore(agent_name: string, store: UserModelStore): void {
-    this.userModelStoreOverrides.set(agent_name, store);
-    // If a consolidator was already built with the default store, drop
-    // it so the next run rebuilds against the override.
-    this.userModelWiring.delete(agent_name);
-  }
-
-  /**
-   * Resolve the dialectic-user-model wiring for an agent, constructing
-   * it lazily from `agent.memory.user_model` on first use. Returns
-   * `undefined` when the agent has no user-model configuration or it
-   * is disabled. The consolidator pulls source signal from the same
-   * agent's `user_memory` store; agents with `user_model` but no
-   * `user_memory` get a no-op consolidator that bootstraps off an
-   * empty memory list.
-   */
-  private getUserModelConsolidator(
-    agent: AgentConfig,
-  ): { store: UserModelStore; consolidator: UserModelConsolidator } | undefined {
-    const cfg = agent.memory?.user_model;
-    if (!cfg || cfg.enabled === false) return undefined;
-
-    const cached = this.userModelWiring.get(agent.name);
-    if (cached) return cached;
-
-    const store =
-      this.userModelStoreOverrides.get(agent.name) ?? new InMemoryUserModelStore();
-
-    // The consolidator needs a UserMemoryStore as its source signal.
-    // When the agent has no user_memory config we synthesise an empty
-    // ephemeral store so the consolidator can still bootstrap a profile
-    // from the conversation summaries it writes itself in future
-    // iterations. Today it just returns nothing on the first pass.
-    const memoryStore = this.getUserMemoryStore(agent)?.store
-      ?? new MemoryUserMemoryStore();
-
-    const opts: UserModelConsolidatorOptions = {
-      ...(cfg.every_n_turns !== undefined ? { every_n_turns: cfg.every_n_turns } : {}),
-      ...(cfg.consolidation_model !== undefined ? { model: cfg.consolidation_model } : {}),
-      ...(cfg.recent_memory_limit !== undefined
-        ? { recent_memory_limit: cfg.recent_memory_limit }
-        : {}),
-      events: this.events,
-    };
-    const consolidator = new UserModelConsolidator(
-      store,
-      memoryStore,
-      this.provider,
-      opts,
-    );
-
-    const wiring = { store, consolidator };
-    this.userModelWiring.set(agent.name, wiring);
-    return wiring;
+    this.memory.setUserModelStore(agent_name, store);
   }
 
   private async safeHook<T>(fn: (() => Promise<T> | T | undefined) | undefined): Promise<T | undefined> {
@@ -750,31 +651,10 @@ export class AgentRunner {
         allTools.push(...skillTools);
       }
 
-      // Resolve the semantic memory config + store once per run. Both
-      // the system-prompt injection (later in this method) and the
-      // ToolContext.memory helpers / curated agent tools route through
-      // the same `MemoryEnforcer`, so per-agent cap, LRU eviction, and
-      // memory:* events fire exactly once per logical operation.
-      //
-      // The curated tools are NOT a Voice — voices declare permissions
-      // and have setup/teardown hooks that don't apply to in-process
-      // memory. They are appended directly to `allTools` here.
-      const semanticCfg = agent.memory?.semantic;
-      const semanticStore: SemanticMemoryStore | undefined = semanticCfg?.enabled
-        ? (semanticCfg.store ?? this.semanticMemory)
-        : undefined;
-      const memoryEnforcer =
-        semanticCfg?.enabled && semanticStore
-          ? new MemoryEnforcer(
-              semanticStore,
-              agent.name,
-              semanticCfg.max_entries_per_agent ?? DEFAULT_MAX_ENTRIES_PER_AGENT,
-              this.events,
-            )
-          : undefined;
-      if (memoryEnforcer && semanticCfg?.curated_tools !== false) {
-        allTools.push(...createMemoryTools({ enforcer: memoryEnforcer }));
-      }
+      // Resolve semantic memory once per run. The prompt injection, the
+      // ToolContext.memory helpers and the curated tools share its enforcer.
+      const semantic = resolveSemanticMemory(agent, this.semanticMemory, this.events);
+      allTools.push(...curatedToolsFor(semantic));
 
       const toolDefs = allTools.map(toolToDefinition);
       // Counted once per run — neither voices nor HITL toggle mid-loop.
@@ -929,85 +809,19 @@ export class AgentRunner {
           ". No other text.";
       }
 
-      // Inject the user's dialectic profile (if any) BEFORE per-fact
-      // user memories so the agent sees the holistic picture first, then
-      // the specific facts. Both injectors are independently no-op when
-      // their respective configs are absent.
-      const userMemory = this.getUserMemoryStore(agent);
-      const userModel = this.getUserModelConsolidator(agent);
-      if (userId && userModel) {
-        try {
-          const profile = await userModel.store.get(userId);
-          if (profile) {
-            baseSystemPrompt += renderProfileForPrompt(profile);
-          }
-        } catch (err) {
-          logger.warn(
-            { error: err instanceof Error ? err.message : String(err), agent: agent.name, user_id: userId },
-            "User-model load failed — continuing without injected profile",
-          );
-        }
-      }
-
-      // Inject user memories ONCE before the first turn, into the base
-      // prompt so they persist for every subsequent turn. Search uses the
-      // raw input so the most contextually relevant memories surface.
-      // No-op when either user_id or per-agent user_memory config is absent.
-      let injectedUserMemories: UserMemory[] = [];
-      if (userId && userMemory) {
-        const limit = userMemory.cfg.inject_limit ?? 10;
-        try {
-          injectedUserMemories = await userMemory.store.search(userId, guardedInput, limit);
-        } catch (err) {
-          // User-memory failures are non-fatal — log and continue with
-          // an empty memory set rather than aborting the whole run.
-          logger.warn(
-            { error: err instanceof Error ? err.message : String(err), agent: agent.name, user_id: userId },
-            "User-memory search failed — continuing without injected memories",
-          );
-        }
-        if (injectedUserMemories.length > 0) {
-          baseSystemPrompt += "\n\nWhat I remember about you:\n" +
-            injectedUserMemories
-              .map((m) => "- " + m.content + " [importance: " + importanceLabel(m.importance) + "]")
-              .join("\n");
-        }
-      }
-
-      // Inject semantic memories ONCE before the first turn, as user
-      // memories are above. The search is keyed on the run's input, which
-      // does not change between turns, and a system prompt that stays the
-      // same from turn to turn is what lets the provider's prompt cache
-      // serve it. Uses the per-agent-resolved store so a custom
-      // `agent.memory.semantic.store` is honoured here too.
-      const memCfg = semanticCfg;
-      if (memCfg?.enabled && semanticStore) {
-        const maxMemories = memCfg.max_memories ?? 5;
-        const injectSystem = memCfg.inject_system !== false;
-        if (injectSystem) {
-          const memories = await semanticStore.search(
-            input,
-            agent.name,
-            maxMemories,
-          );
-          if (memories.length > 0) {
-            const memoryBlock = memories
-              .map((m) => `- ${m.content}`)
-              .join("\n");
-            baseSystemPrompt +=
-              "\n\nRelevant context from previous sessions:\n" +
-              memoryBlock;
-            // When the curated tools are also active, hint that the
-            // model may call them to extend or correct this context.
-            if (memCfg.curated_tools !== false) {
-              baseSystemPrompt +=
-                "\n\nUse the `remember` tool when the user shares something worth keeping. " +
-                "Use `recall` to look things up. " +
-                "Use `forget` to remove an entry the user retracts.";
-            }
-          }
-        }
-      }
+      // Inject the user's profile, user memories and semantic memories
+      // ONCE before the first turn. Each is a no-op when its config is absent.
+      const userMemory = this.memory.userMemoryFor(agent);
+      const userModel = this.memory.userModelFor(agent);
+      baseSystemPrompt = await injectMemories(baseSystemPrompt, {
+        agentName: agent.name,
+        userId,
+        guardedInput,
+        rawInput: input,
+        userMemory,
+        userModel,
+        semantic,
+      });
 
       // Agentic loop. The try/catch around it only exists to surface the
       // last durable checkpoint on crash — the error itself still
@@ -1299,34 +1113,7 @@ export class AgentRunner {
           ...(userId !== undefined ? { user_id: userId } : {}),
         };
 
-        // Attach user-memory helpers when both the agent has user_memory
-        // configured and the run was started with a user_id. The bound
-        // userId is implicit — tool code does not pass it on every call.
-        // Defaults to importance: 3 (high) since explicit `remember()`
-        // calls from tool code reflect deliberate intent.
-        if (userId && userMemory) {
-          const store = userMemory.store;
-          toolContext.user_memory = {
-            remember: async (content, options) => {
-              const stored = await store.store(userId, content, {
-                source: "explicit",
-                importance: options?.importance ?? 3,
-                ...(options?.tags !== undefined ? { tags: options.tags } : {}),
-                ...(options?.expires_at !== undefined ? { expires_at: options.expires_at } : {}),
-              });
-              return { id: stored.id };
-            },
-          };
-        }
-
-        // Attach memory helpers if semantic memory is enabled. Both
-        // `ctx.memory` (for user-defined tool code) and the curated
-        // `remember` / `recall` / `forget` agent tools route through
-        // the same `MemoryEnforcer`, so cap, LRU eviction, and
-        // `memory:*` events fire exactly once per logical operation.
-        if (memoryEnforcer) {
-          toolContext.memory = createMemoryHelpers(memoryEnforcer);
-        }
+        attachMemoryHelpers(toolContext, { userId, userMemory, semantic });
 
         // Pass the audit array only when an observer is wired —
         // executeTool short-circuits the hash + push when undefined.
@@ -1580,11 +1367,11 @@ export class AgentRunner {
       // effort — failures are logged and swallowed so a flaky inference
       // pass never breaks the run for the caller.
       if (userId && userMemory && userMemory.cfg.auto_infer === true) {
-        await this.inferAndStoreUserMemories(
-          agent,
-          userId,
-          messages,
-          userMemory.store,
+        await inferUserMemories(
+          (req) =>
+            this.callProviderChat({ agent_name: agent.name, destructive_tool_count: 0 }, req)
+              .then((r) => extractText(r.content)),
+          { agentName: agent.name, model: agent.model, userId, messages, store: userMemory.store },
         );
       }
 
@@ -1615,69 +1402,6 @@ export class AgentRunner {
 
       return agentResult;
     });
-  }
-
-  /**
-   * Send the last few turns of the conversation to the LLM with an
-   * extraction prompt and store any returned facts as `inferred` memories.
-   *
-   * Best-effort: parsing failures, malformed responses, and provider
-   * errors are all logged and swallowed. Auto-infer must never abort
-   * the wider run.
-   */
-  private async inferAndStoreUserMemories(
-    agent: AgentConfig,
-    userId: string,
-    messages: ChatMessage[],
-    store: UserMemoryStore,
-  ): Promise<void> {
-    // Last 5 turns ≈ last 10 messages (one user + one assistant per turn).
-    // We don't try to be precise — the LLM does not need exact framing.
-    const recent = messages.slice(-10);
-    if (recent.length === 0) return;
-
-    const extractionPrompt =
-      "Extract 0–3 new factual memories about the user from this conversation. " +
-      "Return a JSON array of strings. Each string must be a single sentence " +
-      "starting with 'User'. Return [] if nothing new was learned.";
-
-    let response: ChatResponse;
-    try {
-      response = await this.callProviderChat(
-        { agent_name: agent.name, destructive_tool_count: 0 },
-        {
-          model: agent.model,
-          system: extractionPrompt,
-          messages: recent,
-        },
-      );
-    } catch (err) {
-      logger.warn(
-        { error: err instanceof Error ? err.message : String(err), agent: agent.name },
-        "User-memory auto-infer LLM call failed — skipping inference",
-      );
-      return;
-    }
-
-    const text = extractText(response.content).trim();
-    const facts = parseInferredMemories(text);
-    if (facts.length === 0) return;
-
-    for (const content of facts) {
-      try {
-        const opts: StoreOptions = { source: "inferred", importance: 2 };
-        await store.store(userId, content, opts);
-      } catch (err) {
-        logger.warn(
-          {
-            error: err instanceof Error ? err.message : String(err),
-            agent: agent.name,
-            user_id: userId,
-          },
-          "User-memory auto-infer store failed for one fact",
-        );
-      }
-    }
   }
 
   private async executeWithTimeout<T>(
@@ -2097,76 +1821,4 @@ function extractText(content: string | ContentBlock[] | undefined): string {
     .filter((b) => b.type === "text")
     .map((b) => (b as { text: string }).text)
     .join("\n");
-}
-
-/**
- * Format a {@link UserProfile} for inclusion in the agent's system
- * prompt. Returns an empty string when the profile is bootstrap-empty
- * (no summary, no preferences, no projects) so the runtime doesn't
- * inject dead weight on a brand-new user.
- */
-function renderProfileForPrompt(profile: UserProfile): string {
-  const hasSummary = profile.summary.trim().length > 0;
-  const prefEntries = Object.entries(profile.preferences);
-  const hasProjects = profile.ongoing_projects.length > 0;
-  if (!hasSummary && prefEntries.length === 0 && !hasProjects) return "";
-
-  const parts: string[] = ["\n\nUser profile:"];
-  if (hasSummary) parts.push(profile.summary.trim());
-
-  if (prefEntries.length > 0) {
-    parts.push("Known preferences:");
-    for (const [key, value] of prefEntries) {
-      parts.push("- " + key + ": " + value);
-    }
-  }
-
-  if (hasProjects) {
-    parts.push("Ongoing projects:");
-    for (const proj of profile.ongoing_projects) {
-      parts.push("- " + proj);
-    }
-  }
-
-  return parts.join("\n");
-}
-
-/** Render a UserMemoryImportance literal as a human-readable label. */
-function importanceLabel(importance: 1 | 2 | 3): string {
-  if (importance === 3) return "high";
-  if (importance === 1) return "low";
-  return "normal";
-}
-
-/**
- * Parse the LLM's auto-infer response. Tolerates code-fenced JSON, prose
- * around the array, and accidentally-doubled wrappers — the LLM does not
- * always cooperate. Returns an empty array on any parse error rather
- * than throwing; auto-infer is best-effort.
- */
-function parseInferredMemories(text: string): string[] {
-  if (text === "") return [];
-  // Strip a single leading/trailing code fence if present.
-  let body = text.trim();
-  const fence = /^```(?:json)?\n?([\s\S]*?)\n?```$/;
-  const match = fence.exec(body);
-  if (match) body = match[1].trim();
-
-  // Find the first '[' and the matching last ']' — robust to leading prose.
-  const first = body.indexOf("[");
-  const last = body.lastIndexOf("]");
-  if (first === -1 || last === -1 || last < first) return [];
-  const sliced = body.slice(first, last + 1);
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(sliced);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
-  return parsed
-    .filter((x): x is string => typeof x === "string")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
 }

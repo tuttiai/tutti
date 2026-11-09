@@ -1,6 +1,6 @@
 ---
 title: "RAG Voice"
-description: "@tuttiai/rag — retrieval-augmented generation: ingest documents, search them with embeddings + BM25"
+description: "@tuttiai/rag: retrieval-augmented generation: ingest documents, search them with embeddings + BM25"
 sidebar:
   order: 12
 ---
@@ -49,20 +49,20 @@ RagVoice({
 | ------ | ------- | ----------- |
 | `collection` | required | Logical name for this knowledge base. |
 | `embeddings` | required | Embedding provider config (OpenAI, Voyage, etc.). |
-| `storage` | `{ provider: "memory" }` | Vector store — `memory` or `pgvector`. |
+| `storage` | `{ provider: "memory" }` | Vector store: `memory` or `pgvector`. |
 | `default_top_k` | `5` | Default number of results returned by `search_knowledge`. |
-| `hyde` | `false` | Hypothetical Document Embeddings — improves recall, requires an `llm` option. |
+| `hyde` | `false` | Hypothetical Document Embeddings: improves recall, requires an `llm` option. |
 
 ### Storage providers
 
 ```ts
-// Postgres pgvector — persistent, production-ready
+// Postgres pgvector: persistent, production-ready
 storage: {
   provider: "pgvector",
   connection_string: process.env.DATABASE_URL!,
 }
 
-// In-memory — fast, ephemeral, single-process
+// In-memory: fast, ephemeral, single-process
 storage: { provider: "memory" }
 ```
 
