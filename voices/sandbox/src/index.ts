@@ -50,8 +50,9 @@ export interface SandboxConfig {
 }
 
 /**
- * Sandbox voice — gives agents secure code execution with per-session
- * filesystem isolation.
+ * Sandbox voice: gives agents code execution in a per-session working
+ * directory. Not a security boundary: child processes run as the server's
+ * own user.
  *
  * On {@link setup}, creates `/tmp/tutti-sandbox/{conversation_id}/`
  * when the run names its conversation, and `/tmp/tutti-sandbox/{session_id}/`
@@ -89,7 +90,7 @@ export interface SandboxConfig {
 export class SandboxVoice implements Voice {
   readonly name = "sandbox";
   readonly description =
-    "Map a repository, execute code, read/write files, and install packages in an isolated sandbox";
+    "Map a repository, execute code, read/write files, and install packages in a per-session working directory";
   readonly required_permissions: Permission[] = ["shell"];
   tools: Tool[] = [];
 
