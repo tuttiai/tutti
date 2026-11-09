@@ -2,7 +2,8 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
 export default defineConfig({
-  site: "https://docs.tutti-ai.com",
+  site: "https://tutti-ai.com",
+  base: "/docs",
   integrations: [
     starlight({
       title: "Tutti AI",
@@ -20,11 +21,11 @@ export default defineConfig({
       },
       customCss: ["./src/styles/custom.css"],
       head: [
-        { tag: "link", attrs: { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" } },
-        { tag: "link", attrs: { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png" } },
-        { tag: "link", attrs: { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16.png" } },
-        { tag: "link", attrs: { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" } },
-        { tag: "meta", attrs: { property: "og:image", content: "https://docs.tutti-ai.com/og-image.png" } },
+        { tag: "link", attrs: { rel: "icon", type: "image/svg+xml", href: "/docs/favicon.svg" } },
+        { tag: "link", attrs: { rel: "icon", type: "image/png", sizes: "32x32", href: "/docs/favicon-32.png" } },
+        { tag: "link", attrs: { rel: "icon", type: "image/png", sizes: "16x16", href: "/docs/favicon-16.png" } },
+        { tag: "link", attrs: { rel: "apple-touch-icon", sizes: "180x180", href: "/docs/apple-touch-icon.png" } },
+        { tag: "meta", attrs: { property: "og:image", content: "https://tutti-ai.com/docs/og-image.png" } },
         { tag: "meta", attrs: { property: "og:title", content: "Tutti AI" } },
         { tag: "meta", attrs: { property: "og:description", content: "All agents. All together." } },
         { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
