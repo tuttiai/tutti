@@ -48,14 +48,23 @@ beforeEach(() => {
   spawn.mockReset();
 });
 
+/** The `env` option of the first spawn call. */
+function spawnedEnv(): unknown {
+  const options: unknown = spawn.mock.calls[0]?.[2];
+  expect(options).toHaveProperty("env");
+  return (options as { env: unknown }).env; // safe: asserted on the line above
+}
+
 describe("runClaudeCode", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.useRealTimers();
   });
 
-  it("adds the invocation's variables on top of the server's environment", async () => {
-    vi.stubEnv("TUTTI_TEST_INHERITED", "kept");
+  it("adds the invocation's variables on top of the allowlisted environment only", async () => {
+    vi.stubEnv("TUTTI_PG_URL", "postgres://tutti:" + "pw@db/tutti");
+    vi.stubEnv("OPENAI_API_KEY", "sk" + "-" + "x1Y2".repeat(6));
+    vi.stubEnv("HOME", "/home/tutti");
     const child = fakeChild();
     const pending = start({ env: { CLAUDE_CONFIG_DIR: "/state/claude" } });
     child.emit("close", 0);
@@ -64,18 +73,25 @@ describe("runClaudeCode", () => {
     expect(spawn).toHaveBeenCalledWith("claude", ["-p"], expect.objectContaining({
       cwd: "/work",
       shell: false,
-      env: expect.objectContaining({ CLAUDE_CONFIG_DIR: "/state/claude", TUTTI_TEST_INHERITED: "kept" }),
+      env: expect.objectContaining({ CLAUDE_CONFIG_DIR: "/state/claude", HOME: "/home/tutti" }),
     }));
+    expect(spawnedEnv()).not.toHaveProperty("TUTTI_PG_URL");
+    expect(spawnedEnv()).not.toHaveProperty("OPENAI_API_KEY");
   });
 
-  it("lets the CLI inherit the server's environment when none is added", async () => {
+  it("passes the allowlisted environment even when none is added", async () => {
+    vi.stubEnv("TUTTI_PG_URL", "postgres://tutti:" + "pw@db/tutti");
+    vi.stubEnv("OPENAI_API_KEY", "sk" + "-" + "x1Y2".repeat(6));
+    vi.stubEnv("PATH", "/usr/bin");
     const child = fakeChild();
     const pending = start();
     child.emit("close", 0);
     await pending;
 
-    // Without `env`, spawn passes the whole parent environment through.
-    expect(spawn.mock.calls[0]?.[2]).not.toHaveProperty("env");
+    // Without `env`, spawn would pass the whole parent environment through.
+    expect(spawnedEnv()).toMatchObject({ PATH: "/usr/bin" });
+    expect(spawnedEnv()).not.toHaveProperty("TUTTI_PG_URL");
+    expect(spawnedEnv()).not.toHaveProperty("OPENAI_API_KEY");
   });
 
   it("feeds stdin and captures stdout, stderr and the exit code", async () => {
