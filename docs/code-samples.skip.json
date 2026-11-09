@@ -1,0 +1,778 @@
+{
+  "samples": [
+    {
+      "file": "docs/src/content/docs/api/overview.mdx",
+      "heading": "tuttiruntime",
+      "index": 1,
+      "reason": "pseudo-code: a class outline whose constructor has no body (TS2390)"
+    },
+    {
+      "file": "docs/src/content/docs/api/overview.mdx",
+      "heading": "agentrouter",
+      "index": 1,
+      "reason": "pseudo-code: a class outline whose constructor has no body (TS2390)"
+    },
+    {
+      "file": "docs/src/content/docs/api/overview.mdx",
+      "heading": "agentresult",
+      "index": 1,
+      "reason": "partial snippet: uses ChatMessage without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/api/overview.mdx",
+      "heading": "toolcache",
+      "index": 1,
+      "reason": "partial snippet: uses ToolResult without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/api/overview.mdx",
+      "heading": "llmprovider",
+      "index": 1,
+      "reason": "partial snippet: uses ChatRequest without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/api/overview.mdx",
+      "heading": "streamchunk",
+      "index": 1,
+      "reason": "partial snippet: uses ToolUseBlock without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/cli/reference.mdx",
+      "heading": "tutti-ai-inbox-start-score",
+      "index": 1,
+      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Tele..."
+    },
+    {
+      "file": "docs/src/content/docs/cli/reference.mdx",
+      "heading": "tutti-ai-deploy",
+      "index": 1,
+      "reason": "TS2353: Object literal may only specify known properties, and 'min' does not exist in type '{ minI..."
+    },
+    {
+      "file": "docs/src/content/docs/cli/reference.mdx",
+      "heading": "tutti-ai-schedule-score",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/cli/reference.mdx",
+      "heading": "scheduled-delivery",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/cli/reference.mdx",
+      "heading": "cost-analysis",
+      "index": 1,
+      "reason": "partial snippet: uses score without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/contributing/voice-authoring.mdx",
+      "heading": "voice-anatomy",
+      "index": 1,
+      "reason": "partial snippet: uses Tool without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/contributing/voice-authoring.mdx",
+      "heading": "tool-anatomy",
+      "index": 1,
+      "reason": "partial snippet: uses ZodType without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/contributing/voice-authoring.mdx",
+      "heading": "tool-results",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1108)"
+    },
+    {
+      "file": "docs/src/content/docs/contributing/voice-authoring.mdx",
+      "heading": "zod-parameter-schemas",
+      "index": 1,
+      "reason": "partial snippet: uses z without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/contributing/voice-authoring.mdx",
+      "heading": "unit-test-individual-tools",
+      "index": 1,
+      "reason": "imports ../src/tools/my-tool.js, a file the guide does not show (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/contributing/voice-authoring.mdx",
+      "heading": "test-the-voice-class",
+      "index": 1,
+      "reason": "imports ../src/index.js, a file the guide does not show (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/contributing/voice-authoring.mdx",
+      "heading": "integration-test-with-agentrunner",
+      "index": 1,
+      "reason": "imports @tuttiai/core/tests/helpers/mock-provider, which no package exports (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "score",
+      "index": 1,
+      "reason": "TS2739: Type '{}' is missing the following properties from type 'AgentConfig': name, system_prompt..."
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "agents",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "agents",
+      "index": 2,
+      "reason": "shows alternatives in one block, so it declares runtime twice (TS2451)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "runtime",
+      "index": 1,
+      "reason": "partial snippet: uses TuttiRuntime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "events",
+      "index": 1,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "sessions",
+      "index": 1,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "memory",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "memory",
+      "index": 2,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "memory",
+      "index": 3,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "tool-result-caching",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "parallel-execution",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "permissions",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "streaming",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "streaming",
+      "index": 2,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "telemetry",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
+      "heading": "mcp-bridge",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/adding-voices.mdx",
+      "heading": "voice-configuration",
+      "index": 1,
+      "reason": "partial snippet: uses GitHubVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/adding-voices.mdx",
+      "heading": "multiple-voices-per-agent",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/building-a-voice.mdx",
+      "heading": "step-2-create-the-voice-class",
+      "index": 1,
+      "reason": "imports ./tools/weather.js, a file the guide does not show (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/building-a-voice.mdx",
+      "heading": "step-4-write-tests",
+      "index": 1,
+      "reason": "imports ../src/index.js, a file the guide does not show (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/building-a-voice.mdx",
+      "heading": "step-5-use-it",
+      "index": 1,
+      "reason": "imports @yourscope/weather-voice, which no package exports (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/building-a-voice.mdx",
+      "heading": "voice-lifecycle-hooks",
+      "index": 1,
+      "reason": "partial snippet: uses Voice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/custom-stores.mdx",
+      "heading": "plugging-a-store-in",
+      "index": 1,
+      "reason": "partial snippet: uses TuttiRuntime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/custom-stores.mdx",
+      "heading": "interruptstore",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/custom-stores.mdx",
+      "heading": "checkpointstore",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/deploy.mdx",
+      "heading": "step-1-add-a-deploy-block-to-one-agent",
+      "index": 1,
+      "reason": "TS2353: Object literal may only specify known properties, and 'min' does not exist in type '{ minI..."
+    },
+    {
+      "file": "docs/src/content/docs/guides/deploy.mdx",
+      "heading": "cost-monitoring-after-deploy",
+      "index": 1,
+      "reason": "partial snippet: uses score without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/inbox.mdx",
+      "heading": "quick-start-telegram",
+      "index": 1,
+      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Tele..."
+    },
+    {
+      "file": "docs/src/content/docs/guides/inbox.mdx",
+      "heading": "slack-socket-mode",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/inbox.mdx",
+      "heading": "discord",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/inbox.mdx",
+      "heading": "whatsapp-cloud-api-webhook",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/inbox.mdx",
+      "heading": "email-imap-idle-smtp",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/inbox.mdx",
+      "heading": "all-five-adapters-at-once",
+      "index": 1,
+      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: (Tel..."
+    },
+    {
+      "file": "docs/src/content/docs/guides/inbox.mdx",
+      "heading": "score-level-configuration",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "session-memory",
+      "index": 1,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "in-memory-store-default",
+      "index": 1,
+      "reason": "partial snippet: uses TuttiRuntime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "in-memory-store-default",
+      "index": 2,
+      "reason": "partial snippet: uses TuttiRuntime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "file-store",
+      "index": 1,
+      "reason": "partial snippet: uses TuttiRuntime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "postgresql-store",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "postgresql-store",
+      "index": 2,
+      "reason": "partial snippet: uses TuttiRuntime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "enable-it-per-agent",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "storing-memories-from-tools",
+      "index": 1,
+      "reason": "TS7006: Parameter 'input' implicitly has an 'any' type."
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "agent-curated-memory-tools",
+      "index": 1,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "storing-memories-from-your-code",
+      "index": 1,
+      "reason": "partial snippet: uses TuttiRuntime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "user-model-dialectic-profile",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "user-model-dialectic-profile",
+      "index": 2,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "postgres-user-model-store",
+      "index": 1,
+      "reason": "partial snippet: uses score without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "multi-turn-sessions",
+      "index": 1,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "token-usage",
+      "index": 1,
+      "reason": "partial snippet: uses result without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/memory-sessions.mdx",
+      "heading": "keeping-long-runs-small",
+      "index": 1,
+      "reason": "partial snippet: uses GitHubVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/multi-agent.mdx",
+      "heading": "run-with-the-agentrouter",
+      "index": 1,
+      "reason": "imports ./tutti.score.js, a file the guide does not show (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/multi-agent.mdx",
+      "heading": "stream-a-specialist-s-output",
+      "index": 1,
+      "reason": "imports ./tutti.score.js, a file the guide does not show (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/multi-agent.mdx",
+      "heading": "nested-delegation",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/multi-agent.mdx",
+      "heading": "declarative-parallel-entry",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/multi-agent.mdx",
+      "heading": "programmatic-runparallel",
+      "index": 1,
+      "reason": "partial snippet: uses AgentRouter without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/providers.mdx",
+      "heading": "anthropic-claude",
+      "index": 1,
+      "reason": "shows alternatives in one block, so it declares provider twice (TS2451)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/providers.mdx",
+      "heading": "openai-gpt",
+      "index": 1,
+      "reason": "shows alternatives in one block, so it declares provider twice (TS2451)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/providers.mdx",
+      "heading": "google-gemini",
+      "index": 1,
+      "reason": "shows alternatives in one block, so it declares provider twice (TS2451)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/providers.mdx",
+      "heading": "openrouter-300-models-one-api-key",
+      "index": 1,
+      "reason": "shows alternatives in one block, so it declares provider twice (TS2451)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/providers.mdx",
+      "heading": "claude-code-your-own-claude-subscription",
+      "index": 1,
+      "reason": "shows alternatives in one block, so it declares provider twice (TS2451)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/providers.mdx",
+      "heading": "per-agent-model-overrides",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/providers.mdx",
+      "heading": "token-budget-by-model",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "permission-system",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "secret-redaction",
+      "index": 1,
+      "reason": "partial snippet: uses SecretsManager without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "prompt-injection-defense",
+      "index": 1,
+      "reason": "partial snippet: uses tutti without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "budgets",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "budgets",
+      "index": 2,
+      "reason": "partial snippet: uses score without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "budgets",
+      "index": 3,
+      "reason": "partial snippet: uses runtime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "tool-rate-limiting",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "guardrails-beforerun-afterrun",
+      "index": 1,
+      "reason": "partial snippet: uses AnthropicProvider without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/security.mdx",
+      "heading": "approval-gates-hitl",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1109)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/skills.mdx",
+      "heading": "what-gets-stored",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/smart-routing.mdx",
+      "heading": "per-agent-opt-in-model-auto",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/smart-routing.mdx",
+      "heading": "classifier-strategies",
+      "index": 1,
+      "reason": "partial snippet: uses SmartProvider without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/smart-routing.mdx",
+      "heading": "budget-integration",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/smart-routing.mdx",
+      "heading": "observability",
+      "index": 1,
+      "reason": "partial snippet: uses runtime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/smart-routing.mdx",
+      "heading": "auto-fallback",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1109)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/smart-routing.mdx",
+      "heading": "forcing-a-tier",
+      "index": 1,
+      "reason": "partial snippet: uses score without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/tool-caching.mdx",
+      "heading": "quick-start",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/tool-caching.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/tool-caching.mdx",
+      "heading": "observability",
+      "index": 1,
+      "reason": "partial snippet: uses runtime without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/guides/tool-caching.mdx",
+      "heading": "custom-cache-backends",
+      "index": 1,
+      "reason": "TS2355: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a val..."
+    },
+    {
+      "file": "docs/src/content/docs/guides/your-first-agent.mdx",
+      "heading": "step-6-use-programmatically",
+      "index": 1,
+      "reason": "imports ./tutti.score.js, a file the guide does not show (TS2307)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/discord.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses DiscordVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/discord.mdx",
+      "heading": "inbound-inbox",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/email.mdx",
+      "heading": "score-example",
+      "index": 1,
+      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Emai..."
+    },
+    {
+      "file": "docs/src/content/docs/voices/email.mdx",
+      "heading": "inbound-inbox",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/github.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses GitHubVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/knowledge.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses KnowledgeVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/mcp.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses McpVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/mcp.mdx",
+      "heading": "example",
+      "index": 1,
+      "reason": "TS2741: Property 'system_prompt' is missing in type '{ name: string; model: string; voices: McpVoi..."
+    },
+    {
+      "file": "docs/src/content/docs/voices/mcp.mdx",
+      "heading": "bridging-multiple-mcp-servers",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1109)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/notion.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses NotionVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/overview.mdx",
+      "heading": "using-a-voice",
+      "index": 1,
+      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/overview.mdx",
+      "heading": "the-voice-interface",
+      "index": 1,
+      "reason": "partial snippet: uses Tool without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/playwright.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses PlaywrightVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/playwright.mdx",
+      "heading": "teardown",
+      "index": 1,
+      "reason": "partial snippet: uses PlaywrightVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/postgres.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses PostgresVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/rag.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses RagVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/rag.mdx",
+      "heading": "storage-providers",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/realtime.mdx",
+      "heading": "score-wiring",
+      "index": 1,
+      "reason": "TS2345: Argument of type '{ voice: \"shimmer\"; }' is not assignable to parameter of type 'RealtimeC..."
+    },
+    {
+      "file": "docs/src/content/docs/voices/realtime.mdx",
+      "heading": "connecting-from-a-browser",
+      "index": 1,
+      "reason": "partial snippet: uses TUTTI_API_KEY without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/sandbox.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses SandboxVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/sender.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses SenderVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/slack.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses SlackVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/slack.mdx",
+      "heading": "inbound-inbox",
+      "index": 1,
+      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/stripe.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses StripeVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/telegram.mdx",
+      "heading": "score-example",
+      "index": 1,
+      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Tele..."
+    },
+    {
+      "file": "docs/src/content/docs/voices/twitter.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses TwitterVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/web.mdx",
+      "heading": "configuration",
+      "index": 1,
+      "reason": "partial snippet: uses WebVoice without importing or declaring it (TS2304)"
+    },
+    {
+      "file": "docs/src/content/docs/voices/whatsapp.mdx",
+      "heading": "score-example",
+      "index": 1,
+      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: What..."
+    }
+  ]
+}
