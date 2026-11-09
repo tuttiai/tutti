@@ -8,47 +8,24 @@
  */
 
 import chalk from "chalk";
+import type {
+  CostAgentBudget,
+  CostRun as WireCostRun,
+  CostToolsResponse,
+  CostToolUsage,
+} from "@tuttiai/types";
 
 /** Wire shape of one row from `GET /cost/runs`. */
-export interface CostRun {
-  run_id: string;
-  agent_name: string;
-  /** ISO-8601 string. */
-  started_at: string;
-  cost_usd: number;
-  total_tokens: number;
-}
+export type CostRun = WireCostRun;
 
 /** Wire shape of one row from `GET /cost/tools`. */
-export interface ToolUsage {
-  tool_name: string;
-  call_count: number;
-  total_llm_tokens: number;
-  avg_llm_tokens_per_call: number;
-}
+export type ToolUsage = CostToolUsage;
 
 /** Wire shape of `GET /cost/tools`. */
-export interface ToolsResponse {
-  /** ISO-8601 timestamp of the earliest span in the live tracer window. */
-  window_started_at: string;
-  /** Total spans the live tracer is currently holding. */
-  window_span_count: number;
-  tools: ToolUsage[];
-}
+export type ToolsResponse = CostToolsResponse;
 
 /** Wire shape of one row from `GET /cost/budgets`. */
-export interface AgentBudget {
-  agent_id: string;
-  budget?: {
-    max_tokens?: number;
-    max_cost_usd?: number;
-    max_cost_usd_per_day?: number;
-    max_cost_usd_per_month?: number;
-    warn_at_percent?: number;
-  };
-  daily_total_usd: number | null;
-  monthly_total_usd: number | null;
-}
+export type AgentBudget = CostAgentBudget;
 
 /** Sparkline glyphs ordered low → high. */
 const SPARK_BARS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];

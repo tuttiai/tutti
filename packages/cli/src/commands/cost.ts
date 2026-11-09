@@ -11,14 +11,20 @@
 import chalk from "chalk";
 import { SecretsManager } from "@tuttiai/core";
 import {
+  CostBudgetsResponseSchema,
+  CostRunsResponseSchema,
+  CostToolsResponseSchema,
+  type CostBudgetsResponse,
+  type CostRunsResponse,
+} from "@tuttiai/types";
+import { parseServerResponse } from "../server-response.js";
+import {
   parseLastWindow,
   renderAnalyze,
   renderBudgets,
   renderReportCsv,
   renderReportJson,
   renderReportText,
-  type AgentBudget,
-  type CostRun,
   type ToolsResponse,
 } from "./cost-render.js";
 
@@ -78,23 +84,11 @@ function handleNonOk(res: Response): void {
   }
 }
 
-interface CostRunsBody {
-  since: string | null;
-  until: string | null;
-  agent_id: string | null;
-  store_missing: boolean;
-  runs: CostRun[];
-}
-
-interface CostBudgetsBody {
-  agents: AgentBudget[];
-}
-
 async function fetchRuns(
   baseUrl: string,
   opts: CostOptions,
   query: { since: Date; agent?: string; limit?: number },
-): Promise<CostRunsBody> {
+): Promise<CostRunsResponse> {
   const params = new URLSearchParams();
   params.set("since", query.since.toISOString());
   if (query.agent !== undefined) params.set("agent_id", query.agent);
@@ -107,7 +101,7 @@ async function fetchRuns(
     explainConnectionError(err, baseUrl);
   }
   handleNonOk(res);
-  return (await res.json()) as CostRunsBody;
+  return parseServerResponse(res, CostRunsResponseSchema, "GET /cost/runs");
 }
 
 async function fetchTools(
@@ -125,14 +119,15 @@ async function fetchTools(
     return undefined;
   }
   if (!res.ok) return undefined;
-  return (await res.json()) as ToolsResponse;
+  // Unavailable is best-effort, but a body that arrives malformed still fails.
+  return parseServerResponse(res, CostToolsResponseSchema, "GET /cost/tools");
 }
 
 async function fetchBudgets(
   baseUrl: string,
   opts: CostOptions,
   agent?: string,
-): Promise<CostBudgetsBody> {
+): Promise<CostBudgetsResponse> {
   const params = new URLSearchParams();
   if (agent !== undefined) params.set("agent_id", agent);
   const qs = params.toString();
@@ -148,7 +143,7 @@ async function fetchBudgets(
     process.exit(1);
   }
   handleNonOk(res);
-  return (await res.json()) as CostBudgetsBody;
+  return parseServerResponse(res, CostBudgetsResponseSchema, "GET /cost/budgets");
 }
 
 function resolveSince(last: string | undefined, fallbackDays: number): Date {
