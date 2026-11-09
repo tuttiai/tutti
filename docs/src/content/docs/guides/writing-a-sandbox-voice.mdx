@@ -1,0 +1,234 @@
+---
+title: "Writing a Sandbox Voice"
+description: "What a voice that runs code must provide: execution, file I/O, an environment allowlist, timeouts and cleanup"
+sidebar:
+  order: 5
+---
+
+A sandbox voice gives an agent somewhere to run code and keep files. Tutti ships one, `@tuttiai/sandbox`, and this guide uses it as the reference implementation. Read it when you want to write your own, for example one backed by a container, a remote runner or a hosted sandbox service. It assumes you have read [Building a Voice](/guides/building-a-voice/).
+
+:::caution[A sandbox voice is not a security boundary by itself]
+`@tuttiai/sandbox` runs every snippet as the same operating system user as the Tutti server. It is not a security boundary.
+
+- The environment allowlist controls what a child process is **handed**, not what it can **read**. A snippet can run `cat /proc/1/environ` and get every credential the server holds. See [tutti#29](https://github.com/tuttiai/tutti/pull/29).
+- The path check covers only `read_file` and `write_file`. `execute_code` can read and write anything the server's user can.
+- Code you do not trust needs real isolation: a container or virtual machine with its own user and no host credentials. Providing that is the voice author's job, not Tutti's.
+
+The [isolation limits](#isolation-limits) section lists the rest.
+:::
+
+## The voice shape
+
+A sandbox voice is an ordinary `Voice` from `@tuttiai/types`, with `Tool`, `ToolResult`, `Permission` and `VoiceContext` from the same package. The reference is `SandboxVoice` in `voices/sandbox/src/index.ts`:
+
+- `name` and `description`;
+- `required_permissions: ["shell"]`, so an agent must be given the `shell` permission to use it;
+- `tools`, built in `setup(context: VoiceContext)` once the working folder exists;
+- `teardown()`, which removes that folder.
+
+Its options are validated by `SandboxVoiceConfigSchema` in `voices/sandbox/src/config-schema.ts`, a strict Zod schema, so an unknown option is rejected rather than ignored. Validate your own options the same way.
+
+A sandbox voice has five duties. Each section below says what the voice must do, where `@tuttiai/sandbox` does it today, and what happens when it fails.
+
+## Execution
+
+**What the voice must do.** Run a snippet in a child process, with the session's folder as its working directory, and return its output and exit code as a tool result. Validate the tool input with Zod, and limit the languages to the ones the voice was configured with.
+
+**In `@tuttiai/sandbox`.** `execute(code, language, options)` in `voices/sandbox/src/executor.ts` spawns the child and returns an `ExecResult` (`stdout`, `stderr`, `exit_code`, `duration_ms`, `truncated`). Its options are `ExecOptions` and its languages are `Language`: `typescript` (run with `tsx`), `python` (run with `python3`) and `bash`. `createExecuteCodeTool` in `voices/sandbox/src/tools/run-code.ts` wraps it as the `execute_code` tool. It narrows the `language` enum to `allowed_languages`, so the model cannot pick another runtime, and caps the tool's `timeout_ms` input at 120 000 ms.
+
+**On failure.** A tool never throws. A non-zero exit code comes back as `is_error: true` with the output, so the model can read the error and try again. A child that cannot be started (for example a missing `python3`) gives exit code 127 with the reason in `stderr`, and anything else that goes wrong is returned as `Execution failed: <message>` with `is_error: true`.
+
+## File I/O
+
+**What the voice must do.** Read and write files under one folder per session, and refuse any path that resolves outside it, including `../` and absolute paths.
+
+**In `@tuttiai/sandbox`.** `SessionSandbox` in `voices/sandbox/src/sandbox.ts` owns the folder: `root` is its absolute path, `init()` creates it, `resolve()` turns a path from the model into an absolute path inside `root`, and `destroy()` removes it. `createReadFileTool` in `voices/sandbox/src/tools/read-file.ts` reads a file as `utf-8` or `base64`, and `sliceLines` cuts it to the line range asked for. `createWriteFileTool` in `voices/sandbox/src/tools/write-file.ts` checks the size against `max_file_size_bytes` (1 MB by default) before writing anything, and creates parent folders as needed.
+
+**On failure.** `resolve()` throws `SandboxEscapeError` (with `code` set to `"SANDBOX_ESCAPE"`) when a path escapes, and its message leaves out the resolved host path. Both tools catch it and return the message with `is_error: true`. A file over the size limit is refused before anything is written, with a hint to write less or split the file.
+
+## Environment allowlist
+
+**What the voice must do.** Give the child process a fresh environment built from a short allowlist, never `process.env` itself. Read each allowed variable through `SecretsManager` from `@tuttiai/core`, never through `process.env` directly. A variable that is not on the list, such as `ANTHROPIC_API_KEY`, must be absent in the child.
+
+**In `@tuttiai/sandbox`.** `childEnv(extra)` in `voices/sandbox/src/utils/child-env.ts` reads 19 allowlisted names, such as `PATH`, `HOME`, `LANG`, `TZ` and the proxy variables, through `SecretsManager.optional`, then lays `extra` (the voice's `env` option) on top. It returns a new object. `NODE_ENV` is deliberately left off. `voices/sandbox/tests/child-env-allowlist.test.ts` checks that a real bash snippet sees none of the credentials. `childEnv` is internal and not exported, so write your own version of it; the example below shows the pattern.
+
+**On failure.** There is no error to report: a variable that is not allowed is simply missing, and code that needs it fails in the child. Anything a snippet needs must be passed explicitly. Never put a credential in the `env` option: it reaches every snippet the agent runs.
+
+## Timeouts
+
+**What the voice must do.** Stop a child that runs too long, report that it was stopped, and keep the output small enough for the model to read.
+
+**In `@tuttiai/sandbox`.** `execute` in `voices/sandbox/src/executor.ts` starts a timer (30 000 ms by default, set by the `timeout_ms` option or the tool input) and sends `SIGKILL` when it fires. Output is cleaned by `stripAnsi`, cut by `truncateOutput` to 10 KB with its start and end kept, and passed through `redactPaths` so the working folder's host path does not reach the model. All three are in `voices/sandbox/src/utils/sanitize.ts`. Package installs have their own timeout, `install_timeout_ms` (60 000 ms by default).
+
+**On failure.** A child killed by the timer returns exit code 137, and `Process killed after <N>ms timeout` is added to `stderr`, so the tool result is an error the model can act on.
+
+## Cleanup
+
+**What the voice must do.** Remove the session's folder and everything in it in `teardown()`, and leave the voice ready for a fresh `setup()`.
+
+**In `@tuttiai/sandbox`.** `SandboxVoice.teardown()` calls `SessionSandbox.destroy()`, which removes `root` recursively. The folder is named after `conversation_id` when the run gives one, and `session_id` when it does not.
+
+**On failure.** `destroy()` uses a forced recursive remove, so a folder that is already gone is not an error.
+
+## A minimal working example
+
+This voice has the three core tools (`execute_code` for bash, `read_file` and `write_file`), a temporary root per setup, a path check, an allowlisted environment, a `SIGKILL` timeout and cleanup in `teardown()`. Every failure is returned as `{ content, is_error: true }` with a hint, never thrown. It imports only `@tuttiai/types`, `SecretsManager` from `@tuttiai/core`, `zod` and Node built-ins.
+
+```ts title="src/mini-sandbox-voice.ts"
+import { spawn } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve, sep } from "node:path";
+import { z } from "zod";
+import { SecretsManager } from "@tuttiai/core";
+import type { Permission, Tool, ToolResult, Voice } from "@tuttiai/types";
+
+/** The only variables a child inherits. Credentials are never on this list. */
+const ALLOWLIST = ["PATH", "HOME", "LANG", "TZ"] as const;
+const TIMEOUT_MS = 5_000;
+const MAX_BYTES = 65_536;
+
+/** Build a child environment from the allowlist, read through SecretsManager. */
+export function allowlistedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of ALLOWLIST) {
+    const value = SecretsManager.optional(key);
+    if (value !== undefined) env[key] = value;
+  }
+  return env;
+}
+
+/** Resolve `path` under `root`, or return undefined when it escapes. */
+export function resolveInside(root: string, path: string): string | undefined {
+  const full = resolve(root, path);
+  return full === root || full.startsWith(root + sep) ? full : undefined;
+}
+
+/** Run a bash command in `cwd` and SIGKILL it after `timeoutMs`. Never rejects. */
+export function runBash(command: string, cwd: string, timeoutMs: number): Promise<ToolResult> {
+  return new Promise((done) => {
+    const child = spawn("/bin/bash", ["-c", command], { cwd, env: allowlistedEnv() });
+    let output = "";
+    let killed = false;
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString("utf-8")));
+    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString("utf-8")));
+    const timer = setTimeout(() => {
+      killed = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      done({ content: `Could not start bash: ${err.message}. Is bash installed?`, is_error: true });
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const exit = killed ? 137 : (code ?? 1);
+      const note = killed ? `Killed after ${timeoutMs}ms. Make the command shorter.\n` : "";
+      const content = `${output}${note}exit_code: ${exit}`;
+      done(exit === 0 ? { content } : { content, is_error: true });
+    });
+  });
+}
+
+const ESCAPE: ToolResult = {
+  content: "Path leaves the sandbox. Use a relative path.",
+  is_error: true,
+};
+const runInput = z.object({ command: z.string().min(1) });
+const readInput = z.object({ path: z.string().min(1) });
+const writeInput = z.object({ path: z.string().min(1), content: z.string() });
+
+function runTool(root: string): Tool<z.infer<typeof runInput>> {
+  return {
+    name: "execute_code",
+    description: "Run a bash command in the sandbox root.",
+    parameters: runInput,
+    execute: (input) => runBash(input.command, root, TIMEOUT_MS),
+  };
+}
+
+function readTool(root: string): Tool<z.infer<typeof readInput>> {
+  return {
+    name: "read_file",
+    description: "Read a UTF-8 file under the sandbox root.",
+    parameters: readInput,
+    execute: async (input): Promise<ToolResult> => {
+      const full = resolveInside(root, input.path);
+      if (full === undefined) return ESCAPE;
+      try {
+        return { content: await readFile(full, "utf-8") };
+      } catch {
+        return { content: `Cannot read ${input.path}. Check the name.`, is_error: true };
+      }
+    },
+  };
+}
+
+function writeTool(root: string): Tool<z.infer<typeof writeInput>> {
+  return {
+    name: "write_file",
+    description: "Write a UTF-8 file under the sandbox root.",
+    parameters: writeInput,
+    execute: async (input): Promise<ToolResult> => {
+      const bytes = Buffer.byteLength(input.content, "utf-8");
+      if (bytes > MAX_BYTES) {
+        return { content: `${bytes} bytes is over ${MAX_BYTES}. Split the file.`, is_error: true };
+      }
+      const full = resolveInside(root, input.path);
+      if (full === undefined) return ESCAPE;
+      try {
+        await mkdir(dirname(full), { recursive: true });
+        await writeFile(full, input.content, "utf-8");
+        return { content: `Wrote ${input.path} (${bytes} bytes)` };
+      } catch {
+        return { content: `Cannot write ${input.path}. Check the path.`, is_error: true };
+      }
+    },
+  };
+}
+
+/** A minimal sandbox voice: bash, read_file and write_file under a temporary root. */
+export class MiniSandboxVoice implements Voice {
+  readonly name = "mini-sandbox";
+  readonly required_permissions: Permission[] = ["shell"];
+  tools: Tool[] = [];
+  /** Absolute path of the session's root while the voice is set up. */
+  root: string | undefined;
+
+  /** Create a fresh root and the tools bound to it. */
+  async setup(): Promise<void> {
+    const root = await mkdtemp(join(tmpdir(), "mini-sandbox-"));
+    this.root = root;
+    this.tools = [runTool(root), readTool(root), writeTool(root)];
+  }
+
+  /** Delete the root and everything in it. */
+  async teardown(): Promise<void> {
+    if (this.root !== undefined) await rm(this.root, { recursive: true, force: true });
+    this.root = undefined;
+    this.tools = [];
+  }
+}
+```
+
+It has the same limits as the reference: it runs as the server's user, and the path check covers only the file tools. Run its `execute_code` inside a container with no credentials before you give it to an agent that handles input you do not control.
+
+## Isolation limits
+
+The caution at the top of this page applies to every sandbox voice that runs code on the server's own host. `@tuttiai/sandbox` also has these limits today:
+
+- **Same user as the server.** Sandboxed code runs as the server's own user, so `cat /proc/1/environ` returns every credential the server holds ([tutti#29](https://github.com/tuttiai/tutti/pull/29)). The allowlist stops a snippet being handed credentials; it does not stop a snippet that goes looking for them.
+- **The path check covers only the file tools.** `execute_code` runs with the session folder as its working directory, but it can read and write anything the server's user can.
+- **The timeout kills only the direct child.** The child is not started in its own process group, so a background process a snippet starts can outlive the timeout.
+- **Time is the only limit.** There is no CPU, memory or network limit.
+- **Some temporary folders stay behind.** TypeScript and Python snippets are written to a new folder under the system temporary directory (`tutti-ts-*` or `tutti-py-*`). The file is deleted after the run, but its folder is not.
+- **`install_package` installs anything** when `allowed_packages` is not set.
+- **No tool sets `destructive`.** The source of `execute_code`, `write_file` and `install_package` does not set the `destructive` flag on the tool.
+
+If your voice must run code you do not trust, put the execution behind a real boundary: a container or virtual machine with its own user, no host credentials and limits on CPU, memory and network.
+
+## See also
+
+- [Sandbox Voice](/voices/sandbox/), the reference voice and its options.
+- [Building a Voice](/guides/building-a-voice/), for packaging and publishing.
+- [Security](/guides/security/), for permissions and secrets.
