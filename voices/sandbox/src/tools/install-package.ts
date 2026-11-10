@@ -60,12 +60,11 @@ export function createInstallPackageTool(
     parameters,
     execute: async (input): Promise<ToolResult> => {
       try {
-        // Validate the package name doesn't contain shell injection chars.
-        if (!SAFE_NAME_RE.test(input.name)) {
+        // Checked before the allowlist, so no list can let an unsafe name through.
+        const reason = invalidNameReason(input.name);
+        if (reason) {
           return {
-            content:
-              "Invalid package name: must contain only alphanumeric " +
-              "characters, @, _, ., /, and -.",
+            content: `Invalid package name "${input.name}": ${reason}\n` + INSTALL_ERROR_HINT,
             is_error: true,
           };
         }
@@ -117,6 +116,23 @@ export function createInstallPackageTool(
       }
     },
   };
+}
+
+/**
+ * Why `name` must not reach npm or pip, or `undefined` when it is safe.
+ *
+ * The name goes unquoted into a bash command line, so it must hold no shell
+ * meta-characters, and it must not be read as an option (a leading "-") or as
+ * a local path outside the sandbox (a leading "/" or any "..").
+ */
+function invalidNameReason(name: string): string | undefined {
+  if (!SAFE_NAME_RE.test(name)) {
+    return "must contain only alphanumeric characters, @, _, ., /, and -.";
+  }
+  if (name.startsWith("-") || name.startsWith("/") || name.includes("..")) {
+    return 'must not start with "-", be an absolute path or contain "..".';
+  }
+  return undefined;
 }
 
 /**
