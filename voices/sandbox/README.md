@@ -183,6 +183,7 @@ Required permission: `"shell"` (must be explicitly granted in `AgentConfig.permi
 | File size | `write_file` rejects content exceeding `max_file_size_bytes` |
 | Package allowlist | `install_package` rejects names not on `allowed_packages` |
 | Shell injection | Package names validated against `[a-zA-Z0-9@_./-]` regex |
+| Option and path injection | `install_package` rejects names that start with `-` or `/`, or contain `..`, before anything runs |
 | Language restriction | `execute_code` Zod schema rejects disallowed languages |
 
 ## License
