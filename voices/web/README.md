@@ -59,7 +59,7 @@ const score = defineScore({
   agents: {
     researcher: {
       name: "researcher",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt:
         "You are a research assistant. Use web_search to find current " +
         "information, fetch_url to read full articles, and " +
