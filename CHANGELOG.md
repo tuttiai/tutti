@@ -76,6 +76,8 @@
 
 ### Added
 
+**`tutti-ai eval run --fail-on-skip` fails CI when a scorer skipped, and every run prints the skipped count** (`@tuttiai/cli`). A similarity case without `OPENAI_API_KEY` used to pass silently. The summary now always prints `Skipped: N` after the totals. With `--fail-on-skip`, each skipped result fails its case and the run exits 1, with or without `--ci`, and the JUnit XML gets a `ScorerSkipped` failure naming the case and the scorer. Without the flag, exit codes, totals and JUnit output are unchanged.
+
 **Skipped scorer results are marked, so CI can tell a skip from a pass** (`@tuttiai/core`). `ScoreResult` gains an optional `skipped?: boolean`, and the similarity scorer sets `skipped: true` when `OPENAI_API_KEY` is not set and no client is injected. `passed` stays `true` on a skip and every other result is unchanged, so existing runs keep their verdicts. Additive only: no signature changes.
 
 **`npm run docs:check-samples` type-checks the TypeScript code blocks in the docs** (repository tooling, nothing published changes). It pulls every fenced block whose language is `ts`, `tsx` or `typescript` out of `docs/**/*.mdx`, checks each as its own module against the built workspace packages with the TypeScript already in the tree, and prints any error at its line and column in the `.mdx` file. A sample is keyed by file, nearest heading and its position under that heading. `docs/code-samples.skip.json` lists the 129 of 181 samples that fail on main today, each with a reason; the run also fails when a listed sample starts to pass or an entry names no block, so the list can only shrink. Run `npm run build` first. `npm run test:docs-samples` type-checks and tests the checker. Not yet wired into CI.
