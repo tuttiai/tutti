@@ -888,6 +888,7 @@ tutti-ai eval run                                   # replay every case, report 
 tutti-ai eval run --case <id>                       # filter by id (8-char prefix ok)
 tutti-ai eval run --tag regression                  # filter by tag
 tutti-ai eval run --ci                              # JUnit XML + exit 1 on any failure
+tutti-ai eval run --ci --fail-on-skip               # also fail when a scorer skipped
 tutti-ai eval suite ./my-suite.ts                   # v1 assertion-based suite runner
 ```
 
@@ -899,6 +900,9 @@ tutti-ai eval suite ./my-suite.ts                   # v1 assertion-based suite r
 | `--tag <tag>` | Run only cases carrying this tag. Combinable with `--case` (ANDed). |
 | `--ci` | Plain one-line-per-case output, no ANSI, writes JUnit XML to `.tutti/eval-results.xml`, exits 1 if any case fails. |
 | `-s, --score <path>` | Score file to load (default `./tutti.score.ts`). |
+| `--fail-on-skip` | Fail the run and exit 1 when any scorer result was skipped (for example `similarity` without `OPENAI_API_KEY`). Works with or without `--ci`. |
+
+After the pass/fail totals, every run prints `Skipped: N`, the number of scorer results that were skipped (`Skipped: 0` when there are none). Without `--fail-on-skip` a skipped result still counts as passed and the JUnit XML is unchanged. With the flag, each skipped result fails its case: the line reads `Skipped: N (failing run: --fail-on-skip)`, and in `--ci` mode the case's `<testcase>` carries `<failure type="ScorerSkipped" message='case "<name>" skipped by scorer "<scorer>": <detail>'>`. Saved runs keep the scorer's own verdict, so `eval list` is not affected.
 
 `eval record <session-id>` captures the output + tool sequence of a past session and stores it as a pinned golden case. Subsequent `eval run` calls replay the agent against the captured input and score the result with configured scorers (`exact`, `similarity`, `tool-sequence`, or custom modules).
 
