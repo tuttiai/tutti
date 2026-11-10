@@ -56,9 +56,10 @@ export interface SimilarityScorerOptions {
  * Cosine-similarity scorer backed by OpenAI's embedding API.
  *
  * When `OPENAI_API_KEY` is unset and no client override is provided, the
- * scorer returns `{ score: 0, passed: true, detail: "skipped: ..." }`
+ * scorer returns `{ score: 0, passed: true, skipped: true, detail: "skipped: ..." }`
  * so CI runs without OpenAI credentials don't fail the overall golden
- * run — the skip is recorded in the detail instead.
+ * run. The skip is marked by `skipped: true` and recorded in the detail,
+ * so a caller such as `tutti-ai eval run --fail-on-skip` can fail on it.
  *
  * The threshold is configurable per-case via `ScorerRef.threshold` and
  * carried into the constructor by the registry.
@@ -92,6 +93,7 @@ export class SimilarityScorer implements Scorer {
         scorer: this.name,
         score: 0,
         passed: true,
+        skipped: true,
         detail: "skipped: OPENAI_API_KEY not set",
       };
     }
