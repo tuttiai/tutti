@@ -179,7 +179,7 @@ export async function execute(
 
       resolve({
         stdout: "",
-        stderr: err.message,
+        stderr: redactPaths(err.message, cwd),
         exit_code: 127,
         duration_ms: Date.now() - start,
         truncated: false,
