@@ -36,7 +36,7 @@ For each voice that passes the check, `PermissionGuard.warn(voice)` logs a warni
 
 The guarantee covers runs started through `TuttiRuntime.run()`. If you build your own loop on `AgentRunner`, call `PermissionGuard.check` yourself.
 
-Skills follow the same rule. When skills are enabled, a skill whose `required_permissions` the agent does not grant throws the same `PermissionError` when the run starts, with the voice name given as `skill:<name>`.
+Skills are checked later, by the agent runner. When skills are enabled, a skill whose `required_permissions` the agent does not grant makes `runtime.run()` reject with a `PermissionError` too, with the voice name given as `skill:<name>`. That error is thrown inside the runner, after the session has been created or loaded, the `beforeAgentRun` hooks have run, `agent:start` has been emitted and every voice's `setup()` has run. No model call is made.
 
 ## Example: a grant and a denial
 
@@ -95,6 +95,8 @@ Grant them in your score file:
 ```
 
 ## What happens on a denial
+
+These points describe a voice permission denial, from the check in `TuttiRuntime.run()`. A skill denial happens later, as described under [How enforcement works](#how-enforcement-works).
 
 - `runtime.run()` rejects with a `PermissionError`. It is a thrown error, not a tool result with `is_error`, so catch it around `run()`.
 - `err.code` is `"PERMISSION_DENIED"`, and `err.context` is `{ voice, required, granted }`: the voice name, everything that voice requires and everything the agent grants.
