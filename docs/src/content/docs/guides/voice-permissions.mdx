@@ -1,0 +1,106 @@
+---
+title: "Voice Permissions"
+description: "What a voice can be permitted to do, how the runtime enforces it, and what a denial looks like"
+sidebar:
+  order: 7
+---
+
+Every voice says which permissions it needs, and every agent says which permissions it grants. Before an agent runs, the runtime checks that the agent grants everything each of its voices needs. If anything is missing, the run stops before it starts.
+
+This page covers that model in detail. The [Security guide](./security) covers the other layers: secret redaction, prompt injection defence, budgets and score validation.
+
+## The four permissions
+
+A permission is one of four values, defined as `Permission` in `@tuttiai/types` and re-exported from `@tuttiai/core`:
+
+| Permission | What it allows the voice to do |
+| --- | --- |
+| `network` | Make HTTP requests and call external APIs |
+| `filesystem` | Read and write local files |
+| `shell` | Run shell commands |
+| `browser` | Drive a browser |
+
+There are no other values. A permission applies to the whole voice, not to single tools: an agent that grants `shell` to a voice grants it to every tool that voice provides.
+
+## Who declares and who grants
+
+- **A voice declares** what it needs in `required_permissions: Permission[]`. A voice that needs nothing declares an empty array.
+- **An agent grants** permissions in `permissions` on its config in the score. Leaving `permissions` out grants nothing: the runtime reads it as `agent.permissions ?? []`.
+- **The score is validated when it loads.** A value that is not one of the four permissions, in either field, is rejected. Run `npx tutti-ai check` to validate a score without running it.
+
+## How enforcement works
+
+`TuttiRuntime.run()` enforces permissions. After it finds the agent and before it hands the run to the agent runner, it calls `PermissionGuard.check(voice, granted)` once for each voice on the agent, on every run. This includes a run resumed after a human approval, which goes through `TuttiRuntime.run()` again.
+
+For each voice that passes the check, `PermissionGuard.warn(voice)` logs a warning, "Voice has elevated permissions", with the voice name and its permissions when the voice requires `shell` or `filesystem`. The warning does not stop the run.
+
+The guarantee covers runs started through `TuttiRuntime.run()`. If you build your own loop on `AgentRunner`, call `PermissionGuard.check` yourself.
+
+Skills follow the same rule. When skills are enabled, a skill whose `required_permissions` the agent does not grant throws the same `PermissionError` when the run starts, with the voice name given as `skill:<name>`.
+
+## Example: a grant and a denial
+
+This example defines a small voice that needs `shell`, then runs the same agent twice: once with `shell` granted and once with nothing granted.
+
+```ts title="permissions.ts"
+import { AnthropicProvider, PermissionError, TuttiRuntime } from "@tuttiai/core";
+import type { Permission, ScoreConfig, Voice } from "@tuttiai/core";
+
+const deployVoice: Voice = {
+  name: "deploy",
+  description: "Runs deployment scripts",
+  required_permissions: ["shell"],
+  tools: [],
+};
+
+function deployScore(permissions: Permission[]): ScoreConfig {
+  return {
+    provider: new AnthropicProvider(),
+    agents: {
+      deployer: {
+        name: "deployer",
+        system_prompt: "You deploy the app when asked.",
+        voices: [deployVoice],
+        permissions,
+      },
+    },
+  };
+}
+
+// Granted: the check passes and the run goes ahead.
+const allowed = new TuttiRuntime(deployScore(["shell"]));
+const result = await allowed.run("deployer", "Deploy the staging build");
+console.log(result.output);
+
+// Denied: nothing is granted, so run() rejects before the run starts.
+const denied = new TuttiRuntime(deployScore([]));
+try {
+  await denied.run("deployer", "Deploy the staging build");
+} catch (err: unknown) {
+  if (!(err instanceof PermissionError)) throw err;
+  console.log(err.code); // "PERMISSION_DENIED"
+  console.log(err.context); // { voice: "deploy", required: ["shell"], granted: [] }
+  console.log(err.message);
+}
+```
+
+The granted run also logs the "Voice has elevated permissions" warning, because `deploy` requires `shell`.
+
+The denied run prints this message:
+
+```
+Voice "deploy" requires permissions not granted: shell
+Grant them in your score file:
+  permissions: ['shell']
+```
+
+## What happens on a denial
+
+- `runtime.run()` rejects with a `PermissionError`. It is a thrown error, not a tool result with `is_error`, so catch it around `run()`.
+- `err.code` is `"PERMISSION_DENIED"`, and `err.context` is `{ voice, required, granted }`: the voice name, everything that voice requires and everything the agent grants.
+- The message lists only the missing permissions and the `permissions` line to add to the score.
+- The run never starts: no model call is made, no tool runs, no session is created or changed, and no hook runs.
+- No event is emitted. There is no permission event type, and the check runs before the runner emits `agent:start`, so event listeners see nothing for a denied run.
+- The check stops at the first voice that fails, so a score with several under-granted voices reports them one at a time.
+
+`PermissionError` extends `TuttiError`, like every other Tutti error, so a handler that catches `TuttiError` catches it too.
