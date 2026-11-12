@@ -49,3 +49,18 @@ export {
   type OTLPExporterOptions,
   type SpanExporter,
 } from "./exporters/index.js";
+
+export {
+  GEN_AI_ATTRIBUTES,
+  GEN_AI_OPERATIONS,
+} from "./semconv/genai-attributes.js";
+
+export { genAiSpanNaming } from "./semconv/genai-naming.js";
+
+export type { SpanNamingMode } from "./semconv/mode.js";
+
+export {
+  legacySpanNaming,
+  type ExportedSpanNaming,
+  type SpanNamingStrategy,
+} from "./semconv/naming.js";

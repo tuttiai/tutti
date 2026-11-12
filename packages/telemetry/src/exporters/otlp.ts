@@ -1,7 +1,8 @@
 import { JsonTraceSerializer } from "@opentelemetry/otlp-transformer";
 
 import type { TuttiSpan } from "../types.js";
-import { legacySpanNaming } from "../semconv/naming.js";
+import { resolveSpanNaming, type SpanNamingMode } from "../semconv/mode.js";
+import type { SpanNamingStrategy } from "../semconv/naming.js";
 import { tuttiSpanToReadableSpan } from "./otlp-adapter.js";
 import type { SpanExporter } from "./types.js";
 
@@ -31,6 +32,16 @@ export interface OTLPExporterOptions {
    * callers that want visibility into dropped batches pass a logger here.
    */
   onError?: (err: unknown, attempt: number) => void;
+  /**
+   * Span-naming convention to export with. `"legacy"` (the default) sends
+   * today's names and attributes unchanged. `"genai"` sends the
+   * OpenTelemetry GenAI semantic-convention names (`invoke_agent {agent}`,
+   * `chat {model}`, `execute_tool {tool}`) and `gen_ai.*` attributes, and
+   * leaves tool input and output out; see {@link genAiSpanNaming}. Only the
+   * exported copy changes: in-process span names stay as they are. Any
+   * other value makes the constructor throw.
+   */
+  semconv?: SpanNamingMode;
 }
 
 /* ------------------------------------------------------------------ */
@@ -57,8 +68,10 @@ export class OTLPExporter implements SpanExporter {
   private timer: ReturnType<typeof setInterval> | undefined;
   private inFlight: Promise<void> | undefined;
   private shuttingDown = false;
+  private readonly naming: SpanNamingStrategy;
 
   constructor(private readonly opts: OTLPExporterOptions) {
+    this.naming = resolveSpanNaming(opts.semconv, "OTLPExporter");
     const intervalMs = opts.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
     this.timer = setInterval(() => {
       void this.flush();
@@ -105,7 +118,7 @@ export class OTLPExporter implements SpanExporter {
 
   private async send(batch: TuttiSpan[]): Promise<void> {
     const payloadBytes = JsonTraceSerializer.serializeRequest(
-      batch.map((span) => tuttiSpanToReadableSpan(span, legacySpanNaming)),
+      batch.map((span) => tuttiSpanToReadableSpan(span, this.naming)),
     );
     if (!payloadBytes) return; // serialiser produced nothing — drop silently
     // Decode to string: JsonTraceSerializer's output is UTF-8 JSON, and

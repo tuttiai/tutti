@@ -123,6 +123,28 @@ await stop();
 - **`JsonFileExporter`** — appends one JSON object per closed span to a file. Lazy file-open on first write.
 - **Custom** — implement the `SpanExporter` interface (`export` / `flush` / `shutdown`).
 
+### GenAI semantic conventions (opt-in)
+
+Pass `semconv: "genai"` to send agent, LLM and tool spans with the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/), so backends with a GenAI view can read them without a custom mapping:
+
+```ts
+new OTLPExporter({ endpoint: "http://localhost:4318/v1/traces", semconv: "genai" });
+```
+
+| Kind | Exported name | GenAI attributes |
+|---|---|---|
+| `agent` | `invoke_agent {agent_id}` | `gen_ai.operation.name=invoke_agent`, `gen_ai.agent.name`, `gen_ai.conversation.id`, `gen_ai.request.model` |
+| `llm` | `chat {model}` | `gen_ai.operation.name=chat`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` |
+| `tool` | `execute_tool {tool_name}` | `gen_ai.operation.name=execute_tool`, `gen_ai.tool.name` |
+
+- The `gen_ai.*` keys replace `agent_id`, `model`, `prompt_tokens`, `completion_tokens`, the two cache counts and `tool_name`. Other attributes (`session_id`, `total_tokens`, `cost_usd`, `router_*`, `tutti.kind`) stay.
+- `tool_input` and `tool_output` are left out. No prompt, completion or tool content is ever sent.
+- A missing name gives the bare operation (`chat`) and leaves its attribute out. A reported `0` token count is kept; an unreported one is left out.
+- A failed span gets `error.type=_OTHER`. Guardrail and checkpoint spans are sent as before.
+- Only the exported copy changes. In-process names, `getRunCost` and the CLI are unaffected.
+- `"legacy"` (the default) sends exactly what earlier versions sent. Any other value throws.
+- The upstream conventions are experimental; the keys were checked against semantic conventions 1.43.0 and are exported as `GEN_AI_ATTRIBUTES` and `GEN_AI_OPERATIONS`.
+
 ## Span schema
 
 Every span carries:
