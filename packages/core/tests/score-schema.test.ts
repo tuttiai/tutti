@@ -406,4 +406,43 @@ describe("validateScore", () => {
       validateScore(scoreWithSchedule({ input: "Daily report" })),
     ).toThrow("exactly one of cron, every, or at must be set");
   });
+
+  it("accepts an end_at with Z or an offset, and one equal to at", () => {
+    for (const end_at of ["2026-12-31T23:59:59Z", "2026-12-31T18:00:00+01:00"]) {
+      expect(() =>
+        validateScore(scoreWithSchedule({ cron: "0 9 * * *", input: "Daily", end_at })),
+      ).not.toThrow();
+    }
+    const at = "2026-12-31T18:00:00Z";
+    expect(() =>
+      validateScore(scoreWithSchedule({ at, input: "Once", end_at: at })),
+    ).not.toThrow();
+  });
+
+  it.each(["next friday", "2026-12-31", "2026-12-31T18:00:00", "2026-12-31T18:00:00Z; rm -rf /"])(
+    "rejects an end_at of %j, naming the field and quoting the value",
+    (end_at) => {
+      expect(() =>
+        validateScore(scoreWithSchedule({ every: "1h", input: "Hourly", end_at })),
+      ).toThrow(`schedule.end_at must be an ISO-8601 date-time with a timezone, got "${end_at}"`);
+    },
+  );
+
+  it("rejects an end_at that is not a string", () => {
+    expect(() =>
+      validateScore(scoreWithSchedule({ every: "1h", input: "Hourly", end_at: 1767225600000 })),
+    ).toThrow("agents.reporter.schedule.end_at");
+  });
+
+  it("rejects an end_at before at", () => {
+    expect(() =>
+      validateScore(
+        scoreWithSchedule({
+          at: "2026-12-31T18:00:00Z",
+          input: "Once",
+          end_at: "2026-12-31T17:59:59Z",
+        }),
+      ),
+    ).toThrow("agents.reporter.schedule.end_at: schedule.end_at must not be before schedule.at");
+  });
 });
