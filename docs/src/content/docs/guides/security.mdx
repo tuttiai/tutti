@@ -135,11 +135,11 @@ Two enforcement modes:
 Daily/monthly caps query a `RunCostStore` at run start and add this run's accumulating cost to the snapshot. Use `PostgresRunCostStore` in any deployment with more than one worker so every process shares the same total: `InMemoryRunCostStore` is for dev and tests.
 
 ```ts
-import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+import { TuttiRuntime, PostgresRunCostStore, SecretsManager } from "@tuttiai/core";
 
 const runtime = new TuttiRuntime(score, {
   runCostStore: new PostgresRunCostStore({
-    connection_string: process.env.DATABASE_URL!,
+    connection_string: SecretsManager.require("DATABASE_URL"),
   }),
 });
 ```
