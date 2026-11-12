@@ -21,6 +21,7 @@ import type {
 } from "@tuttiai/types";
 
 import type { Checkpoint } from "../checkpoint/types.js";
+import { validCost } from "./carried-budget.js";
 import { splitPausedMessages, toolUses, type SplitMessages } from "./paused-messages.js";
 import type { InterruptRequest } from "./types.js";
 
@@ -40,7 +41,7 @@ export interface PausedTurn {
   response: ChatResponse;
   /** One entry per `tool_use` id of the paused turn. */
   dispositions: Map<string, Disposition>;
-  /** Tokens the run had used when it paused. */
+  /** Tokens the run had used when it paused, and its cost (`cost_usd`) when the checkpoint kept one. */
   usage: TokenUsage;
 }
 
@@ -60,6 +61,7 @@ export interface PauseSnapshot {
   finished: ToolResultBlock[];
   /** `tool_use` ids that have not finished. */
   pending: string[];
+  /** Tokens used so far; `cost_usd`, when valid, is written as `state.cost_usd_used`. */
   usage: TokenUsage;
   /** When the turn first paused. Kept on every rewrite of the checkpoint. */
   saved_at: Date;
@@ -74,6 +76,7 @@ export interface PauseSnapshot {
 export function buildPauseCheckpoint(snap: PauseSnapshot): Checkpoint {
   const messages = [...snap.messages];
   if (snap.finished.length > 0) messages.push({ role: "user", content: [...snap.finished] });
+  const cost = validCost(snap.usage.cost_usd);
   return {
     session_id: snap.session_id,
     turn: snap.turn,
@@ -83,6 +86,7 @@ export function buildPauseCheckpoint(snap: PauseSnapshot): Checkpoint {
       next_turn: snap.turn + 1,
       prompt_tokens_used: snap.usage.input_tokens,
       completion_tokens_used: snap.usage.output_tokens,
+      ...(cost !== undefined ? { cost_usd_used: cost } : {}),
       pending_tool_ids: [...snap.pending],
       awaiting_tool_results: false,
     },
@@ -113,6 +117,11 @@ export function isPauseCheckpoint(cp: Checkpoint): boolean {
  * defaults filled in), while the checkpoint holds the model's raw input, so
  * a call matches a record equal to either.
  *
+ * A saved `cost_usd_used` that is not a finite number of at least zero makes
+ * the checkpoint invalid: it is never read as zero, so a damaged checkpoint
+ * cannot reset the run's spend. Discard or repair such a checkpoint. A
+ * checkpoint with no `cost_usd_used` (saved before cost was kept) is valid.
+ *
  * @param cp - A pause checkpoint.
  * @param records - The session's approval records, in any order.
  * @param parseArgs - The tool's parsed arguments for a call, or `undefined` when they cannot be parsed.
@@ -124,7 +133,7 @@ export function planResume(
   parseArgs: ArgsParser = () => undefined,
 ): ResumePlan {
   const split = splitPausedMessages(cp.messages);
-  if (!isPauseCheckpoint(cp) || !split) return { kind: "invalid" };
+  if (!isPauseCheckpoint(cp) || !split || !savedCostReadable(cp.state.cost_usd_used)) return { kind: "invalid" };
   const pending = new Set(cp.state.pending_tool_ids);
   const candidates = records
     .filter((r) => r.session_id === cp.session_id && r.requested_at.getTime() >= cp.saved_at.getTime())
@@ -154,6 +163,11 @@ function settle(decided: Map<string, Disposition | "wait">): Map<string, Disposi
   return settled;
 }
 
+/** Whether a checkpoint's saved cost is absent or valid. */
+function savedCostReadable(value: unknown): boolean {
+  return value === undefined || validCost(value) !== undefined;
+}
+
 function claim(block: ToolUseBlock, parsed: unknown, candidates: InterruptRequest[]): Disposition | "wait" {
   const index = candidates.findIndex(
     (r) =>
@@ -168,12 +182,17 @@ function claim(block: ToolUseBlock, parsed: unknown, candidates: InterruptReques
 
 function toPausedTurn(cp: Checkpoint, split: SplitMessages, dispositions: Map<string, Disposition>): PausedTurn {
   const content: ContentBlock[] = typeof split.assistant.content === "string" ? [] : split.assistant.content;
+  const cost = validCost(cp.state.cost_usd_used);
   return {
     session_id: cp.session_id,
     turn: cp.turn,
     messages: split.history,
     response: { id: "", content, stop_reason: "tool_use", usage: { input_tokens: 0, output_tokens: 0 } },
     dispositions,
-    usage: { input_tokens: cp.state.prompt_tokens_used, output_tokens: cp.state.completion_tokens_used },
+    usage: {
+      input_tokens: cp.state.prompt_tokens_used,
+      output_tokens: cp.state.completion_tokens_used,
+      ...(cost !== undefined ? { cost_usd: cost } : {}),
+    },
   };
 }

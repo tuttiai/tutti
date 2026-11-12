@@ -31,7 +31,7 @@ import { abortable, abortError, raceAbort, throwIfAborted, withSignal } from "./
 import { scopeFor, toolCallScope } from "./delegation/tool-call-scope.js";
 import { toolInputSchema } from "./tool-schema.js";
 import { PromptGuard } from "./prompt-guard.js";
-import { TokenBudget } from "./token-budget.js";
+import type { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
 import type { AgentRunOptions, UserMemoryStore } from "./memory/user/types.js";
 import type { UserModelStore } from "./memory/user-model.js";
@@ -54,6 +54,7 @@ import { logger } from "./logger.js";
 import { Tracing, getCurrentTraceId, setActiveLlmAttributes } from "./telemetry.js";
 import type { InterruptRequest, InterruptStore } from "./interrupt/index.js";
 import { needsApproval } from "./interrupt/index.js";
+import { budgetFor } from "./interrupt/carried-budget.js";
 import { dropWaiter, noteWaiter, takeReplay } from "./interrupt/live-waiters.js";
 import {
   PauseRecorder,
@@ -710,9 +711,7 @@ export class AgentRunner {
 
       const maxTurns = agent.max_turns ?? DEFAULT_MAX_TURNS;
       const maxToolCalls = agent.max_tool_calls ?? DEFAULT_MAX_TOOL_CALLS;
-      const budget = agent.budget
-        ? new TokenBudget(agent.budget, agent.model ?? "")
-        : undefined;
+      const budget = budgetFor(agent.budget, agent.model ?? "", paused);
 
       // Snapshot daily / monthly cost from the run-cost store at run
       // start. We add this run's accumulating cost to the snapshot for
@@ -767,7 +766,7 @@ export class AgentRunner {
             }
         : undefined;
       const totalUsage: TokenUsage = paused
-        ? { ...paused.usage }
+        ? { input_tokens: paused.usage.input_tokens, output_tokens: paused.usage.output_tokens }
         : resuming && checkpoint
           ? {
               input_tokens: checkpoint.state.prompt_tokens_used,
@@ -1118,7 +1117,9 @@ export class AgentRunner {
         // Pass the audit array only when an observer is wired —
         // executeTool short-circuits the hash + push when undefined.
         const auditSink = this.trajectoryObserver ? trajectoryAudit : undefined;
-        const recorder = this.pauseRecorder(session.id, turns, messages, totalUsage, toolUseBlocks);
+        // The run's spend at the pause, kept in the checkpoint so a resumed run's budget carries on from it.
+        const pauseUsage = budget ? { ...totalUsage, cost_usd: budget.estimated_cost_usd } : totalUsage;
+        const recorder = this.pauseRecorder(session.id, turns, messages, pauseUsage, toolUseBlocks);
         const toolResults: ToolResultBlock[] = await Promise.all(
           toolUseBlocks.map((block) =>
             this.executeTool(
