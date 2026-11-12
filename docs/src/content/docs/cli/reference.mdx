@@ -695,8 +695,8 @@ const score = defineScore({
 
 `end_at` is optional. It takes an ISO-8601 date-time with a timezone, either `Z` or an offset such as `+01:00`. A date on its own, a time with no zone, or anything that is not a date is rejected when the score is loaded. This is stricter than `at`, which also accepts a time with no zone.
 
-- A run due exactly at `end_at` still fires. No run starts after it, including a manual `tutti-ai schedules trigger`.
-- Once `end_at` passes, the schedule is disabled, exactly as when `max_runs` is used up. With both set, whichever comes first stops the schedule.
+- A run due exactly at `end_at` still fires. Timers and cron fire a few milliseconds late, so a tick or a manual `tutti-ai schedules trigger` up to one second after `end_at` still runs. After that, no run starts.
+- Once `end_at` (plus that one second) passes, the schedule is disabled, exactly as when `max_runs` is used up. With both set, whichever comes first stops the schedule.
 - A run already in progress at `end_at` is not cancelled; it finishes.
 - `end_at` must not be before `at`. For a new schedule it must also be in the future, otherwise registration fails with a message to remove or extend `end_at`. With the in-memory store every start registers the schedule as new, so once `end_at` has passed, `tutti-ai schedule` refuses to start until you remove or extend it. With `TUTTI_PG_URL` set, a stored schedule whose `end_at` has passed is registered as disabled instead.
 
