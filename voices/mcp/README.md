@@ -46,8 +46,8 @@ the server process is stopped.
 
 ## Long-running tools (MCP Tasks)
 
-Some MCP servers run slow tools (builds, crawls, data jobs) as
-[tasks](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks)
+Some MCP servers run slow tools (builds, crawls, data jobs) as tasks, an
+experimental part of the [MCP specification](https://modelcontextprotocol.io/specification),
 instead of holding one request open. The voice uses a task when both of these hold:
 
 - the server declares `tasks.requests.tools.call` in its capabilities, and
