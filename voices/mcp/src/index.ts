@@ -11,6 +11,8 @@ import type {
   VoiceContext,
 } from "@tuttiai/types";
 import { jsonSchemaToZod } from "./json-schema.js";
+import { callWithTask } from "./task-call.js";
+import { taskMode } from "./task-support.js";
 
 const require = createRequire(import.meta.url);
 const PKG_VERSION: string = (require("../package.json") as { version: string }).version;
@@ -115,10 +117,15 @@ export class McpVoice implements Voice {
         name: mcpTool.name,
         description: mcpTool.description ?? "",
         parameters: schema,
-        execute: async (input: unknown, _context: ToolContext): Promise<ToolResult> => {
+        execute: async (input: unknown, context: ToolContext): Promise<ToolResult> => {
           try {
             // Safe: input has been parsed by the Zod schema derived from the MCP tool's inputSchema.
-            return await this.callMcpTool(mcpTool.name, input as Record<string, unknown>);
+            const args = input as Record<string, unknown>;
+            const mode = taskMode(this.client?.getServerCapabilities(), mcpTool.execution?.taskSupport);
+            if (mode !== "plain") {
+              return await callWithTask(this.client, { server: this.name, name: mcpTool.name, args, mode }, context);
+            }
+            return await this.callMcpTool(mcpTool.name, args);
           } catch (err) {
             return {
               content: err instanceof Error ? err.message : String(err),
