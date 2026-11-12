@@ -99,7 +99,7 @@ TUTTI_STATE_DIR=/state
 - `tutti-ai serve` needs `TUTTI_STATE_DIR` to be an absolute path, such as `/state`. Otherwise it ignores the variable, with a warning.
 - `tutti-ai serve` builds its stores once per process, so a watch-mode reload keeps the approvals already waiting.
 - Postgres that cannot be reached is not a reason to fall back to memory: the error surfaces on first use.
-- The started log line names the store in use as `durability: postgres`, `durability: file` or `durability: memory`.
+- The store in use is logged as `durability: postgres`, `durability: file` or `durability: memory`: on the server image's "Tutti server started" line, and on the "Approval store ready" line of `tutti-ai serve`.
 
 On memory stores, pending approvals, and the runs waiting on them, are lost when the process stops. Each entry point logs a warning at start when it falls back to memory:
 
