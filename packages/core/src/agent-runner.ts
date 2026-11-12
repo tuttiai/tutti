@@ -30,6 +30,7 @@ import { askForFinalAnswer, stoppedMidWork } from "./final-answer.js";
 import { abortable, abortError, raceAbort, throwIfAborted, withSignal } from "./run-abort.js";
 import { scopeFor, toolCallScope } from "./delegation/tool-call-scope.js";
 import { toolInputSchema } from "./tool-schema.js";
+import { callContext } from "./tool-call-context.js";
 import { PromptGuard } from "./prompt-guard.js";
 import { TokenBudget } from "./token-budget.js";
 import type { SemanticMemoryStore } from "./memory/semantic.js";
@@ -1717,11 +1718,15 @@ export class AgentRunner {
         // the caller left, or a sibling call that saw the abort, stops here.
         throwIfAborted(signal);
 
+        // Each call gets its own signal and progress reporter; a timeout aborts it.
+        const call = callContext(context, { block, events: this.events, runSignal: signal });
         let result = await this.executeWithTimeout(
-          () => toolCallScope.run(scopeFor(block.id, context.session_id, signal), () => tool.execute(parsed, context)),
+          () => toolCallScope.run(scopeFor(block.id, context.session_id, signal), () => tool.execute(parsed, call.context)),
           timeoutMs,
           block.name,
-        );
+        )
+          .catch((error: unknown) => call.fail(error))
+          .finally(() => call.settle());
 
         // Populate cache with the successful raw result. Skip error results
         // so transient failures don't get pinned for minutes.
