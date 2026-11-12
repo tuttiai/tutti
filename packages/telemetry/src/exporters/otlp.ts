@@ -1,6 +1,7 @@
 import { JsonTraceSerializer } from "@opentelemetry/otlp-transformer";
 
 import type { TuttiSpan } from "../types.js";
+import { legacySpanNaming } from "../semconv/naming.js";
 import { tuttiSpanToReadableSpan } from "./otlp-adapter.js";
 import type { SpanExporter } from "./types.js";
 
@@ -104,7 +105,7 @@ export class OTLPExporter implements SpanExporter {
 
   private async send(batch: TuttiSpan[]): Promise<void> {
     const payloadBytes = JsonTraceSerializer.serializeRequest(
-      batch.map(tuttiSpanToReadableSpan),
+      batch.map((span) => tuttiSpanToReadableSpan(span, legacySpanNaming)),
     );
     if (!payloadBytes) return; // serialiser produced nothing — drop silently
     // Decode to string: JsonTraceSerializer's output is UTF-8 JSON, and
