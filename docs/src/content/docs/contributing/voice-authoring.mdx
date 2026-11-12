@@ -79,6 +79,29 @@ const parameters = z.object({
 });
 ```
 
+### Long-running tools: signal and progress
+
+`ToolContext` carries two optional fields for tools that take a while:
+
+- `signal` is an `AbortSignal` of the call's own. It aborts when the run is aborted or the call passes `tool_timeout_ms`, so a tool that started remote work can cancel it.
+- `report_progress(update)` puts one `tool:progress` event on the run's event stream, tagged with `tool_name` and `tool_call_id`. `update` may carry `progress`, `total`, `message`, `status`, `task_id` and `source`. The runtime redacts `message` and caps it at 500 characters, and drops updates sent after the call has ended or its signal has aborted.
+
+Both are absent on runtimes older than these fields, so read them with `?.`:
+
+```ts
+import type { ToolContext, ToolResult } from "@tuttiai/types";
+
+export function crawl(input: { pages: number }, context: ToolContext): Promise<ToolResult> {
+  for (let page = 1; page <= input.pages; page++) {
+    if (context.signal?.aborted === true) {
+      return Promise.resolve({ content: "Crawl stopped: the run was aborted or timed out.", is_error: true });
+    }
+    context.report_progress?.({ progress: page, total: input.pages, message: `Crawled page ${page}` });
+  }
+  return Promise.resolve({ content: `Crawled ${input.pages} pages` });
+}
+```
+
 ## Permissions
 
 Declare what your voice needs:
