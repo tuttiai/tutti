@@ -66,11 +66,14 @@ On runtimes that provide them (`@tuttiai/core` with `ToolContext.signal` and
   `tool:progress` event with `task_id`, `status`, `progress`, `total`,
   `message` and `source` (the voice name, which names the server).
 - **Cancel.** When the run is aborted or the call passes `tool_timeout_ms`,
-  the voice stops waiting at once and sends `tasks/cancel` once, waiting up to
-  5 seconds for the server to confirm it. The agent gets `is_error: true`
-  naming the task, the tool and the server, with "cancelled (run aborted)" or
-  "cancelled (timed out)". A server may ignore or reject the cancel; the result
-  then says so.
+  the voice stops waiting at once and sends `tasks/cancel` once in the
+  background, waiting up to 5 seconds for the server to confirm it. A server
+  may ignore or reject the cancel. What the agent sees comes from the runtime:
+  on a timeout it gets the runtime's tool timeout error, and on an abort the
+  run ends without a tool result. The voice's own result, `is_error: true`
+  naming the task, the tool and the server with "cancelled (run aborted)" or
+  "cancelled (timed out)" and a note when the cancel was not confirmed, is
+  returned only to code that awaits the tool's `execute` itself.
 
 On older runtimes tasks still run and return their results, without
 progress or cancel. Every other tool, and every tool on a server without
