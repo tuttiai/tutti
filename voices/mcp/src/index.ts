@@ -1,5 +1,4 @@
 import { createRequire } from "node:module";
-import { z } from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type {
@@ -10,6 +9,7 @@ import type {
   Voice,
   VoiceContext,
 } from "@tuttiai/types";
+import { jsonSchemaToZod } from "./json-schema.js";
 
 const require = createRequire(import.meta.url);
 const PKG_VERSION: string = (require("../package.json") as { version: string }).version;
@@ -143,63 +143,6 @@ export class McpVoice implements Voice {
       content: text || "(no output)",
       is_error: result.isError === true,
     };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// JSON Schema → Zod converter (covers common MCP tool schemas)
-// ---------------------------------------------------------------------------
-
-function jsonSchemaToZod(schema: Record<string, unknown>): z.ZodTypeAny {
-  const properties = schema.properties as
-    | Record<string, Record<string, unknown>>
-    | undefined;
-  const required = Array.isArray(schema.required)
-    ? schema.required.filter((v): v is string => typeof v === "string")
-    : [];
-
-  if (!properties) {
-    return z.record(z.unknown());
-  }
-
-  const shapeMap = new Map<string, z.ZodTypeAny>();
-  for (const [key, prop] of Object.entries(properties)) {
-    let field: z.ZodTypeAny = convertType(prop);
-    if (typeof prop.description === "string") {
-      field = field.describe(prop.description);
-    }
-    if (!required.includes(key)) {
-      field = field.optional();
-    }
-    shapeMap.set(key, field);
-  }
-
-  return z.object(Object.fromEntries(shapeMap)).passthrough();
-}
-
-function convertType(prop: Record<string, unknown>): z.ZodTypeAny {
-  if (Array.isArray(prop.enum)) {
-    const strings = prop.enum.filter((v): v is string => typeof v === "string");
-    if (strings.length > 0) {
-      return z.enum(strings as [string, ...string[]]);
-    }
-  }
-
-  switch (prop.type) {
-    case "string":
-      return z.string();
-    case "number":
-      return z.number();
-    case "integer":
-      return z.number().int();
-    case "boolean":
-      return z.boolean();
-    case "array":
-      return z.array(z.unknown());
-    case "object":
-      return z.record(z.unknown());
-    default:
-      return z.unknown();
   }
 }
 
