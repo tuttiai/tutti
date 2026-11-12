@@ -25,6 +25,16 @@ export interface ScheduleConfig {
   /** Auto-disable the schedule after this many runs. */
   max_runs?: number;
   /**
+   * Optional end time: an ISO-8601 date-time with a timezone (`Z` or an
+   * offset such as `+01:00`), e.g. `"2026-12-31T18:00:00Z"`. No run starts
+   * after it, and the schedule is disabled once it passes. A run due
+   * exactly at `end_at` still fires: a tick or `trigger()` up to one second
+   * after `end_at` still runs. A run already in flight is not cancelled. With `max_runs`, whichever comes first stops the schedule.
+   * Must not be before `at`, and must be in the future when the schedule
+   * is first registered.
+   */
+  end_at?: string;
+  /**
    * Optional delivery target — when set, the agent's output is dispatched
    * to the platform after each successful run.
    */
@@ -61,7 +71,7 @@ export interface ScheduleRecord {
   agent_id: string;
   /** The schedule configuration. */
   config: ScheduleConfig;
-  /** Whether the schedule is active. `false` after max_runs or manual pause. */
+  /** Whether the schedule is active. `false` after max_runs, end_at or manual pause. */
   enabled: boolean;
   /** When the schedule was first registered. */
   created_at: Date;
