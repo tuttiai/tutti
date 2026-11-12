@@ -28,8 +28,8 @@ export interface ScheduleConfig {
    * Optional end time: an ISO-8601 date-time with a timezone (`Z` or an
    * offset such as `+01:00`), e.g. `"2026-12-31T18:00:00Z"`. No run starts
    * after it, and the schedule is disabled once it passes. A run due
-   * exactly at `end_at` still fires; a run already in flight is not
-   * cancelled. With `max_runs`, whichever comes first stops the schedule.
+   * exactly at `end_at` still fires: a tick or `trigger()` up to one second
+   * after `end_at` still runs. A run already in flight is not cancelled. With `max_runs`, whichever comes first stops the schedule.
    * Must not be before `at`, and must be in the future when the schedule
    * is first registered.
    */

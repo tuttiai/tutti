@@ -11,6 +11,14 @@ import type { ScheduleConfig, ScheduleRecord } from "./types.js";
 /** Longest delay `setTimeout` honours; a longer one fires at once. */
 export const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
+/**
+ * How late a tick may arrive and still count as the run due at end_at.
+ * Real timers and node-cron fire a few milliseconds after the time they
+ * were due; one second matches cron's resolution. The end timer fires
+ * just after `end_at + END_AT_GRACE_MS`.
+ */
+export const END_AT_GRACE_MS = 1_000;
+
 const IsoDateTimeSchema = z.string().datetime({ offset: true });
 
 type Equals<A, B> =
@@ -70,9 +78,12 @@ export function pastEndAtError(id: string, config: ScheduleConfig, nowMs: number
   );
 }
 
-/** True once `nowMs` is past end_at. A run due exactly at end_at still fires. */
+/**
+ * True once `nowMs` is more than {@link END_AT_GRACE_MS} past end_at, so a
+ * run due exactly at end_at still fires when its tick arrives a little late.
+ */
 export function hasEnded(config: ScheduleConfig, nowMs: number): boolean {
-  return config.end_at !== undefined && nowMs > Date.parse(config.end_at);
+  return config.end_at !== undefined && nowMs > Date.parse(config.end_at) + END_AT_GRACE_MS;
 }
 
 /** The reason to disable a schedule before a run, or `undefined` to run it. */
@@ -118,7 +129,8 @@ export function armEndTimer(endMs: number, onEnd: () => void): () => void {
 
 /**
  * Wrap a trigger timer's stop function so it also cancels the end timer,
- * arming one when `config.end_at` is set. Without end_at, returns `stop`.
+ * arming one for just after `end_at + END_AT_GRACE_MS` when `config.end_at`
+ * is set. Without end_at, returns `stop`.
  */
 export function withEndTimer(
   config: ScheduleConfig,
@@ -126,7 +138,7 @@ export function withEndTimer(
   onEnd: () => void,
 ): () => void {
   if (config.end_at === undefined) return stop;
-  const stopEnd = armEndTimer(Date.parse(config.end_at), onEnd);
+  const stopEnd = armEndTimer(Date.parse(config.end_at) + END_AT_GRACE_MS, onEnd);
   return () => {
     stop();
     stopEnd();

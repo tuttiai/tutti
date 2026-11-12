@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  END_AT_GRACE_MS,
   MAX_TIMER_DELAY_MS,
   armEndTimer,
   endAtState,
@@ -84,16 +85,18 @@ describe("pastEndAtError", () => {
 });
 
 describe("hasEnded / stopReason / maxRunsReason", () => {
-  it("treats end_at as inclusive", () => {
+  it("treats end_at as inclusive, with a grace for late ticks", () => {
     const config: ScheduleConfig = { every: "1m", input: "go", end_at: END };
     expect(hasEnded(config, END_MS)).toBe(false);
-    expect(hasEnded(config, END_MS + 1)).toBe(true);
+    expect(hasEnded(config, END_MS + 5)).toBe(false);
+    expect(hasEnded(config, END_MS + END_AT_GRACE_MS)).toBe(false);
+    expect(hasEnded(config, END_MS + END_AT_GRACE_MS + 1)).toBe(true);
     expect(hasEnded({ every: "1m", input: "go" }, Number.MAX_SAFE_INTEGER)).toBe(false);
   });
 
   it("reports end_at before max_runs when both apply", () => {
     const r = record({ end_at: END, max_runs: 1 }, 1);
-    expect(stopReason(r, END_MS + 1)?.message).toBe("Schedule disabled: end_at reached");
+    expect(stopReason(r, END_MS + END_AT_GRACE_MS + 1)?.message).toBe("Schedule disabled: end_at reached");
     expect(stopReason(r, END_MS)?.fields).toEqual({ run_count: 1, max_runs: 1 });
   });
 
@@ -156,6 +159,17 @@ describe("withEndTimer", () => {
   it("returns the trigger stop function unchanged without end_at", () => {
     const stop = (): void => undefined;
     expect(withEndTimer({ every: "1m", input: "go" }, stop, vi.fn())).toBe(stop);
+  });
+
+  it("arms the end timer for just after end_at plus the grace", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(END_MS - 1_000);
+    const onEnd = vi.fn();
+    withEndTimer({ every: "1m", input: "go", end_at: END }, vi.fn(), onEnd);
+    await vi.advanceTimersByTimeAsync(1_000 + END_AT_GRACE_MS);
+    expect(onEnd).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
   it("stops both the trigger timer and the end timer", async () => {
