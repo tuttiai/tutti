@@ -23,13 +23,19 @@ function isPlainObject(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-const JsonObjectSchema: z.ZodType<{ [key: string]: JsonValue }> = z.lazy(() =>
-  z
-    .record(JsonValueSchema)
-    .refine(isPlainObject, { message: "Expected a plain object" }),
-);
+/**
+ * The plain-object check runs on the input, before `z.record` copies it:
+ * a refine after the record would only ever see the copy.
+ */
+const JsonObjectSchema: z.ZodType<{ [key: string]: JsonValue }, z.ZodTypeDef, unknown> =
+  z.lazy(() =>
+    z
+      .unknown()
+      .refine(isPlainObject, { message: "Expected a plain object" })
+      .pipe(z.record(JsonValueSchema)),
+  );
 
-const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+const JsonValueSchema: z.ZodType<JsonValue, z.ZodTypeDef, unknown> = z.lazy(() =>
   z.union([
     z.string(),
     z.number().finite(),
