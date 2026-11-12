@@ -21,6 +21,7 @@ import type {
 } from "@tuttiai/types";
 
 import type { Checkpoint } from "../checkpoint/types.js";
+import { splitPausedMessages, toolUses, type SplitMessages } from "./paused-messages.js";
 import type { InterruptRequest } from "./types.js";
 
 /** What a resumed turn does with one of its tool calls. */
@@ -151,28 +152,6 @@ function settle(decided: Map<string, Disposition | "wait">): Map<string, Disposi
   const settled = new Map<string, Disposition>();
   for (const [id, d] of decided) settled.set(id, d === "wait" ? { kind: "interrupted" } : d);
   return settled;
-}
-
-interface SplitMessages {
-  history: ChatMessage[];
-  assistant: ChatMessage;
-  finished: ToolResultBlock[];
-}
-
-function splitPausedMessages(messages: ChatMessage[]): SplitMessages | undefined {
-  const last = messages.at(-1);
-  const trailing = last?.role === "user" ? 1 : 0;
-  const assistant = messages.at(-1 - trailing);
-  if (assistant?.role !== "assistant" || toolUses(assistant.content).length === 0) return undefined;
-  const finished = trailing === 1 && last && typeof last.content !== "string"
-    ? last.content.filter((b): b is ToolResultBlock => b.type === "tool_result")
-    : [];
-  return { history: messages.slice(0, messages.length - 1 - trailing), assistant, finished };
-}
-
-function toolUses(content: ChatMessage["content"]): ToolUseBlock[] {
-  if (typeof content === "string") return [];
-  return content.filter((b): b is ToolUseBlock => b.type === "tool_use");
 }
 
 function claim(block: ToolUseBlock, parsed: unknown, candidates: InterruptRequest[]): Disposition | "wait" {
