@@ -71,6 +71,26 @@ export interface UserMemoryToolHelpers {
   ): Promise<{ id: string }>;
 }
 
+/**
+ * One progress update a tool reports while it runs, through
+ * {@link ToolContext.report_progress}. Every field is optional; the runtime
+ * turns each update into one `tool:progress` event.
+ */
+export interface ToolProgressUpdate {
+  /** Work done so far, in the unit `total` uses. */
+  progress?: number;
+  /** Total amount of work, when known. */
+  total?: number;
+  /** A short status line. The runtime redacts it and caps it at 500 characters. */
+  message?: string;
+  /** Id of the remote task the tool is waiting on, such as an MCP task id. */
+  task_id?: string;
+  /** Status of that task as the remote side reports it, for example `working`. */
+  status?: string;
+  /** Where the update comes from, usually the voice name. */
+  source?: string;
+}
+
 export interface ToolContext {
   session_id: string;
   agent_name: string;
@@ -84,6 +104,18 @@ export interface ToolContext {
   user_memory?: UserMemoryToolHelpers;
   /** End-user identifier for the active run, if any. Mirrors {@link AgentRunOptions.user_id}. */
   user_id?: string;
+  /**
+   * Aborts when the run is aborted or this call passes `tool_timeout_ms`.
+   * Every call gets a signal of its own. A tool that starts remote work
+   * should cancel that work when it fires. Absent on older runtimes.
+   */
+  signal?: AbortSignal;
+  /**
+   * Report progress while the call runs. Each update becomes one
+   * `tool:progress` event; updates after the call has ended or its signal
+   * has aborted are dropped. Absent on older runtimes.
+   */
+  report_progress?: (update: ToolProgressUpdate) => void;
 }
 
 export interface Tool<T = unknown> {
