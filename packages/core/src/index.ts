@@ -326,6 +326,10 @@ export type {
   RunOptions as GraphRunOptions,
   EdgeOptions,
   NodeOptions,
+  WaitMatch,
+  WaitNode,
+  WaitOptions,
+  WaitTimeout,
 } from "./graph/index.js";
 
 // Providers

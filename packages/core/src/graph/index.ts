@@ -33,7 +33,7 @@
 
 import type { AgentRunner } from "../agent-runner.js";
 import type { GraphConfig, GraphEvent, GraphRunResult, RunOptions } from "./types.js";
-import { validateGraphConfig } from "./validate.js";
+import { assertNoWaitNodes, validateGraphConfig } from "./validate.js";
 import { executeGraph } from "./engine.js";
 import { logger } from "../logger.js";
 
@@ -131,6 +131,7 @@ export class TuttiGraph {
    * @throws {GuardrailError}    When a node's guardrail hook aborts the run.
    */
   async run(input: string, options?: RunOptions): Promise<GraphRunResult> {
+    assertNoWaitNodes(this.config);
     return executeGraph(this.config, this.runner, input, options, (e) =>
       this.dispatch(e),
     );
@@ -149,6 +150,7 @@ export class TuttiGraph {
    * @yields {GraphEvent} Events in execution order.
    */
   async *stream(input: string, options?: RunOptions): AsyncIterable<GraphEvent> {
+    assertNoWaitNodes(this.config);
     const events: GraphEvent[] = [];
     const result = await executeGraph(
       this.config,
@@ -193,5 +195,6 @@ export {
   GraphStateError,
 } from "./errors.js";
 export { defineGraph, GraphBuilder } from "./dsl.js";
-export type { EdgeOptions, NodeOptions } from "./dsl.js";
+export type { EdgeOptions, NodeOptions, WaitOptions } from "./dsl.js";
+export type { WaitMatch, WaitNode, WaitTimeout } from "./wait.js";
 export { renderGraph, graphToJSON } from "./visualize.js";
