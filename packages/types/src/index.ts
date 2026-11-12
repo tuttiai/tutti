@@ -19,6 +19,7 @@ export type {
   ToolMemoryHelpers,
   ToolRememberOptions,
   ToolContext,
+  ToolProgressUpdate,
   Tool,
   UserMemoryToolHelpers,
   VoiceContext,
