@@ -11,6 +11,7 @@ The package has no runtime dependencies. It uses the standard `WebSocket` constr
 ## Quick start
 
 ```typescript
+import { SecretsManager } from "@tuttiai/core";
 import { RealtimeClient } from "@tuttiai/realtime";
 
 const client = new RealtimeClient();
@@ -20,7 +21,7 @@ const off = client.on("response.audio.delta", (event) => {
   speaker.play(event["delta"]);
 });
 
-await client.connect(process.env.OPENAI_API_KEY!, {
+await client.connect(SecretsManager.require("OPENAI_API_KEY"), {
   model: "gpt-4o-realtime-preview",
   voice: "alloy",
   turnDetection: { type: "server_vad", threshold: 0.5, silenceDurationMs: 500 },
