@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type {
   Permission,
   Tool,
@@ -44,7 +45,7 @@ export class McpVoice implements Voice {
   tools: Tool[] = [];
 
   private client: Client | undefined;
-  private transport: StdioClientTransport | undefined;
+  private transport: Transport | undefined;
   private initialized = false;
 
   constructor(private options: McpVoiceOptions) {
@@ -55,14 +56,7 @@ export class McpVoice implements Voice {
   async setup(_context: VoiceContext): Promise<void> {
     if (this.initialized) return;
 
-    const [command, cmdArgs] = parseCommand(this.options.server);
-
-    this.transport = new StdioClientTransport({
-      command,
-      args: [...cmdArgs, ...(this.options.args ?? [])],
-      env: this.options.env,
-      stderr: "pipe",
-    });
+    this.transport = this.createTransport();
 
     this.client = new Client(
       { name: "tutti", version: PKG_VERSION },
@@ -72,13 +66,28 @@ export class McpVoice implements Voice {
 
     // Drain stderr so the child process doesn't stall from backpressure.
     // Errors are non-fatal — the server may log diagnostics we don't need.
-    const stderr = this.transport.stderr;
+    const stderr = this.transport instanceof StdioClientTransport ? this.transport.stderr : null;
     if (stderr) {
       stderr.on("data", () => { /* discard */ });
     }
 
     this.tools = await this.discoverTools();
     this.initialized = true;
+  }
+
+  /**
+   * The transport `setup()` connects through: the server's command over stdio.
+   *
+   * @internal Tests override it to connect to an in-memory server.
+   */
+  protected createTransport(): Transport {
+    const [command, cmdArgs] = parseCommand(this.options.server);
+    return new StdioClientTransport({
+      command,
+      args: [...cmdArgs, ...(this.options.args ?? [])],
+      env: this.options.env,
+      stderr: "pipe",
+    });
   }
 
   async teardown(): Promise<void> {
