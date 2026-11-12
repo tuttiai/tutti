@@ -38,8 +38,18 @@ function boot(stores: Stores, provider: LLMProvider, voice: Voice, budget?: Budg
   );
 }
 
+/** What {@link pauseThenRestart} hands a test: the second "process" and what it can observe. */
+interface Restarted {
+  stores: Stores;
+  counts: Counts;
+  approval: { interrupt_id: string; session_id: string };
+  runtime: TuttiRuntime;
+  provider: ReturnType<typeof createMockProvider>;
+  events: TuttiEvent[];
+}
+
 /** Pause at the gate after a $0.20 turn, then boot a second runtime on the same stores. */
-async function pauseThenRestart(before?: BudgetConfig, after: BudgetConfig | undefined = before) {
+async function pauseThenRestart(before?: BudgetConfig, after: BudgetConfig | undefined = before): Promise<Restarted> {
   const stores = memoryStores();
   const counts: Counts = { safe_tool: 0, danger_tool: 0, slow_tool: 0 };
   const first = boot(stores, createMockProvider([firstTurn]), countingVoice(counts), before);
