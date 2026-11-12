@@ -2,6 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client";
+import { InMemoryTaskStore } from "@modelcontextprotocol/sdk/experimental/tasks";
 import { toolContext } from "./helpers/in-memory.js";
 import { POLL_MS } from "./helpers/task-server.js";
 import { taskHarness, tick } from "./helpers/task-harness.js";
@@ -120,6 +121,24 @@ describe("McpVoice task calls", () => {
 
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("task store offline");
+    await h.voice.teardown();
+  });
+
+  it("returns an error result when tasks/result fails", async () => {
+    const h = await taskHarness();
+    vi.spyOn(InMemoryTaskStore.prototype, "getTaskResult").mockRejectedValue(new Error("result store offline"));
+
+    const run = h.tool.execute({}, h.context);
+    await tick();
+    await h.control.finish([{ type: "text", text: "done" }]);
+    await tick(POLL_MS);
+    const result = await run;
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain(`MCP task ${h.control.taskId} (crawl on mcp-test) failed:`);
+    expect(result.content).toContain("result store offline");
+    expect(result.content).toContain("Check the input and the server's logs, then retry.");
+    expect(vi.getTimerCount()).toBe(0);
     await h.voice.teardown();
   });
 
