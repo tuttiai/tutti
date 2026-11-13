@@ -200,7 +200,7 @@ for (const [agentId, result] of results) {
 
 - All agents start at once via `Promise.all`; each gets its own session.
 - If one agent fails, the others still complete: the failure is surfaced as a synthetic `[error]` result in the returned map (so callers can see which agent broke).
-- `timeout_ms` caps wall-clock time for any single agent and cancels stragglers.
+- `timeout_ms` limits how long `runParallel` waits for each agent. An agent that takes longer gets an `[error]` result saying it exceeded the timeout, and the call returns without its output. The agent is not cancelled: it keeps running in the background, its events still reach `router.events`, and it may keep calling the model and spending until it finishes. Its usage is not counted in `runParallelWithSummary`'s totals. To cap what it can spend, set `budget.max_cost_usd` on the agent; the run then stops at the start of its next turn once the cap is reached, so a model call already in progress still completes.
 
 For the full aggregate (merged output + total usage + total cost + duration) use `runParallelWithSummary`, which returns a `ParallelAgentResult`.
 
