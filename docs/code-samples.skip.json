@@ -44,12 +44,6 @@
     },
     {
       "file": "docs/src/content/docs/cli/reference.mdx",
-      "heading": "tutti-ai-deploy",
-      "index": 1,
-      "reason": "TS2353: Object literal may only specify known properties, and 'min' does not exist in type '{ minI..."
-    },
-    {
-      "file": "docs/src/content/docs/cli/reference.mdx",
       "heading": "tutti-ai-schedule-score",
       "index": 1,
       "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
@@ -257,12 +251,6 @@
       "heading": "checkpointstore",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
-    },
-    {
-      "file": "docs/src/content/docs/guides/deploy.mdx",
-      "heading": "step-1-add-a-deploy-block-to-one-agent",
-      "index": 1,
-      "reason": "TS2353: Object literal may only specify known properties, and 'min' does not exist in type '{ minI..."
     },
     {
       "file": "docs/src/content/docs/guides/deploy.mdx",
