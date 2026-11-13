@@ -18,9 +18,10 @@ In your score:
 
 ```ts
 import { TelegramVoice } from "@tuttiai/telegram";
-import { defineScore } from "@tuttiai/core";
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
 
 export default defineScore({
+  provider: new AnthropicProvider(),
   agents: {
     support: {
       name: "support",
@@ -140,7 +141,7 @@ Set `TUTTI_EMAIL_PASSWORD` (shared) or `TUTTI_EMAIL_IMAP_PASSWORD` + `TUTTI_EMAI
 Wire every platform into a single inbox so an agent can be reached on whichever channel its users prefer:
 
 ```ts
-import { defineScore } from "@tuttiai/core";
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
 import { TelegramVoice } from "@tuttiai/telegram";
 import { SlackVoice } from "@tuttiai/slack";
 import { DiscordVoice } from "@tuttiai/discord";
@@ -156,6 +157,7 @@ const EMAIL_CONN = {
 const WHATSAPP_PHONE_NUMBER_ID = "1234567890";
 
 export default defineScore({
+  provider: new AnthropicProvider(),
   agents: {
     support: {
       name: "support",
