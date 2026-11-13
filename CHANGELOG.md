@@ -27,6 +27,8 @@
 
 ### Fixed
 
+- core: AgentRouter.runParallelWithSummary now prices total_cost_usd at each agent's model rate from PRICING, instead of a fixed $3/$15 per million tokens for every model. A model with no PRICING entry is costed at $0, as in TokenBudget.
+
 **The @tuttiai/rag examples read API keys through SecretsManager** (docs, `@tuttiai/rag`). The `RagVoice` TSDoc example, the package README and the RAG voice docs page used `process.env.OPENAI_API_KEY!` (and `VOYAGE_API_KEY!` and `DATABASE_URL!` in the same way), which reads `process.env` directly and hides a missing key behind a non-null assertion. They now use `SecretsManager.require()` from `@tuttiai/core`, which fails with a clear message when the key is unset or empty. Docs only: no change to the package's behaviour or API.
 
 **`@tuttiai/sandbox` is described as a per-session working directory, not "secure" or "isolated"** (`@tuttiai/sandbox`, docs). The package description, the voice's `description` string and TSDoc, the voice manifest and the sandbox docs page now say "per-session working directory" and that it is not a security boundary, matching `utils/child-env.ts` and the sandbox-voice guide. The docs tool table's Destructive column now reads "no" for every tool, because no sandbox tool sets `destructive`. "Writing a Sandbox Voice" is added to the Guides sidebar after "Building a Voice". Docs and wording only, no behaviour change.
