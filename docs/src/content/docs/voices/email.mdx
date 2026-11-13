@@ -35,9 +35,10 @@ For Gmail / Outlook with 2FA, basic auth is disabled: generate an [app-specific 
 
 ```ts
 import { EmailVoice } from "@tuttiai/email";
-import { defineScore } from "@tuttiai/core";
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
 
 export default defineScore({
+  provider: new AnthropicProvider(),
   agents: {
     support: {
       name: "support",
