@@ -626,12 +626,6 @@
     },
     {
       "file": "docs/src/content/docs/voices/mcp.mdx",
-      "heading": "example",
-      "index": 1,
-      "reason": "TS2741: Property 'system_prompt' is missing in type '{ name: string; model: string; voices: McpVoi..."
-    },
-    {
-      "file": "docs/src/content/docs/voices/mcp.mdx",
       "heading": "bridging-multiple-mcp-servers",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1109)"
