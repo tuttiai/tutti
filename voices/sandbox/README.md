@@ -1,8 +1,9 @@
 # @tuttiai/sandbox
 
-Sandbox voice for [Tutti](https://tutti-ai.com) — secure code execution
-with per-session filesystem isolation for TypeScript, Python 3, and Bash,
-and a ranked map of any repository cloned into the sandbox.
+Sandbox voice for [Tutti](https://tutti-ai.com): code execution in a
+per-session working directory for TypeScript, Python 3, and Bash,
+and a ranked map of any repository cloned into the sandbox. It is not a
+security boundary: code runs as the server's own user.
 
 ## Install
 
@@ -24,7 +25,7 @@ const score = defineScore({
   agents: {
     coder: {
       name: "coder",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt:
         "You are a coding assistant. Write code to solve problems, " +
         "execute it to verify, and iterate until correct. You can " +
@@ -174,7 +175,7 @@ Required permission: `"shell"` (must be explicitly granted in `AgentConfig.permi
 
 | Measure | Detail |
 |---------|--------|
-| Filesystem isolation | Every path validated by `SessionSandbox.resolve()` — throws `SandboxEscapeError` for `../../` traversal |
+| Path validation | Every path validated by `SessionSandbox.resolve()`, which throws `SandboxEscapeError` for `../../` traversal |
 | Repository map | `repo_map` refuses a directory whose real path leaves the sandbox, skips symbolic links, and stops git searching above the sandbox for a repository |
 | Process timeout | `SIGKILL` after `timeout_ms`; exit code 137 |
 | Output size | stdout and stderr kept to 10 KB each: about the first 3 KB and the last 7 KB, with a `[… N characters left out …]` line between, because errors and test summaries come at the end |
