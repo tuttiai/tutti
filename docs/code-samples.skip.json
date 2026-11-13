@@ -44,12 +44,6 @@
     },
     {
       "file": "docs/src/content/docs/cli/reference.mdx",
-      "heading": "tutti-ai-deploy",
-      "index": 1,
-      "reason": "TS2353: Object literal may only specify known properties, and 'min' does not exist in type '{ minI..."
-    },
-    {
-      "file": "docs/src/content/docs/cli/reference.mdx",
       "heading": "tutti-ai-schedule-score",
       "index": 1,
       "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"

@@ -487,18 +487,20 @@ tutti-ai deploy --target railway --dry-run     # print the plan without executin
 **Score-side configuration:** add a `deploy` block to one agent in your score. Exactly one agent should declare it (the deploy entrypoint).
 
 ```ts
-import { defineScore } from "@tuttiai/core";
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
 
 export default defineScore({
+  provider: new AnthropicProvider(),
   agents: {
     api: {
       name: "api",
-      // ...
+      system_prompt: "You are a customer-facing API agent.",
+      voices: [],
       deploy: {
         target: "fly",                              // optional override; --target wins
         region: "auto",
-        scale: { min: 0, max: 3, memory: "512MB" },
-        health: { path: "/health", interval_seconds: 30 },
+        scale: { minInstances: 0, maxInstances: 3, memory: "512MB" },
+        healthCheck: { path: "/health", intervalSeconds: 30 },
         env: { LOG_LEVEL: "info" },
         secrets: ["ANTHROPIC_API_KEY", "DATABASE_URL"],
       },
