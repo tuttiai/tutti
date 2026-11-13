@@ -620,12 +620,6 @@
     },
     {
       "file": "docs/src/content/docs/voices/email.mdx",
-      "heading": "score-example",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Emai..."
-    },
-    {
-      "file": "docs/src/content/docs/voices/email.mdx",
       "heading": "inbound-inbox",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
@@ -751,12 +745,6 @@
       "reason": "partial snippet: uses StripeVoice without importing or declaring it (TS2304)"
     },
     {
-      "file": "docs/src/content/docs/voices/telegram.mdx",
-      "heading": "score-example",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Tele..."
-    },
-    {
       "file": "docs/src/content/docs/voices/twitter.mdx",
       "heading": "configuration",
       "index": 1,
@@ -767,12 +755,6 @@
       "heading": "configuration",
       "index": 1,
       "reason": "partial snippet: uses WebVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/whatsapp.mdx",
-      "heading": "score-example",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: What..."
     }
   ]
 }
