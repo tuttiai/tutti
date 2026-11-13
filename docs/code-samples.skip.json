@@ -260,12 +260,6 @@
     },
     {
       "file": "docs/src/content/docs/guides/deploy.mdx",
-      "heading": "step-1-add-a-deploy-block-to-one-agent",
-      "index": 1,
-      "reason": "TS2353: Object literal may only specify known properties, and 'min' does not exist in type '{ minI..."
-    },
-    {
-      "file": "docs/src/content/docs/guides/deploy.mdx",
       "heading": "cost-monitoring-after-deploy",
       "index": 1,
       "reason": "partial snippet: uses score without importing or declaring it (TS2304)"
