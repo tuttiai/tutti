@@ -11,6 +11,7 @@ import { nestedDelegators, validateDelegationGraph } from "./delegation/delegati
 import { TuttiRuntime } from "./runtime.js";
 import type { EventBus } from "./event-bus.js";
 import { addUsage } from "./usage.js";
+import { TokenBudget } from "./token-budget.js";
 import { buildDelegateTool, type DelegateInput } from "./delegation/delegate-tool.js";
 
 /** Safe lookup into score.agents by dynamic key. */
@@ -22,9 +23,8 @@ function getAgent(
   return map.get(id);
 }
 
-// Sonnet-class fallback pricing (per million tokens) — matches eval runner.
-const DEFAULT_INPUT_PER_M = 3;
-const DEFAULT_OUTPUT_PER_M = 15;
+/** TuttiRuntime.run's fallback model; keep in step with DEFAULT_MODEL in runtime.ts. */
+const RUNTIME_DEFAULT_MODEL = "claude-sonnet-5-5";
 
 /**
  * Type-guard: is this entry config the declarative parallel form?
@@ -37,16 +37,13 @@ function isParallelEntry(
   );
 }
 
-/**
- * Estimate cost in USD for a given token usage. Uses Sonnet-class pricing
- * as a neutral default — callers needing strict accounting should consult
- * {@link TokenBudget} with a configured model.
- */
-function estimateCostUsd(usage: TokenUsage): number {
-  return (
-    (usage.input_tokens / 1_000_000) * DEFAULT_INPUT_PER_M +
-    (usage.output_tokens / 1_000_000) * DEFAULT_OUTPUT_PER_M
-  );
+/** One agent's cost at its own model's PRICING row, by TokenBudget's rule (no row costs $0). */
+function agentCostUsd(score: ScoreConfig, agentId: string, usage: TokenUsage): number {
+  const own = getAgent(score.agents, agentId)?.model;
+  const model = own ? own : (score.default_model ?? RUNTIME_DEFAULT_MODEL);
+  const budget = new TokenBudget({}, model);
+  budget.add(usage.input_tokens, usage.output_tokens);
+  return budget.estimated_cost_usd;
 }
 
 /**
@@ -234,7 +231,7 @@ export class AgentRouter {
         results.set(outcome.agent_id, outcome.result);
         completed.push(outcome.agent_id);
         addUsage(total_usage, outcome.result.usage);
-        total_cost_usd += estimateCostUsd(outcome.result.usage);
+        total_cost_usd += agentCostUsd(this._score, outcome.agent_id, outcome.result.usage);
         mergedLines.push(
           `[${outcome.agent_id}] ${outcome.result.output}`,
         );
