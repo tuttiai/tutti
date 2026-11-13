@@ -27,6 +27,8 @@
 
 ### Fixed
 
+**Seven docs score examples type-check against the current API** (docs). The score examples on the Telegram, email and WhatsApp voice pages, the two in the inbox guide and the one under `tutti-ai inbox start` in the CLI reference left out the required `provider`; they now pass `new AnthropicProvider()`, as the sandbox and RAG pages already do. The MCP voice example left out the required `system_prompt` and now has one. All seven come off the docs-sample skip list. Docs only: no change to any package.
+
 **The @tuttiai/rag examples read API keys through SecretsManager** (docs, `@tuttiai/rag`). The `RagVoice` TSDoc example, the package README and the RAG voice docs page used `process.env.OPENAI_API_KEY!` (and `VOYAGE_API_KEY!` and `DATABASE_URL!` in the same way), which reads `process.env` directly and hides a missing key behind a non-null assertion. They now use `SecretsManager.require()` from `@tuttiai/core`, which fails with a clear message when the key is unset or empty. Docs only: no change to the package's behaviour or API.
 
 **`@tuttiai/sandbox` is described as a per-session working directory, not "secure" or "isolated"** (`@tuttiai/sandbox`, docs). The package description, the voice's `description` string and TSDoc, the voice manifest and the sandbox docs page now say "per-session working directory" and that it is not a security boundary, matching `utils/child-env.ts` and the sandbox-voice guide. The docs tool table's Destructive column now reads "no" for every tool, because no sandbox tool sets `destructive`. "Writing a Sandbox Voice" is added to the Guides sidebar after "Building a Voice". Docs and wording only, no behaviour change.
