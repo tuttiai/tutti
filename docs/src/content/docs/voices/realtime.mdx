@@ -34,12 +34,13 @@ export default defineScore({
       name: "talker",
       model: "claude-sonnet-4-6",
       system_prompt: "You are a helpful voice assistant. Keep replies short.",
-      voices: [RealtimeVoice({ voice: "shimmer" })],
+      voices: [RealtimeVoice({ model: "gpt-4o-realtime-preview", voice: "shimmer", turnDetection: { type: "server_vad" } })],
       permissions: ["network"],
       realtime: {
+        model: "gpt-4o-realtime-preview",
         voice: "shimmer",                  // OpenAI voice id
         instructions: "Be concise.",        // overrides system_prompt for the realtime turn
-        server_vad: { silence_ms: 500 },    // server-side VAD config
+        turnDetection: { type: "server_vad", silenceDurationMs: 500 }, // server-side VAD config
       },
     },
   },

@@ -710,12 +710,6 @@
     },
     {
       "file": "docs/src/content/docs/voices/realtime.mdx",
-      "heading": "score-wiring",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ voice: \"shimmer\"; }' is not assignable to parameter of type 'RealtimeC..."
-    },
-    {
-      "file": "docs/src/content/docs/voices/realtime.mdx",
       "heading": "connecting-from-a-browser",
       "index": 1,
       "reason": "partial snippet: uses TUTTI_API_KEY without importing or declaring it (TS2304)"
