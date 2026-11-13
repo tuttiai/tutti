@@ -27,6 +27,8 @@
 
 ### Fixed
 
+**The realtime score wiring example matches `RealtimeConfig`** (docs). The example on the realtime voice page called `RealtimeVoice({ voice })` and gave the agent's `realtime` block `server_vad: { silence_ms }`, but both need `model`, `voice` and `turnDetection`. It now passes `model: "gpt-4o-realtime-preview"` (the id in the `RealtimeVoice` TSDoc example) and `turnDetection: { type: "server_vad", silenceDurationMs: 500 }`, and comes off the docs-sample skip list. Docs only: no change to any package.
+
 **The @tuttiai/rag examples read API keys through SecretsManager** (docs, `@tuttiai/rag`). The `RagVoice` TSDoc example, the package README and the RAG voice docs page used `process.env.OPENAI_API_KEY!` (and `VOYAGE_API_KEY!` and `DATABASE_URL!` in the same way), which reads `process.env` directly and hides a missing key behind a non-null assertion. They now use `SecretsManager.require()` from `@tuttiai/core`, which fails with a clear message when the key is unset or empty. Docs only: no change to the package's behaviour or API.
 
 **`@tuttiai/sandbox` is described as a per-session working directory, not "secure" or "isolated"** (`@tuttiai/sandbox`, docs). The package description, the voice's `description` string and TSDoc, the voice manifest and the sandbox docs page now say "per-session working directory" and that it is not a security boundary, matching `utils/child-env.ts` and the sandbox-voice guide. The docs tool table's Destructive column now reads "no" for every tool, because no sandbox tool sets `destructive`. "Writing a Sandbox Voice" is added to the Guides sidebar after "Building a Voice". Docs and wording only, no behaviour change.
