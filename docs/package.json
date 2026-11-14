@@ -8,9 +8,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "astro": "^6.1.6",
-    "@astrojs/starlight": "^0.38.0",
-    "sharp": "^0.33.0"
+    "astro": "^7.4.7",
+    "@astrojs/starlight": "^0.43.1",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "vitest": "5.1.0"
