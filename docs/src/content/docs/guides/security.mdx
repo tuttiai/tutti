@@ -218,7 +218,7 @@ Each factory returns a `GuardrailHook`. Three built-in factories ship with `@tut
 | `piiDetector(opts)` | Detect / redact emails, phone numbers, SSNs, credit cards | `{ on_match, patterns? }` |
 | `topicBlocker(opts)` | Refuse to answer prompts about listed topics | `{ topics: string[], on_match }` |
 
-You can also write your own by implementing the `GuardrailHook` contract: any `(context) => Promise<GuardrailResult>` function with `action: "allow" | "block" | "rewrite"`. See [Guardrails](/guides/guardrails) for the full API.
+You can also write your own by implementing the `GuardrailHook` contract: any `(context) => Promise<GuardrailResult>` function with `action: "allow" | "block" | "rewrite"`.
 
 ## Approval gates (HITL)
 

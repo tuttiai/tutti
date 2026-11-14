@@ -65,6 +65,8 @@
 
 - Docs site: the site URL, sitemap and canonical links now point to https://tutti-ai.com/docs instead of the retired docs subdomain.
 
+**Three docs links no longer point to guides that do not exist** (docs). The CLI reference's `serve` section and the Security guide's Guardrails section linked to `/guides/serve` and `/guides/guardrails`, and the `schedule` row in Core Concepts to `/guides/scheduling`. None of these pages exists, so the docs site returned 404 and the website showed plain text. The `schedule` row now links to the `tutti-ai schedule` section of the CLI reference, and the other two sentences are removed. Docs only, no package changes.
+
 ### Changed
 
 **`GraphBuilder` types its private state schema without `any`** (`@tuttiai/core`, internal lint and typing cleanup, nothing published changes). The private `stateSchema` field takes its type from `GraphConfig["state"]` instead of repeating `ZodType<unknown, any, any>` under an inline `no-explicit-any` disable. The emitted `.d.ts` is byte-identical. `GraphConfig.state` and `GraphBuilder.state()` keep their `any`, because changing them changes the published types.
