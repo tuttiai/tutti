@@ -32,13 +32,8 @@
  */
 
 import type { AgentRunner } from "../agent-runner.js";
-import type {
-  GraphConfig,
-  GraphEvent,
-  GraphRunResult,
-  RunOptions,
-} from "./types.js";
-import { GraphValidationError } from "./errors.js";
+import type { GraphConfig, GraphEvent, GraphRunResult, RunOptions } from "./types.js";
+import { assertNoWaitNodes, validateGraphConfig } from "./validate.js";
 import { executeGraph } from "./engine.js";
 import { logger } from "../logger.js";
 
@@ -76,7 +71,7 @@ export class TuttiGraph {
   constructor(config: GraphConfig, runner: AgentRunner) {
     this.config = config;
     this.runner = runner;
-    this.validate();
+    validateGraphConfig(config);
   }
 
   /**
@@ -136,6 +131,7 @@ export class TuttiGraph {
    * @throws {GuardrailError}    When a node's guardrail hook aborts the run.
    */
   async run(input: string, options?: RunOptions): Promise<GraphRunResult> {
+    assertNoWaitNodes(this.config);
     return executeGraph(this.config, this.runner, input, options, (e) =>
       this.dispatch(e),
     );
@@ -154,6 +150,7 @@ export class TuttiGraph {
    * @yields {GraphEvent} Events in execution order.
    */
   async *stream(input: string, options?: RunOptions): AsyncIterable<GraphEvent> {
+    assertNoWaitNodes(this.config);
     const events: GraphEvent[] = [];
     const result = await executeGraph(
       this.config,
@@ -178,81 +175,6 @@ export class TuttiGraph {
       yield endEvent;
     }
   }
-
-  /**
-   * Validate the graph config at construction time.
-   *
-   * Checks performed:
-   * 1. At least one node exists.
-   * 2. No duplicate node IDs.
-   * 3. Entrypoint references an existing node.
-   * 4. Every edge's `from` references an existing node.
-   * 5. Every edge's `to` references an existing node or is `END`.
-   * 6. Every non-terminal node has at least one outgoing edge.
-   *
-   * @throws {GraphValidationError} On the first structural problem found.
-   */
-  private validate(): void {
-    const { nodes, edges, entrypoint } = this.config;
-    const nodeIds = new Set(nodes.map((n) => n.id));
-
-    if (nodes.length === 0) {
-      throw new GraphValidationError("Graph must have at least one node.");
-    }
-
-    // Duplicate IDs
-    if (nodeIds.size !== nodes.length) {
-      const counts = new Map<string, number>();
-      for (const n of nodes) {
-        counts.set(n.id, (counts.get(n.id) ?? 0) + 1);
-      }
-      const dupes = [...counts.entries()]
-        .filter(([, c]) => c > 1)
-        .map(([id]) => id);
-      throw new GraphValidationError(
-        `Duplicate node IDs: ${dupes.join(", ")}`,
-        { duplicates: dupes },
-      );
-    }
-
-    // Entrypoint
-    if (!nodeIds.has(entrypoint)) {
-      throw new GraphValidationError(
-        `Entrypoint "${entrypoint}" does not match any node ID.\n` +
-          `Available nodes: ${[...nodeIds].join(", ")}`,
-        { entrypoint, available: [...nodeIds] },
-      );
-    }
-
-    // Edge references
-    for (const edge of edges) {
-      if (!nodeIds.has(edge.from)) {
-        throw new GraphValidationError(
-          `Edge from "${edge.from}" references a non-existent node.`,
-          { edge_from: edge.from, edge_to: edge.to },
-        );
-      }
-      if (edge.to !== "__end__" && !nodeIds.has(edge.to)) {
-        throw new GraphValidationError(
-          `Edge to "${edge.to}" references a non-existent node.`,
-          { edge_from: edge.from, edge_to: edge.to },
-        );
-      }
-    }
-
-    // Every non-terminal node must have at least one outgoing edge.
-    // Terminal = has at least one edge to END.
-    const nodesWithOutgoing = new Set(edges.map((e) => e.from));
-    for (const id of nodeIds) {
-      if (!nodesWithOutgoing.has(id)) {
-        throw new GraphValidationError(
-          `Node "${id}" has no outgoing edges. ` +
-            `Add at least one edge from this node (or an edge to END).`,
-          { node_id: id },
-        );
-      }
-    }
-  }
 }
 
 // Re-export types and errors for convenience
@@ -273,5 +195,6 @@ export {
   GraphStateError,
 } from "./errors.js";
 export { defineGraph, GraphBuilder } from "./dsl.js";
-export type { EdgeOptions, NodeOptions } from "./dsl.js";
+export type { EdgeOptions, NodeOptions, WaitOptions } from "./dsl.js";
+export type { WaitMatch, WaitNode, WaitTimeout } from "./wait.js";
 export { renderGraph, graphToJSON } from "./visualize.js";
