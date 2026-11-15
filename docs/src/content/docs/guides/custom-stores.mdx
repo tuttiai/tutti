@@ -119,6 +119,12 @@ so a durable interrupt store is only useful together with a durable checkpoint s
 runtime treats the pair as durable unless either is a `MemoryInterruptStore` or a
 `MemoryCheckpointStore` (`packages/core/src/interrupt/pause-recorder.ts:32-34`).
 
+The checkpoint taken at a pause keeps the run's token counts and its spent cost
+(`SessionState.cost_usd_used`), and the resumed run's budget carries on from them, so a
+`max_cost_usd` ceiling holds across an approval. Checkpoints saved before the cost was kept
+resume with cost counted from zero. A checkpoint whose `cost_usd_used` is not a finite number of
+at least zero is refused as unreadable, so a store must return the number it was given.
+
 ## CheckpointStore
 
 Defined in `packages/core/src/checkpoint/store.ts:13-24`, with `Checkpoint` and `SessionState` in
