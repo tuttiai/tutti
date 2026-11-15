@@ -95,7 +95,9 @@ export function createInstallPackageTool(
           return {
             content:
               `Failed to install ${input.name} via ${input.manager}:\n` +
-              result.stderr,
+              redactPaths(result.stderr, sandbox.root) +
+              "\n" +
+              INSTALL_ERROR_HINT,
             is_error: true,
           };
         }
