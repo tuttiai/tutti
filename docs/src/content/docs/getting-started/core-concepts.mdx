@@ -45,7 +45,7 @@ An **agent** is an LLM-powered worker. Each agent has:
 | `delegates` | No | Agent IDs this orchestrator can delegate to |
 | `role` | No | `"orchestrator"` or `"specialist"` |
 | `durable` | No | Checkpoint between turns to Redis/Postgres so crashed runs can resume. |
-| `schedule` | No | Cron / interval / one-shot trigger: see the [scheduler guide](/guides/scheduling). |
+| `schedule` | No | Cron / interval / one-shot trigger: see [`tutti-ai schedule`](/cli/reference#tutti-ai-schedule-score). |
 | `outputSchema` | No | Zod schema; the agent returns a validated typed object. |
 | `allow_human_input` | No | Agent can emit `hitl:requested` events to ask a human. |
 | `requireApproval` | No | Gate specific tool calls behind an interrupt that must be approved. |

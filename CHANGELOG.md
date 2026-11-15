@@ -84,6 +84,8 @@
 
 - Docs site: the site URL, sitemap and canonical links now point to https://tutti-ai.com/docs instead of the retired docs subdomain.
 
+**Three docs links no longer point to guides that do not exist** (docs). The CLI reference's `serve` section and the Security guide's Guardrails section linked to `/guides/serve` and `/guides/guardrails`, and the `schedule` row in Core Concepts to `/guides/scheduling`. None of these pages exists, so the docs site returned 404 and the website showed plain text. The `schedule` row now links to the `tutti-ai schedule` section of the CLI reference, and the other two sentences are removed. Docs only, no package changes.
+
 ### Changed
 
 **The OTLP exporter builds span names and attributes through a naming strategy** (`@tuttiai/telemetry`, no behaviour change). The span adapter moves out of `exporters/otlp.ts` into `exporters/otlp-adapter.ts` and takes the exported name and attributes from an internal `legacySpanNaming`, which returns exactly what was sent before. A golden test, written against main before the move, pins the OTLP payload for every span kind, an error span and a running span. Prepares the opt-in GenAI span names; no API changes.
