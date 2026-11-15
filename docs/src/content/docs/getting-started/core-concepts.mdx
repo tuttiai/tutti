@@ -78,7 +78,7 @@ An **agent** is an LLM-powered worker. Each agent has:
 Wire the store on the runtime to enable daily/monthly enforcement:
 
 ```ts
-import { TuttiRuntime, InMemoryRunCostStore, PostgresRunCostStore } from "@tuttiai/core";
+import { TuttiRuntime, InMemoryRunCostStore, PostgresRunCostStore, SecretsManager } from "@tuttiai/core";
 
 // Single-process / dev:
 const runtime = new TuttiRuntime(score, {
@@ -88,7 +88,7 @@ const runtime = new TuttiRuntime(score, {
 // Multi-process / prod: every worker shares one daily total:
 const runtime = new TuttiRuntime(score, {
   runCostStore: new PostgresRunCostStore({
-    connection_string: process.env.DATABASE_URL!,
+    connection_string: SecretsManager.require("DATABASE_URL"),
   }),
 });
 ```
