@@ -43,6 +43,7 @@ import {
   inferUserMemories,
   resolveSemanticMemory,
 } from "./runner/memory-run.js";
+import { writeBack } from "./runner/session-write-back.js";
 import type { TrajectoryObserver } from "./skills/observer.js";
 import { hashToolInput } from "./skills/observer.js";
 import type { SkillExecutor } from "./skills/executor.js";
@@ -1302,7 +1303,7 @@ export class AgentRunner {
       }
 
       // Persist updated messages
-      this.sessions.update(session.id, messages);
+      writeBack(this.sessions, session, messages);
       await this.clearPause(session.id, durableEnabled);
 
       logger.info(

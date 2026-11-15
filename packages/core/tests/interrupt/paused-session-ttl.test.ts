@@ -79,6 +79,13 @@ describe("a run paused for approval longer than the session idle TTL (#131)", ()
     expect(lastContent(paused)).toEqual([{ type: "text", text: "done" }]);
   });
 
+  it("still evicts the restored session once it sits idle past the TTL", async () => {
+    const paused = await pauseFor(8 * DAY, "approved");
+    await vi.advanceTimersByTimeAsync(DEFAULT_SESSION_IDLE_TTL_MS + 1);
+
+    expect(paused.stores.sessions.get(paused.session_id)).toBeUndefined();
+  });
+
   it("still ends with InterruptDeniedError on a denial, without running the tool", async () => {
     const paused = await pauseFor(8 * DAY, "denied");
 
