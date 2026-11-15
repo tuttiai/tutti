@@ -23,6 +23,7 @@
 import type { AgentConfig } from "@tuttiai/types";
 import type { ZodType } from "zod";
 import type { GraphConfig, GraphEdge, GraphNode, NodeResult } from "./types.js";
+import type { WaitNode } from "./wait.js";
 
 /** Options accepted by {@link GraphBuilder.edge}. */
 export interface EdgeOptions {
@@ -43,6 +44,14 @@ export interface NodeOptions {
 }
 
 /**
+ * Options accepted by {@link GraphBuilder.wait}: the optional fields of a
+ * {@link WaitNode} (`match`, `timeout`, `description`).
+ *
+ * @experimental The engine does not execute wait nodes yet.
+ */
+export type WaitOptions = Omit<WaitNode, "kind" | "id" | "event">;
+
+/**
  * Fluent builder that accumulates nodes and edges, then produces a
  * validated {@link GraphConfig} via {@link build}.
  */
@@ -50,6 +59,7 @@ export class GraphBuilder {
   private readonly entrypoint: string;
   private readonly nodes: GraphNode[] = [];
   private readonly edges: GraphEdge[] = [];
+  private readonly waits: WaitNode[] = [];
   private stateSchema?: GraphConfig["state"];
 
   constructor(entrypoint: string) {
@@ -79,6 +89,20 @@ export class GraphBuilder {
     return this;
   }
 
+  /**
+   * Add a wait-for-event node. Like {@link node}, nothing is checked here;
+   * the graph validates it when constructed.
+   *
+   * @param id - Node id, unique across agent nodes and waits.
+   * @param event - Name of the event to wait for, for example `"order.paid"`.
+   * @param options - Optional payload `match`, `timeout` branch and `description`.
+   * @experimental The engine does not execute wait nodes yet.
+   */
+  wait(id: string, event: string, options: WaitOptions = {}): this {
+    this.waits.push({ kind: "wait", id, event, ...options });
+    return this;
+  }
+
   /** Set the shared state Zod schema for the graph. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   state(schema: ZodType<unknown, any, any>): this {
@@ -93,6 +117,7 @@ export class GraphBuilder {
       nodes: [...this.nodes],
       edges: [...this.edges],
       ...(this.stateSchema ? { state: this.stateSchema } : {}),
+      ...(this.waits.length > 0 ? { waits: [...this.waits] } : {}),
     };
   }
 }
