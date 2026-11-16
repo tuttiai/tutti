@@ -101,7 +101,7 @@ async function forkParallel(
     cursor.input = done.map((r) => `[from: ${r.id}]\n${r.result.output}`).join("\n\n");
     cursor.node_id = mergeNodeId;
   } else {
-    // No merge node found — terminate. Use last branch output.
+    // No merge node found: terminate and use the last branch output.
     cursor.input = done.at(-1)?.result.output ?? "";
     cursor.node_id = END;
   }
