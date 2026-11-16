@@ -88,6 +88,8 @@
 
 ### Changed
 
+**refactor(core): the graph engine runs from a run cursor** (`@tuttiai/core`, no API or behaviour change). `executeGraph` kept every piece of a run's progress in local variables inside one 200-line loop, so a run could only ever start at the entrypoint. Its position, input, visit counts, outputs, path, usage and state now live in an internal `RunCursor`, the fixed lookups in an internal `RunContext` (`graph/run-context.ts`), and running one node moves to `graph/node-step.ts`; an internal `continueGraph` runs from any cursor. This prepares durable wait nodes, which need to stop and continue a run. A new test pins the result and the exact event order of a run with a parallel fork, a merge and a state update; it passes on the old and the new engine. No API changes.
+
 **The OTLP exporter builds span names and attributes through a naming strategy** (`@tuttiai/telemetry`, no behaviour change). The span adapter moves out of `exporters/otlp.ts` into `exporters/otlp-adapter.ts` and takes the exported name and attributes from an internal `legacySpanNaming`, which returns exactly what was sent before. A golden test, written against main before the move, pins the OTLP payload for every span kind, an error span and a running span. Prepares the opt-in GenAI span names; no API changes.
 **Three docs-sample skip-list entries say why they are skipped** (docs tooling, nothing published changes). The `core-concepts` score, the `memory-sessions` tool fragment and the `tool-caching` custom backend were listed with a raw compiler error that read like drift from the API. They are pseudo-code or partial snippets, and their reasons in `docs/code-samples.skip.json` now say so. No sample is added to or removed from the list.
 
