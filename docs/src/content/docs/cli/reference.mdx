@@ -888,7 +888,7 @@ tutti-ai eval run                                   # replay every case, report 
 tutti-ai eval run --case <id>                       # filter by id (8-char prefix ok)
 tutti-ai eval run --tag regression                  # filter by tag
 tutti-ai eval run --ci                              # JUnit XML + exit 1 on any failure
-tutti-ai eval suite ./my-suite.ts                   # v1 assertion-based suite runner
+tutti-ai eval suite ./my-suite.json                 # v1 assertion-based suite runner
 ```
 
 **`eval run` options:**
@@ -902,7 +902,7 @@ tutti-ai eval suite ./my-suite.ts                   # v1 assertion-based suite r
 
 `eval record <session-id>` captures the output + tool sequence of a past session and stores it as a pinned golden case. Subsequent `eval run` calls replay the agent against the captured input and score the result with configured scorers (`exact`, `similarity`, `tool-sequence`, or custom modules).
 
-See the [eval guide](/guides/eval) for scorer configuration and CI integration.
+The `eval suite` file must be JSON.
 
 ---
 
