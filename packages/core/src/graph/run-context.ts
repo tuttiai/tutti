@@ -45,7 +45,7 @@ export interface RunCursor {
   state: Record<string, unknown>;
 }
 
-/** How the caller observes a run. */
+/** @internal How the caller observes a run. */
 export interface RunHooks {
   options: RunOptions;
   onEvent?: (event: GraphEvent) => void;
