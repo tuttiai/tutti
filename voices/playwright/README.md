@@ -22,7 +22,7 @@ const score = defineScore({
   agents: {
     qa: {
       name: "QA Agent",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt: "You are a QA engineer. Test web apps thoroughly.",
       voices: [playwright],
       permissions: ["network", "browser"],

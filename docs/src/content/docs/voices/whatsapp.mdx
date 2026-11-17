@@ -47,9 +47,10 @@ The `phoneNumberId` is NOT a secret: it's an opaque identifier visible in the Me
 
 ```ts
 import { WhatsAppVoice } from "@tuttiai/whatsapp";
-import { defineScore } from "@tuttiai/core";
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
 
 export default defineScore({
+  provider: new AnthropicProvider(),
   agents: {
     support: {
       name: "support",

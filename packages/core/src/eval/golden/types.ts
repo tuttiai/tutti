@@ -39,6 +39,14 @@ export interface ScoreResult {
   passed: boolean;
   /** Optional human-readable explanation (diff hint, top-k ids, etc.). */
   detail?: string;
+  /**
+   * `true` only when the scorer did not evaluate the output at all, for
+   * example because a credential it needs is not set. `passed` stays
+   * `true` on a skipped result so existing runs keep their verdicts;
+   * callers that must not treat a skip as a pass check this field.
+   * Absent on every result that was actually scored.
+   */
+  skipped?: boolean;
 }
 
 /**
