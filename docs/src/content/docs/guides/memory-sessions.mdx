@@ -49,6 +49,9 @@ const tutti = new TuttiRuntime(score, {
 });
 ```
 
+A run that stays paused longer than that, waiting on an approval or on a frozen host, and then
+finishes puts its session back under the same id rather than failing. `FileSessionStore` does the same.
+
 ### File store
 
 `FileSessionStore` keeps each session as a JSON file in a directory, so sessions survive a
