@@ -263,6 +263,7 @@ const score = defineScore({
         cron: "0 9 * * *",       // 9 AM daily
         input: "Generate the daily status report",
         max_runs: 30,             // auto-disable after 30 runs
+        end_at: "2026-12-31T18:00:00Z", // optional: stop at this time, whichever comes first
       },
     },
   },
