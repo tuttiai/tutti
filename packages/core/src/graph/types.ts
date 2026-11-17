@@ -10,6 +10,7 @@
 
 import type { ZodType } from "zod";
 import type { AgentConfig, TokenUsage } from "@tuttiai/types";
+import type { NodeResumedEvent, NodeWaitingEvent, WaitNode } from "./wait.js";
 
 // ── Sentinel ──────────────────────────────────────────────────
 
@@ -94,6 +95,8 @@ export interface GraphConfig {
   state?: ZodType<unknown, any, any>;
   /** Node ID where execution begins. Must match a node in `nodes`. */
   entrypoint: string;
+  /** @experimental Wait-for-event nodes; see {@link WaitNode}. Not executed yet. */
+  waits?: WaitNode[];
 }
 
 // ── Results ───────────────────────────────────────────────────
@@ -182,6 +185,8 @@ export type GraphEvent = (
   | { type: "edge:evaluate"; from: string; to: string; label?: string; taken: boolean }
   | { type: "edge:traverse"; from: string; to: string; label?: string }
   | { type: "state:update"; node_id: string; state: Record<string, unknown> }
+  | NodeWaitingEvent
+  | NodeResumedEvent
 ) & {
   /**
    * Run identifier — present when the graph was executed with
