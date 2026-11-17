@@ -86,7 +86,24 @@ describe("SimilarityScorer", () => {
     const r = await scorer.score(mkInput("whatever", "something else"));
     expect(r.score).toBe(0);
     expect(r.passed).toBe(true); // skip does not fail the overall run
+    expect(r.skipped).toBe(true);
     expect(r.detail).toMatch(/OPENAI_API_KEY/);
+  });
+
+  it("does not mark the result skipped when a client is injected and no key is set", async () => {
+    const client = fixedClient({ hello: [1, 0], hi: [1, 0] });
+    const scorer = new SimilarityScorer({ client });
+    const r = await scorer.score(mkInput("hello", "hi"));
+    expect(r).not.toHaveProperty("skipped");
+  });
+
+  it("does not mark the result skipped when a key is set, and never puts the key in the result", async () => {
+    process.env.OPENAI_API_KEY = "sk-test-not-a-real-key";
+    const client = fixedClient({ hello: [1, 0], hi: [1, 0] });
+    const scorer = new SimilarityScorer({ client });
+    const r = await scorer.score(mkInput("hello", "hi"));
+    expect(r).toEqual({ scorer: "similarity", score: 1, passed: true });
+    expect(JSON.stringify(r)).not.toContain("sk-test");
   });
 
   it("returns passed:false when expected_output is missing", async () => {
@@ -94,6 +111,7 @@ describe("SimilarityScorer", () => {
     const scorer = new SimilarityScorer({ client });
     const r = await scorer.score(mkInput("x"));
     expect(r.passed).toBe(false);
+    expect(r).not.toHaveProperty("skipped");
     expect(r.detail).toMatch(/expected_output/);
   });
 
@@ -106,6 +124,7 @@ describe("SimilarityScorer", () => {
     const r = await scorer.score(mkInput("hello", "hi"));
     expect(r.score).toBeCloseTo(1, 9);
     expect(r.passed).toBe(true);
+    expect(r).not.toHaveProperty("skipped");
   });
 
   it("passes when cosine is above the default 0.85 threshold", async () => {
@@ -131,6 +150,7 @@ describe("SimilarityScorer", () => {
     expect(r.passed).toBe(false);
     expect(r.score).toBeCloseTo(Math.SQRT1_2, 6);
     expect(r.detail).toMatch(/cosine.*below threshold/);
+    expect(r).not.toHaveProperty("skipped");
   });
 
   it("respects a custom threshold", async () => {
@@ -165,5 +185,6 @@ describe("SimilarityScorer", () => {
     const r = await scorer.score(mkInput("a", "b"));
     expect(r.passed).toBe(false);
     expect(r.detail).toMatch(/embedding request failed.*rate limited/);
+    expect(r).not.toHaveProperty("skipped");
   });
 });

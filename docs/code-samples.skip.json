@@ -112,7 +112,7 @@
       "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
       "heading": "score",
       "index": 1,
-      "reason": "TS2739: Type '{}' is missing the following properties from type 'AgentConfig': name, system_prompt..."
+      "reason": "pseudo-code: agent bodies elided with `{ /* ... */ }` (TS2739)"
     },
     {
       "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
@@ -358,7 +358,7 @@
       "file": "docs/src/content/docs/guides/memory-sessions.mdx",
       "heading": "storing-memories-from-tools",
       "index": 1,
-      "reason": "TS7006: Parameter 'input' implicitly has an 'any' type."
+      "reason": "partial snippet: a tool's `execute` property shown on its own, so `input` and `context` have no type (TS7006)"
     },
     {
       "file": "docs/src/content/docs/guides/memory-sessions.mdx",
@@ -598,7 +598,7 @@
       "file": "docs/src/content/docs/guides/tool-caching.mdx",
       "heading": "custom-cache-backends",
       "index": 1,
-      "reason": "TS2355: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a val..."
+      "reason": "pseudo-code: method bodies elided with `/* ... */` (TS2355)"
     },
     {
       "file": "docs/src/content/docs/guides/your-first-agent.mdx",

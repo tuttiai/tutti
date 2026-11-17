@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import type { ChatResponse, LLMProvider, ScoreConfig, Voice } from "@tuttiai/types";
+import type { AgentConfig, ChatResponse, LLMProvider, ScoreConfig, Voice } from "@tuttiai/types";
 
 import { MemoryCheckpointStore } from "../../src/checkpoint/memory.js";
 import type { CheckpointStore } from "../../src/checkpoint/store.js";
@@ -87,13 +87,30 @@ export function memoryStores(): Stores {
 
 /** One "process": a runtime over the given stores. */
 export function boot(stores: Stores, provider: LLMProvider, voice: Voice): TuttiRuntime {
-  const score: ScoreConfig = {
-    name: "restart",
-    provider,
-    agents: {
-      worker: { name: "worker", model: "test-model", system_prompt: "Work.", voices: [voice] },
-    },
-  };
+  return bootAgent(stores, provider, workerAgent(voice));
+}
+
+/**
+ * The `worker` agent every runtime here runs.
+ *
+ * @param voice - The agent's one voice.
+ * @param extra - Options to set on top, such as `durable: true`.
+ * @returns The agent's config.
+ */
+export function workerAgent(voice: Voice, extra: Partial<AgentConfig> = {}): AgentConfig {
+  return { name: "worker", model: "test-model", system_prompt: "Work.", voices: [voice], ...extra };
+}
+
+/**
+ * One "process" running the given `worker` agent over the given stores.
+ *
+ * @param stores - The stores the process uses.
+ * @param provider - The model provider.
+ * @param worker - The agent, as {@link workerAgent} builds it.
+ * @returns The runtime.
+ */
+export function bootAgent(stores: Stores, provider: LLMProvider, worker: AgentConfig): TuttiRuntime {
+  const score: ScoreConfig = { name: "restart", provider, agents: { worker } };
   return new TuttiRuntime(score, {
     sessionStore: stores.sessions,
     checkpointStore: stores.checkpoints,

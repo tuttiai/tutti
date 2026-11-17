@@ -28,7 +28,7 @@ permissions: ["network"]
 ```ts
 new KnowledgeVoice({
   url: "https://kb.example.com/agents/support-lead", // the service's address for this agent
-  token: process.env.KNOWLEDGE_TOKEN!,              // bearer token identifying the agent
+  token: SecretsManager.require("KNOWLEDGE_TOKEN"),  // bearer token identifying the agent
   default_top_k: 5,                                  // optional, 1 to 20
   timeout_ms: 15_000,                                // optional
 });
