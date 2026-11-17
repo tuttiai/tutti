@@ -366,10 +366,11 @@ tutti-ai inbox start ./path/to/score.ts # custom path
 **Score example:**
 
 ```ts
-import { defineScore } from "@tuttiai/core";
+import { defineScore, AnthropicProvider } from "@tuttiai/core";
 import { TelegramVoice } from "@tuttiai/telegram";
 
 export default defineScore({
+  provider: new AnthropicProvider(),
   agents: {
     support: {
       name: "support",
