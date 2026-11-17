@@ -56,6 +56,7 @@ export default defineScore({
     assistant: {
       name: "assistant",
       model: "claude-sonnet-5-5",
+      system_prompt: "You are a filesystem assistant. Use the MCP tools to answer.",
       voices: [
         new McpVoice({
           server: "npx -y @modelcontextprotocol/server-filesystem /tmp",

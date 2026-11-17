@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ScoreValidationError } from "./errors.js";
+import { isIsoDateTime } from "./scheduler/end-at.js";
 
 /**
  * Runtime Zod schema for validating a loaded ScoreConfig object.
@@ -91,6 +92,12 @@ const AgentScheduleSchema = z
     at: z.string().min(1).optional(),
     input: z.string().min(1, "schedule.input is required"),
     max_runs: z.number().int().positive("schedule.max_runs must be a positive integer").optional(),
+    end_at: z
+      .string()
+      .refine(isIsoDateTime, (v) => ({
+        message: `schedule.end_at must be an ISO-8601 date-time with a timezone, got "${v}"`,
+      }))
+      .optional(),
     deliver: ScheduleDeliverySchema.optional(),
     deliver_format: z.enum(["text", "markdown"]).optional(),
   })
@@ -99,6 +106,13 @@ const AgentScheduleSchema = z
     (s) => [s.cron, s.every, s.at].filter((v) => v !== undefined).length === 1,
     {
       message: "schedule: exactly one of cron, every, or at must be set",
+    },
+  )
+  .refine(
+    (s) => s.at === undefined || s.end_at === undefined || !(Date.parse(s.end_at) < Date.parse(s.at)),
+    {
+      message: "schedule.end_at must not be before schedule.at",
+      path: ["end_at"],
     },
   );
 

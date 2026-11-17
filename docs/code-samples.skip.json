@@ -38,12 +38,6 @@
     },
     {
       "file": "docs/src/content/docs/cli/reference.mdx",
-      "heading": "tutti-ai-inbox-start-score",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Tele..."
-    },
-    {
-      "file": "docs/src/content/docs/cli/reference.mdx",
       "heading": "tutti-ai-deploy",
       "index": 1,
       "reason": "TS2353: Object literal may only specify known properties, and 'min' does not exist in type '{ minI..."
@@ -112,7 +106,7 @@
       "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
       "heading": "score",
       "index": 1,
-      "reason": "TS2739: Type '{}' is missing the following properties from type 'AgentConfig': name, system_prompt..."
+      "reason": "pseudo-code: agent bodies elided with `{ /* ... */ }` (TS2739)"
     },
     {
       "file": "docs/src/content/docs/getting-started/core-concepts.mdx",
@@ -272,12 +266,6 @@
     },
     {
       "file": "docs/src/content/docs/guides/inbox.mdx",
-      "heading": "quick-start-telegram",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Tele..."
-    },
-    {
-      "file": "docs/src/content/docs/guides/inbox.mdx",
       "heading": "slack-socket-mode",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
@@ -299,12 +287,6 @@
       "heading": "email-imap-idle-smtp",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
-    },
-    {
-      "file": "docs/src/content/docs/guides/inbox.mdx",
-      "heading": "all-five-adapters-at-once",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: (Tel..."
     },
     {
       "file": "docs/src/content/docs/guides/inbox.mdx",
@@ -358,7 +340,7 @@
       "file": "docs/src/content/docs/guides/memory-sessions.mdx",
       "heading": "storing-memories-from-tools",
       "index": 1,
-      "reason": "TS7006: Parameter 'input' implicitly has an 'any' type."
+      "reason": "partial snippet: a tool's `execute` property shown on its own, so `input` and `context` have no type (TS7006)"
     },
     {
       "file": "docs/src/content/docs/guides/memory-sessions.mdx",
@@ -598,7 +580,7 @@
       "file": "docs/src/content/docs/guides/tool-caching.mdx",
       "heading": "custom-cache-backends",
       "index": 1,
-      "reason": "TS2355: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a val..."
+      "reason": "pseudo-code: method bodies elided with `/* ... */` (TS2355)"
     },
     {
       "file": "docs/src/content/docs/guides/your-first-agent.mdx",
@@ -617,12 +599,6 @@
       "heading": "inbound-inbox",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/email.mdx",
-      "heading": "score-example",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Emai..."
     },
     {
       "file": "docs/src/content/docs/voices/email.mdx",
@@ -647,12 +623,6 @@
       "heading": "configuration",
       "index": 1,
       "reason": "partial snippet: uses McpVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/mcp.mdx",
-      "heading": "example",
-      "index": 1,
-      "reason": "TS2741: Property 'system_prompt' is missing in type '{ name: string; model: string; voices: McpVoi..."
     },
     {
       "file": "docs/src/content/docs/voices/mcp.mdx",
@@ -745,12 +715,6 @@
       "reason": "partial snippet: uses StripeVoice without importing or declaring it (TS2304)"
     },
     {
-      "file": "docs/src/content/docs/voices/telegram.mdx",
-      "heading": "score-example",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: Tele..."
-    },
-    {
       "file": "docs/src/content/docs/voices/twitter.mdx",
       "heading": "configuration",
       "index": 1,
@@ -761,12 +725,6 @@
       "heading": "configuration",
       "index": 1,
       "reason": "partial snippet: uses WebVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/whatsapp.mdx",
-      "heading": "score-example",
-      "index": 1,
-      "reason": "TS2345: Argument of type '{ agents: { support: { name: string; system_prompt: string; voices: What..."
     }
   ]
 }
