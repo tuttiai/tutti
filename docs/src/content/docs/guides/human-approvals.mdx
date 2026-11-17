@@ -1,0 +1,146 @@
+---
+title: "Human approvals"
+description: "Gating tool calls for a person, where pending approvals are kept, and what happens across a restart or a rule change"
+sidebar:
+  order: 9
+---
+
+An approval gate stops a tool call until a person approves or denies it. This page covers how to turn approvals on, where pending approvals are kept, what happens to them when the process restarts, and what happens when you change the rules while one is pending.
+
+## Turning approvals on
+
+Each agent takes a `requireApproval` option of type `string[] | "all" | false`. Whether a call is gated is decided in this order:
+
+| `requireApproval` | Gated |
+|---|---|
+| `false` | nothing, tools marked `destructive: true` included |
+| omitted | tools marked `destructive: true` only |
+| `"all"` | every tool call |
+| an array of names or globs | matching tool names, plus tools marked `destructive: true` |
+
+Omitting `requireApproval` is not the same as `false`: destructive tools are still gated. In a glob, `*` is the only wildcard and every other character is literal, so `send_*` matches `send_email` and `send_sms`.
+
+A gated call needs an interrupt store. Without one it fails with `matches requireApproval but no InterruptStore is configured`. To resume a paused run after a restart, the runtime also needs a checkpoint store:
+
+```ts
+import {
+  AnthropicProvider,
+  PostgresCheckpointStore,
+  PostgresInterruptStore,
+  SecretsManager,
+  TuttiRuntime,
+  defineScore,
+} from "@tuttiai/core";
+
+const score = defineScore({
+  provider: new AnthropicProvider(),
+  agents: {
+    assistant: {
+      name: "Assistant",
+      system_prompt: "You help the support team.",
+      voices: [],
+      // Gate every tool whose name starts with send_, plus destructive tools.
+      requireApproval: ["send_*"],
+    },
+  },
+});
+
+const connection_string = SecretsManager.require("TUTTI_PG_URL");
+
+export const tutti = new TuttiRuntime(score, {
+  interruptStore: new PostgresInterruptStore({ connection_string }),
+  checkpointStore: new PostgresCheckpointStore({ connection_string }),
+});
+```
+
+### `TUTTI_REQUIRE_APPROVAL` in the server image
+
+The server image (`packages/server`, `dist/start.js`) runs one agent configured from environment variables, so it sets `requireApproval` from `TUTTI_REQUIRE_APPROVAL`. In a score of your own, set `requireApproval` directly.
+
+| `TUTTI_REQUIRE_APPROVAL` | `requireApproval` | Gated |
+|---|---|---|
+| unset, empty or `destructive` | omitted | tools marked `destructive: true` |
+| `none` | `false` | nothing, destructive tools included |
+| `all` | `"all"` | every tool call |
+| a comma-separated list, such as `send_*,create_pull_request` | the list | matching names, plus destructive tools |
+
+```bash
+TUTTI_REQUIRE_APPROVAL="send_*,create_pull_request"
+```
+
+List items are trimmed and empty items dropped, so a value of only commas counts as unset. Each item may contain only letters, digits and `_ * . -`. Anything else, including `?`, stops startup with a `VoiceConfigError` that quotes the item.
+
+### Seeing and answering approvals
+
+When a call is gated, the runtime writes an interrupt to the store, emits `interrupt:requested` and waits. Resolving it emits `interrupt:resolved`.
+
+- A client reading `POST /run/stream` receives an `approval_requested` frame carrying the `interrupt_id`.
+- `GET /interrupts/pending` lists the approvals waiting.
+- `POST /interrupts/:id/approve` and `POST /interrupts/:id/deny` resolve one. A deny may carry a `reason`.
+- The [`tutti-ai interrupts`](/cli/reference#tutti-ai-interrupts) command reviews and resolves them from a terminal.
+- In your own code, `tutti.interruptStore?.listPending()` lists them and `tutti.resolveInterrupt(id, "approved")` or `tutti.resolveInterrupt(id, "denied", { denial_reason })` resolves one.
+
+## Where pending approvals are kept
+
+`@tuttiai/core` has `MemoryInterruptStore`, `PostgresInterruptStore` and `PostgresCheckpointStore`. The Postgres stores take `{ connection_string }`. `@tuttiai/server` adds `FileInterruptStore` and `FileCheckpointStore`.
+
+The server image and `tutti-ai serve` choose their stores in the same order:
+
+| Configuration | Approvals and pause checkpoints | Survive a restart |
+|---|---|---|
+| `TUTTI_PG_URL` set | Postgres (`PostgresInterruptStore`, `PostgresCheckpointStore`) | yes |
+| otherwise a usable `TUTTI_STATE_DIR` | files under `interrupts/` and `checkpoints/` in that directory | yes |
+| neither | memory | no |
+
+```bash
+TUTTI_STATE_DIR=/state
+```
+
+- `tutti-ai serve` needs `TUTTI_STATE_DIR` to be an absolute path, such as `/state`. Otherwise it ignores the variable, with a warning.
+- `tutti-ai serve` builds its stores once per process, so a watch-mode reload keeps the approvals already waiting.
+- Postgres that cannot be reached is not a reason to fall back to memory: the error surfaces on first use.
+- The store in use is logged as `durability: postgres`, `durability: file` or `durability: memory`: on the server image's "Tutti server started" line, and on the "Approval store ready" line of `tutti-ai serve`.
+
+On memory stores, pending approvals, and the runs waiting on them, are lost when the process stops. Each entry point logs a warning at start when it falls back to memory:
+
+- server image: "pending approvals will not survive a restart; set TUTTI_STATE_DIR or configure Postgres"
+- `tutti-ai serve`: "pending approvals will not survive a restart; set TUTTI_STATE_DIR or TUTTI_PG_URL"
+
+For how long Postgres keeps a pause checkpoint, and how to mount a state volume, see [Pending approvals and restarts](/guides/deploy/#pending-approvals-and-restarts) in the deploy guide.
+
+## Across a restart
+
+With durable stores, a turn that stops at the gate is saved as a pause checkpoint. Resolving the approval when no run in the process is waiting on it, because the process restarted or the stream's client went away, resumes the run from that checkpoint in the background:
+
+- An approved call runs once.
+- A denied call runs zero times, the run ends, and the denial reason is kept on the record.
+- Calls in the same turn that had already finished are not run again.
+- A call the restart cut off is not run again. It gets an error result saying it was interrupted by restart.
+- A second resolve of the same approval returns the first record and changes nothing. The server answers it with 409 `already_resolved`.
+- Two approvals of the same call at the same time resume the run once.
+- A record that cannot be read answers 500 `interrupt_record_corrupt`, and the other approvals are still listed and work.
+- The resumed run goes through `TuttiRuntime.run`, so voice permissions are checked again.
+
+This is what `packages/core/tests/interrupt/resume-after-restart.test.ts` (a second runtime on the same stores) and `packages/server/tests/restart.integration.test.ts` (the built server image, killed and started again) test.
+
+### Limits
+
+- **Aborted waits.** With durable stores, a run stopped while it waits (a shutdown or a dropped stream) leaves its approval pending, and approving it later resumes the run. On memory stores it is denied with "run aborted", as nothing could resume it.
+- **A session that moved on.** If the session was updated after the pause, the approval is recorded but the run is not resumed.
+- **A lost session.** A session the restart lost is rebuilt only when the score has a single agent. Otherwise the approval is recorded and the run does not resume.
+- **A missing or expired checkpoint.** The approval is recorded, a warning is logged, and the run does not resume.
+- **Where the answer goes.** After a restart the original `POST /run/stream` client is gone, so the resumed run's answer is on `GET /sessions/:id`, not on that stream.
+
+## When the rules change
+
+Today a pending or approved approval is not rechecked against `requireApproval` or `TUTTI_REQUIRE_APPROVAL` when it is resolved. The resumed run uses the configuration of the process that resumes it, and a call approved under the old rules still runs after the change. Voice permissions and `beforeToolCall` hooks are checked again on resume.
+
+This page will be updated when rechecking approvals on resume is decided.
+
+### Before you change approval rules
+
+Before you deploy a change to `requireApproval`, `TUTTI_REQUIRE_APPROVAL` or a tool's `destructive` flag, clear the approvals already waiting:
+
+1. List them with `GET /interrupts/pending` or `tutti-ai interrupts`. In your own code, use `tutti.interruptStore?.listPending()`.
+2. Approve or deny each one with `POST /interrupts/:id/approve`, `POST /interrupts/:id/deny`, `tutti-ai interrupts` or `tutti.resolveInterrupt()`.
+3. Let the runs they resume finish, then deploy the change.

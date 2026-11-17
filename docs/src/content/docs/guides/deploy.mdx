@@ -162,6 +162,46 @@ tutti-ai analyze costs --last 7d --url https://api.example.com
 
 Top runs by cost, daily-spend sparkline, and burn-rate optimisation hints. See [the CLI reference](/cli/reference#tutti-ai-analyze-costs) for the full command surface.
 
+## Data residency
+
+When you self-host, Tutti keeps sessions, approvals, memory and traces in the stores you configure, on the hosts where you run them. The framework has no hosted store of its own. What does leave the host, model calls first, is listed under [What leaves the host](#what-leaves-the-host). `deploy.region` picks the platform region the bundle runs in, and so where a store inside the container, or a Postgres or Redis service the bundler adds beside it, keeps its data (see [Conditional services](#conditional-services)). A managed database you attach instead keeps its data wherever you created it.
+
+### Where each store keeps its data
+
+| Data | Store (package) | What chooses where it goes | Default |
+|---|---|---|---|
+| Sessions | `InMemorySessionStore`, `FileSessionStore`, `PostgresSessionStore` (`@tuttiai/core`, table `tutti_sessions`) | `sessionStore` runtime option; score `memory: { provider: "postgres" }` with `memory.url`, else `DATABASE_URL`; server image: `TUTTI_STATE_DIR` | process memory (1,000 sessions, 24 hours idle), lost on restart |
+| Approvals | `MemoryInterruptStore`, `PostgresInterruptStore` (`@tuttiai/core`, table `tutti_interrupts`), file store (`@tuttiai/server`) | `interruptStore` runtime option; server image: `TUTTI_PG_URL`, else `TUTTI_STATE_DIR` | none until you pass one; server image: memory, with a warning |
+| Checkpoints | `MemoryCheckpointStore`, `PostgresCheckpointStore` (table `tutti_checkpoints`), `RedisCheckpointStore` (`@tuttiai/core`), file store (`@tuttiai/server`) | `checkpointStore` runtime option, or agent `durable.store` (`"postgres"` reads `TUTTI_PG_URL`, `"redis"` reads `TUTTI_REDIS_URL`); server image: as approvals | none until configured |
+| Semantic memory | `InMemorySemanticStore` (`@tuttiai/core`) | agent `memory.semantic.store` takes your own `SemanticMemoryStore` | process memory; no other backend ships |
+| User memory | `MemoryUserMemoryStore`, `PostgresUserMemoryStore` (`@tuttiai/core`) | agent `memory.user_memory.store`: `"memory"` or `"postgres"` (reads `TUTTI_PG_URL`) | off until configured |
+| User model | `InMemoryUserModelStore`, `PostgresUserModelStore` (`@tuttiai/core`, table `tutti_user_profiles`) | `runtime.setUserModelStore(agent, store)`; Postgres takes `connection_string` | process memory |
+| Schedules | `MemoryScheduleStore`, `PostgresScheduleStore` (`@tuttiai/core`, table `tutti_schedules`) | the store you pass to `SchedulerEngine`; Postgres takes `connection_string` | the store you pass |
+| Run costs | `InMemoryRunCostStore` (`@tuttiai/telemetry`), `PostgresRunCostStore` (`@tuttiai/core`, table `tutti_run_costs`) | `runCostStore` runtime option; Postgres takes `connection_string` | not recorded until configured |
+| Tool result cache | `InMemoryToolCache` (`@tuttiai/core`) | agent `cache` settings | process memory only |
+| Skills | `InMemorySkillStore` (`@tuttiai/skills`) | `skillStore` runtime option | process memory |
+| Inbox identities | `InMemoryIdentityStore` (`@tuttiai/inbox`) | `identityStore` inbox option | process memory |
+| RAG chunks | `MemoryVectorStore`, `PgVectorStore` (`@tuttiai/rag`) | voice `storage.provider`: `"memory"` or `"pgvector"` with `connection_string`, else `RAG_PG_URL` | as configured on the voice |
+| Traces (OpenTelemetry) | `initTelemetry` (`@tuttiai/core`), OTLP over HTTP | score `telemetry`: `enabled`, `endpoint`, `headers` | off; when enabled without `endpoint`, `http://localhost:4318` |
+| Spans | `OTLPExporter`, `JsonFileExporter` (`@tuttiai/telemetry`) | `TUTTI_OTLP_ENDPOINT` or `TUTTI_TRACE_FILE` | no exporter installed |
+| Logs | pino logger (`@tuttiai/core`) | `TUTTI_LOG_LEVEL` | the process's standard output |
+| Claude Code provider state | `claude-code-sessions.json` and `claude/` under `TUTTI_STATE_DIR` (server image) | `TUTTI_STATE_DIR`, `CLAUDE_CONFIG_DIR` | the CLI's own config directory, `~/.claude` |
+
+The server image's files under `TUTTI_STATE_DIR`, and what survives a restart, are set out in [Pending approvals and restarts](#pending-approvals-and-restarts). Sessions read `memory.url` or `DATABASE_URL`, while approvals, checkpoints, user memory and the server image read `TUTTI_PG_URL`.
+
+### What leaves the host
+
+- **Model calls.** The prompts, tool results and replies of a run go to the model provider you configure, and are processed wherever that provider serves them. `AnthropicProvider` and `GeminiProvider` call the provider's own API and take no endpoint or region option. `OpenAIProvider` takes `base_url`, so it can point at a proxy or a compatible server you run. `OpenRouterProvider` takes `base_url`, `route` and `models`, and OpenRouter picks the upstream provider. A `SmartProvider` from `@tuttiai/router` may send a call to any provider it wraps. See [Providers](/guides/providers/).
+- **Claude Code.** With `ClaudeCodeProvider`, the Claude Code CLI makes the model calls itself, under its own login and configuration.
+- **Realtime.** `@tuttiai/realtime` streams the conversation to the OpenAI Realtime API.
+- **Voices.** A voice sends what the agent hands it to the service it wraps, such as GitHub, Slack or Stripe. The RAG voice sends text to the embedding provider you configure (OpenAI, Voyage AI, or a local server at `base_url`), and the Knowledge voice calls the `url` you set.
+- **Trace exporters.** Spans and traces go only to the endpoint or file you configure.
+- **Registry lookups.** `tutti-ai search` downloads the voice registry from GitHub (`tuttiai/voices`). It is a CLI command, not part of the runtime, and it sends no run data.
+
+### Limits
+
+AWS, GCP and Azure deploy targets and multi-region deployments are not supported yet; see [What's not yet shipped](#whats-not-yet-shipped).
+
 ## What's not yet shipped
 
 - **Cloudflare Workers bundler.** The target value is recognised but the bundler is a follow-up. Until then, the CLI rejects `--target cloudflare` with a clear error.
