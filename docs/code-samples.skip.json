@@ -595,12 +595,6 @@
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1109)"
     },
     {
-      "file": "docs/src/content/docs/voices/notion.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses NotionVoice without importing or declaring it (TS2304)"
-    },
-    {
       "file": "docs/src/content/docs/voices/rag.mdx",
       "heading": "storage-providers",
       "index": 1,
