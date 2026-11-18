@@ -3,6 +3,7 @@ import type { Permission, Tool, Voice } from "@tuttiai/types";
 import { createKnowledgeClient, type KnowledgeFetch } from "./client.js";
 import { KnowledgeVoiceConfigSchema, type KnowledgeVoiceConfig } from "./config-schema.js";
 import { createListKnowledgeBasesTool } from "./tools/list-knowledge-bases.js";
+import { createSearchKnowledgeGraphTool } from "./tools/search-knowledge-graph.js";
 import { createSearchKnowledgeBasesTool } from "./tools/search-knowledge-bases.js";
 
 const DEFAULT_TOP_K = 5;
@@ -18,12 +19,13 @@ export interface KnowledgeVoiceDependencies {
  *
  * Unlike `@tuttiai/rag`, which ingests and stores inside the agent's own process, this voice
  * holds nothing: the service ingests, stores and decides which bases the agent may read, and
- * the agent can only list and search them. Nothing it does changes a base, so no tool is
+ * the agent can only list and search them, and search the entities and facts of its workspace's
+ * graph. Nothing it does changes a base, so no tool is
  * destructive.
  */
 export class KnowledgeVoice implements Voice {
   name = "knowledge";
-  description = "Search the knowledge bases shared with this agent";
+  description = "Search the knowledge bases and the workspace graph shared with this agent";
   required_permissions: Permission[] = ["network"];
   tools: Tool[];
 
@@ -38,6 +40,7 @@ export class KnowledgeVoice implements Voice {
     this.tools = [
       createListKnowledgeBasesTool(client),
       createSearchKnowledgeBasesTool(client, parsed.default_top_k ?? DEFAULT_TOP_K),
+      createSearchKnowledgeGraphTool(client),
     ];
   }
 }
@@ -46,11 +49,17 @@ export { createKnowledgeClient } from "./client.js";
 export type { KnowledgeClient, KnowledgeFetch, KnowledgeResult } from "./client.js";
 export { KnowledgeVoiceConfigSchema, type KnowledgeVoiceConfig } from "./config-schema.js";
 export {
+  GraphFactSchema,
+  GraphHitSchema,
+  GraphSearchRequestSchema,
+  GraphSearchResponseSchema,
   KnowledgeBaseSummarySchema,
   ListBasesResponseSchema,
   SearchHitSchema,
   SearchRequestSchema,
   SearchResponseSchema,
+  type GraphSearchRequest,
+  type GraphSearchResponse,
   type KnowledgeBaseSummary,
   type ListBasesResponse,
   type SearchHit,

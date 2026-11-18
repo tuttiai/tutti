@@ -30,9 +30,9 @@ function tool(voice: KnowledgeVoice, name: string): Tool {
 const CONTEXT = { session_id: "s", agent_name: "a" };
 
 describe("KnowledgeVoice", () => {
-  it("offers two read-only tools and needs only the network", () => {
+  it("offers three read-only tools and needs only the network", () => {
     const voice = voiceWith(vi.fn<KnowledgeFetch>());
-    expect(voice.tools.map((t) => t.name)).toEqual(["list_knowledge_bases", "search_knowledge_bases"]);
+    expect(voice.tools.map((t) => t.name)).toEqual(["list_knowledge_bases", "search_knowledge_bases", "search_knowledge_graph"]);
     expect(voice.tools.some((t) => t.destructive === true)).toBe(false);
     expect(voice.required_permissions).toEqual(["network"]);
   });

@@ -38,7 +38,9 @@ Through the stock server image, the same voice is one `TUTTI_VOICES` entry:
 | `list_knowledge_bases` | The bases this agent may search, with a description and how many sources and passages each holds. |
 | `search_knowledge_bases` | The passages most relevant to a query, each naming its base, source and location. `bases` narrows it to some of the agent's bases. |
 
-Neither tool changes anything, so neither is `destructive`.
+| `search_knowledge_graph` | The accepted entities of the workspace's graph (people, companies, projects) that best match a query, each with the accepted facts about it. `limit` bounds how many. Every result is returned beside a notice that it is untrusted data. |
+
+None of the tools changes anything, so none is `destructive`. The graph tool needs a service that serves `POST <url>/graph/search`; one that does not answers 404 and the tool says so.
 
 ## Configuration
 
