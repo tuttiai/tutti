@@ -42,8 +42,11 @@ enable the content capabilities the agent needs, then add it to each page or dat
 ## Configuration
 
 ```ts
+import { SecretsManager } from "@tuttiai/core";
+import { NotionVoice } from "@tuttiai/notion";
+
 new NotionVoice({
-  token: process.env.NOTION_TOKEN, // optional; falls back to NOTION_TOKEN
+  token: SecretsManager.optional("NOTION_TOKEN"), // optional; falls back to NOTION_TOKEN
 });
 ```
 

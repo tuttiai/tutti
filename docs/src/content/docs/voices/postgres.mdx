@@ -48,6 +48,8 @@ Even if an agent finds a way to bypass the voice, the role itself cannot write.
 ## Configuration
 
 ```ts
+import { PostgresVoice } from "@tuttiai/postgres";
+
 // Default: reads DATABASE_URL / POSTGRES_URL from env
 new PostgresVoice()
 

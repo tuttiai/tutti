@@ -26,6 +26,9 @@ permissions: ["network"]
 ## Configuration
 
 ```ts
+import { SecretsManager } from "@tuttiai/core";
+import { KnowledgeVoice } from "@tuttiai/knowledge";
+
 new KnowledgeVoice({
   url: "https://kb.example.com/agents/support-lead", // the service's address for this agent
   token: SecretsManager.require("KNOWLEDGE_TOKEN"),  // bearer token identifying the agent

@@ -34,6 +34,9 @@ Other embedding providers (Voyage) and vector stores (Postgres pgvector, in-memo
 ## Configuration
 
 ```ts
+import { SecretsManager } from "@tuttiai/core";
+import { RagVoice } from "@tuttiai/rag";
+
 RagVoice({
   collection: "product-docs",
   embeddings: {
