@@ -2,8 +2,11 @@ import type { z } from "zod";
 
 import type { KnowledgeVoiceConfig } from "./config-schema.js";
 import {
+  GraphSearchResponseSchema,
   ListBasesResponseSchema,
   SearchResponseSchema,
+  type GraphSearchRequest,
+  type GraphSearchResponse,
   type ListBasesResponse,
   type SearchRequest,
   type SearchResponse,
@@ -15,10 +18,11 @@ export type KnowledgeFetch = (input: string, init: RequestInit) => Promise<Respo
 /** An answer from the service, or the sentence to hand the model instead. */
 export type KnowledgeResult<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly message: string };
 
-/** The two calls the voice makes. */
+/** The calls the voice makes. */
 export interface KnowledgeClient {
   listBases(): Promise<KnowledgeResult<ListBasesResponse>>;
   search(request: SearchRequest): Promise<KnowledgeResult<SearchResponse>>;
+  searchGraph(request: GraphSearchRequest): Promise<KnowledgeResult<GraphSearchResponse>>;
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -109,5 +113,6 @@ export function createKnowledgeClient(config: KnowledgeVoiceConfig, fetchImpl: K
   return {
     listBases: () => call("/bases", { method: "GET" }, ListBasesResponseSchema),
     search: (request) => call("/search", { method: "POST", body: JSON.stringify(request) }, SearchResponseSchema),
+    searchGraph: (request) => call("/graph/search", { method: "POST", body: JSON.stringify(request) }, GraphSearchResponseSchema),
   };
 }
