@@ -39,8 +39,8 @@ export default defineScore({
       deploy: {
         target: "fly",                              // optional: --target wins
         region: "auto",
-        scale: { min: 0, max: 3, memory: "512MB" },
-        health: { path: "/health", interval_seconds: 30 },
+        scale: { minInstances: 0, maxInstances: 3, memory: "512MB" },
+        healthCheck: { path: "/health", intervalSeconds: 30 },
         env: { LOG_LEVEL: "info" },                  // plaintext config
         secrets: ["ANTHROPIC_API_KEY", "GITHUB_TOKEN"], // names of required env vars
       },
@@ -83,7 +83,7 @@ Tutti generates the bundle in `./tutti-deploy/`, writes `.env.deploy.example`, a
 | `modal` | `modal_app.py`, `tutti.score.ts`, `.env.modal.example`, `deploy.sh` | `modal deploy modal_app.py` |
 | `daytona` | `.devcontainer/devcontainer.json`, `.daytona/snapshots.yaml`, `.gitignore`, `daytona.sh` | `daytona create --no-ide` |
 
-The Docker bundle runs as non-root user `tutti` (uid 1001), exposes port 3000 (configurable), and includes a healthcheck against the `health.path` you set. `NODE_OPTIONS --max-old-space-size` is computed from `scale.memory` so the runtime won't OOM under platform-imposed memory caps.
+The Docker bundle runs as non-root user `tutti` (uid 1001), exposes port 3000 (configurable), and includes a healthcheck against the `healthCheck.path` you set. `NODE_OPTIONS --max-old-space-size` is computed from `scale.memory` so the runtime won't OOM under platform-imposed memory caps.
 
 ### Modal (scale-to-zero)
 
