@@ -108,8 +108,7 @@ describe("a checkpointed run, not waiting on an approval, when its host is pause
     expect(c.safe_tool).toBe(1);
   });
 
-  // TODO(#133): change back to it() once only one runtime can finish a durable run's turn.
-  it.fails("finishes exactly once across both hosts when a peer runs the session during the freeze (exposes #133)", async () => {
+  it("finishes exactly once across both hosts when a peer runs the session during the freeze (exposes #133)", async () => {
     const stores = memoryStores();
     const { c, model, events, run, session_id } = await frozenAfterCheckpoint(stores);
     const peer = bootAgent(stores, createMockProvider([textResponse("done")]), durableWorker(c));
