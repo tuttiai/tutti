@@ -1,8 +1,9 @@
 # @tuttiai/sandbox
 
-Sandbox voice for [Tutti](https://tutti-ai.com) — secure code execution
-with per-session filesystem isolation for TypeScript, Python 3, and Bash,
-and a ranked map of any repository cloned into the sandbox.
+Sandbox voice for [Tutti](https://tutti-ai.com): code execution in a
+per-session working directory for TypeScript, Python 3, and Bash,
+and a ranked map of any repository cloned into the sandbox. It is not a
+security boundary: code runs as the server's own user.
 
 ## Install
 
@@ -24,7 +25,7 @@ const score = defineScore({
   agents: {
     coder: {
       name: "coder",
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5-5",
       system_prompt:
         "You are a coding assistant. Write code to solve problems, " +
         "execute it to verify, and iterate until correct. You can " +
@@ -174,7 +175,7 @@ Required permission: `"shell"` (must be explicitly granted in `AgentConfig.permi
 
 | Measure | Detail |
 |---------|--------|
-| Filesystem isolation | Every path validated by `SessionSandbox.resolve()` — throws `SandboxEscapeError` for `../../` traversal |
+| Path validation | Every path validated by `SessionSandbox.resolve()`, which throws `SandboxEscapeError` for `../../` traversal |
 | Repository map | `repo_map` refuses a directory whose real path leaves the sandbox, skips symbolic links, and stops git searching above the sandbox for a repository |
 | Process timeout | `SIGKILL` after `timeout_ms`; exit code 137 |
 | Output size | stdout and stderr kept to 10 KB each: about the first 3 KB and the last 7 KB, with a `[… N characters left out …]` line between, because errors and test summaries come at the end |
@@ -183,6 +184,7 @@ Required permission: `"shell"` (must be explicitly granted in `AgentConfig.permi
 | File size | `write_file` rejects content exceeding `max_file_size_bytes` |
 | Package allowlist | `install_package` rejects names not on `allowed_packages` |
 | Shell injection | Package names validated against `[a-zA-Z0-9@_./-]` regex |
+| Option and path injection | `install_package` rejects names that start with `-` or `/`, or contain `..`, before anything runs |
 | Language restriction | `execute_code` Zod schema rejects disallowed languages |
 
 ## License

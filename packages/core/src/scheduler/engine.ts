@@ -11,6 +11,8 @@ import { logger } from "../logger.js";
 import { SecretsManager } from "../secrets.js";
 import { assertDeliveryVoiceInstalled } from "./delivery.js";
 import { deliverScheduleResult, deliveryTargetSummary } from "./dispatch.js";
+import { endAtState, maxRunsReason, pastEndAtError, stopReason, withEndTimer } from "./end-at.js";
+import type { StopReason } from "./end-at.js";
 import type { ScheduleStore } from "./store.js";
 import type { ScheduleConfig, ScheduledRun, ScheduleRecord } from "./types.js";
 
@@ -53,6 +55,31 @@ export function parseInterval(every: string): number {
  */
 export function validateCron(expression: string): boolean {
   return cron.validate(expression);
+}
+
+/**
+ * Check that exactly one trigger is set and that it parses.
+ *
+ * @throws When no trigger is set or the set one is malformed.
+ */
+function assertValidTrigger(id: string, config: ScheduleConfig): void {
+  if (!config.cron && !config.every && !config.at) {
+    throw new Error(
+      `Schedule "${id}": exactly one of cron, every, or at must be set.`,
+    );
+  }
+  if (config.cron && !validateCron(config.cron)) {
+    throw new Error(`Schedule "${id}": invalid cron expression "${config.cron}".`);
+  }
+  if (config.every) {
+    parseInterval(config.every); // throws on bad format
+  }
+  if (config.at) {
+    const d = new Date(config.at);
+    if (isNaN(d.getTime())) {
+      throw new Error(`Schedule "${id}": invalid ISO datetime "${config.at}".`);
+    }
+  }
 }
 
 // ── Engine ───────────────────────────────────────────────────
@@ -102,24 +129,8 @@ export class SchedulerEngine {
     agent: AgentConfig,
     config: ScheduleConfig,
   ): Promise<void> {
-    // Validate config
-    if (!config.cron && !config.every && !config.at) {
-      throw new Error(
-        `Schedule "${id}": exactly one of cron, every, or at must be set.`,
-      );
-    }
-    if (config.cron && !validateCron(config.cron)) {
-      throw new Error(`Schedule "${id}": invalid cron expression "${config.cron}".`);
-    }
-    if (config.every) {
-      parseInterval(config.every); // throws on bad format
-    }
-    if (config.at) {
-      const d = new Date(config.at);
-      if (isNaN(d.getTime())) {
-        throw new Error(`Schedule "${id}": invalid ISO datetime "${config.at}".`);
-      }
-    }
+    assertValidTrigger(id, config);
+    const ended = await this.endAtPassed(id, config);
     if (config.deliver) {
       await assertDeliveryVoiceInstalled(config.deliver);
     }
@@ -128,7 +139,7 @@ export class SchedulerEngine {
       id,
       agent_id: agent.name,
       config,
-      enabled: true,
+      enabled: !ended,
       created_at: new Date(),
       run_count: 0,
     };
@@ -139,11 +150,24 @@ export class SchedulerEngine {
     // If already running, start the timer immediately.
     this.active.set(id, { record, agent, stop: () => undefined });
 
-    if (this.running) {
+    if (this.running && record.enabled) {
       this.activateTimer(id, record, agent);
     }
 
     logger.info({ schedule: id, agent: agent.name }, "Schedule registered");
+  }
+
+  /**
+   * Validate `config.end_at` and report whether it has already passed.
+   * A passed end_at is an error for a new id, but marks a schedule the
+   * store already holds (reloaded after a restart) as finished.
+   */
+  private async endAtPassed(id: string, config: ScheduleConfig): Promise<boolean> {
+    const now = Date.now();
+    if (endAtState(id, config, now) === "open") return false;
+    if ((await this.store.get(id)) === null) throw pastEndAtError(id, config, now);
+    logger.warn({ schedule: id, end_at: config.end_at }, "Schedule registered disabled: end_at already passed");
+    return true;
   }
 
   /** Remove a schedule and stop its timer. */
@@ -183,6 +207,7 @@ export class SchedulerEngine {
    *
    * Respects `max_runs` — the schedule is disabled after the limit is
    * reached, just like a timer-triggered run.
+   * Respects `end_at` the same way: a trigger after end_at does not run.
    *
    * Useful for testing and manual "run now" actions.
    */
@@ -193,7 +218,7 @@ export class SchedulerEngine {
     }
     const run = await this.onTick(id);
     if (!run) {
-      throw new Error(`Schedule "${id}" did not execute (disabled or max_runs reached).`);
+      throw new Error(`Schedule "${id}" did not execute (disabled or max_runs reached, or end_at passed).`);
     }
     return run;
   }
@@ -236,24 +261,23 @@ export class SchedulerEngine {
       stopFn = () => undefined;
     }
 
-    this.active.set(id, { record, agent, stop: stopFn });
+    const stop = withEndTimer(config, stopFn, () => {
+      void this.onTick(id);
+    });
+    this.active.set(id, { record, agent, stop });
   }
 
   private async onTick(id: string): Promise<ScheduledRun | undefined> {
     const entry = this.active.get(id);
     if (!entry) return undefined;
 
-    // Re-check enabled and max_runs from store
+    // Re-check enabled, end_at and max_runs from store
     const fresh = await this.store.get(id);
     if (!fresh || !fresh.enabled) return undefined;
 
-    if (fresh.config.max_runs !== undefined && fresh.run_count >= fresh.config.max_runs) {
-      await this.store.setEnabled(id, false);
-      entry.stop();
-      logger.info(
-        { schedule: id, run_count: fresh.run_count, max_runs: fresh.config.max_runs },
-        "Schedule disabled — max_runs reached",
-      );
+    const reason = stopReason(fresh, Date.now());
+    if (reason) {
+      await this.finish(id, entry, reason);
       return undefined;
     }
 
@@ -261,20 +285,17 @@ export class SchedulerEngine {
 
     // Check max_runs again after this run
     const updated = await this.store.get(id);
-    if (
-      updated &&
-      updated.config.max_runs !== undefined &&
-      updated.run_count >= updated.config.max_runs
-    ) {
-      await this.store.setEnabled(id, false);
-      entry.stop();
-      logger.info(
-        { schedule: id, run_count: updated.run_count, max_runs: updated.config.max_runs },
-        "Schedule disabled — max_runs reached",
-      );
-    }
+    const after = updated ? maxRunsReason(updated) : undefined;
+    if (after) await this.finish(id, entry, after);
 
     return run;
+  }
+
+  /** Disable a schedule in the store, stop its timers and log why. */
+  private async finish(id: string, entry: ActiveSchedule, reason: StopReason): Promise<void> {
+    await this.store.setEnabled(id, false);
+    entry.stop();
+    logger.info({ schedule: id, ...reason.fields }, reason.message);
   }
 
   private async executeRun(

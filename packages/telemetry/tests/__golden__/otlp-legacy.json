@@ -1,0 +1,321 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "tutti"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "@tuttiai/telemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "0.1.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "@tuttiai/telemetry",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "0f8fad5bd9cb469fa16570867728950e",
+              "spanId": "7c9e6679742540de",
+              "name": "agent.run",
+              "kind": 1,
+              "startTimeUnixNano": "1793527200000000000",
+              "endTimeUnixNano": "1793527202500000000",
+              "attributes": [
+                {
+                  "key": "agent_id",
+                  "value": {
+                    "stringValue": "assistant"
+                  }
+                },
+                {
+                  "key": "session_id",
+                  "value": {
+                    "stringValue": "sess-1"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "tutti.kind",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 1
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            },
+            {
+              "traceId": "0f8fad5bd9cb469fa16570867728950e",
+              "spanId": "1a2b3c4d5e6f4a1b",
+              "parentSpanId": "7c9e6679742540de",
+              "name": "llm.completion",
+              "kind": 1,
+              "startTimeUnixNano": "1793527200100000000",
+              "endTimeUnixNano": "1793527201335000000",
+              "attributes": [
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "claude-sonnet-4-5"
+                  }
+                },
+                {
+                  "key": "prompt_tokens",
+                  "value": {
+                    "intValue": 1200
+                  }
+                },
+                {
+                  "key": "completion_tokens",
+                  "value": {
+                    "intValue": 340
+                  }
+                },
+                {
+                  "key": "total_tokens",
+                  "value": {
+                    "intValue": 1540
+                  }
+                },
+                {
+                  "key": "cache_read_tokens",
+                  "value": {
+                    "intValue": 800
+                  }
+                },
+                {
+                  "key": "cache_creation_tokens",
+                  "value": {
+                    "intValue": 100
+                  }
+                },
+                {
+                  "key": "cost_usd",
+                  "value": {
+                    "doubleValue": 0.0123
+                  }
+                },
+                {
+                  "key": "router_tier",
+                  "value": {
+                    "stringValue": "medium"
+                  }
+                },
+                {
+                  "key": "auto_routed",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "tutti.kind",
+                  "value": {
+                    "stringValue": "llm"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 1
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            },
+            {
+              "traceId": "0f8fad5bd9cb469fa16570867728950e",
+              "spanId": "2b3c4d5e6f7a4b2c",
+              "parentSpanId": "7c9e6679742540de",
+              "name": "tool.call",
+              "kind": 1,
+              "startTimeUnixNano": "1793527201400000000",
+              "endTimeUnixNano": "1793527201412000000",
+              "attributes": [
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "read_file"
+                  }
+                },
+                {
+                  "key": "tool_input",
+                  "value": {
+                    "stringValue": "{\"path\":\"/tmp/a.txt\",\"lines\":[1,2]}"
+                  }
+                },
+                {
+                  "key": "tool_output",
+                  "value": {
+                    "stringValue": "file body"
+                  }
+                },
+                {
+                  "key": "tutti.kind",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 1
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            },
+            {
+              "traceId": "0f8fad5bd9cb469fa16570867728950e",
+              "spanId": "3c4d5e6f7a8b4c3d",
+              "parentSpanId": "7c9e6679742540de",
+              "name": "guardrail",
+              "kind": 1,
+              "startTimeUnixNano": "1793527201500000000",
+              "endTimeUnixNano": "1793527201503000000",
+              "attributes": [
+                {
+                  "key": "guardrail_name",
+                  "value": {
+                    "stringValue": "pii"
+                  }
+                },
+                {
+                  "key": "guardrail_action",
+                  "value": {
+                    "stringValue": "redact"
+                  }
+                },
+                {
+                  "key": "tutti.kind",
+                  "value": {
+                    "stringValue": "guardrail"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 1
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            },
+            {
+              "traceId": "0f8fad5bd9cb469fa16570867728950e",
+              "spanId": "4d5e6f7a8b9c4d4e",
+              "parentSpanId": "7c9e6679742540de",
+              "name": "checkpoint",
+              "kind": 1,
+              "startTimeUnixNano": "1793527202000000000",
+              "endTimeUnixNano": "1793527202007000000",
+              "attributes": [
+                {
+                  "key": "session_id",
+                  "value": {
+                    "stringValue": "sess-1"
+                  }
+                },
+                {
+                  "key": "tutti.kind",
+                  "value": {
+                    "stringValue": "checkpoint"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 1
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            },
+            {
+              "traceId": "0f8fad5bd9cb469fa16570867728950e",
+              "spanId": "5e6f7a8b9c0d4e5f",
+              "parentSpanId": "9b2f1c4e3d5a4e6f",
+              "name": "tool.call",
+              "kind": 1,
+              "startTimeUnixNano": "1793527203000000000",
+              "endTimeUnixNano": "1793527203040000000",
+              "attributes": [
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "write_file"
+                  }
+                },
+                {
+                  "key": "tool_input",
+                  "value": {
+                    "stringValue": "{\"path\":\"x\"}"
+                  }
+                },
+                {
+                  "key": "tutti.kind",
+                  "value": {
+                    "stringValue": "tool"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 2,
+                "message": "boom"
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
