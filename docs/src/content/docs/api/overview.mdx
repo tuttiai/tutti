@@ -102,6 +102,25 @@ The runtime package. Main exports:
 | `initTelemetry(config)` | Wire `TuttiTracer` to an OTLP exporter using `score.telemetry` |
 | `shutdownTelemetry()` | Flush pending spans and close the exporter cleanly |
 
+### GenAI semantic conventions (opt-in)
+
+`OTLPExporter` from `@tuttiai/telemetry` takes an optional `semconv` option. Set `semconv: "genai"` in its options to send agent, LLM and tool spans with the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/), so backends with a GenAI view can read them without a custom mapping. The default, `"legacy"`, sends exactly the names and attributes earlier versions sent. Any other value makes the constructor throw.
+
+| Span kind | Default name | Name with `semconv: "genai"` | GenAI attributes |
+| --------- | ------------ | ---------------------------- | ---------------- |
+| `agent` | `agent.run` | `invoke_agent {agent_id}` | `gen_ai.operation.name=invoke_agent`, `gen_ai.agent.name`, `gen_ai.conversation.id`, `gen_ai.request.model` |
+| `llm` | `llm.completion` | `chat {model}` | `gen_ai.operation.name=chat`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` |
+| `tool` | `tool.call` | `execute_tool {tool_name}` | `gen_ai.operation.name=execute_tool`, `gen_ai.tool.name` |
+| `guardrail`, `checkpoint` | unchanged | unchanged | none |
+
+- **Replaced attributes.** The `gen_ai.*` keys replace `agent_id`, `model`, `prompt_tokens`, `completion_tokens`, `cache_read_tokens`, `cache_creation_tokens` and `tool_name`. Attributes with no GenAI equivalent stay: `session_id`, `total_tokens`, `cost_usd`, `router_*` and `tutti.kind`.
+- **No content.** No prompt, completion or tool content is ever recorded. `tool_input` and `tool_output` are left out in this mode.
+- **Missing values.** A missing or blank agent, model or tool name gives the bare operation as the span name (`invoke_agent`, `chat`, `execute_tool`) and leaves its attribute out. A reported token count of `0` is kept; an unreported count is left out.
+- **Errors.** A failed span keeps status ERROR and gets `error.type=_OTHER`. The error message is not added as an attribute.
+- **Not emitted.** Tutti spans do not carry the provider or the model that answered, so `gen_ai.provider.name` and `gen_ai.response.model` are not sent. Graph runs have no span yet, so there is no `invoke_workflow` span.
+- **Scope.** Only spans sent through `OTLPExporter` change. In-process span names, `getRunCost` and `tutti-ai traces` are unaffected. The OpenTelemetry spans that `initTelemetry` sends (`llm.call` and others) keep their current names.
+- **Experimental upstream.** The GenAI conventions are still in Development status upstream. The keys were checked against semantic conventions 1.43.0 and are exported as `GEN_AI_ATTRIBUTES` and `GEN_AI_OPERATIONS`, with `genAiSpanNaming`, `legacySpanNaming`, `SpanNamingMode`, `SpanNamingStrategy` and `ExportedSpanNaming`.
+
 ### Providers
 
 | Export | Description |
