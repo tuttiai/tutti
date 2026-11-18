@@ -578,12 +578,6 @@
     },
     {
       "file": "docs/src/content/docs/voices/discord.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses DiscordVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/discord.mdx",
       "heading": "inbound-inbox",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
@@ -593,24 +587,6 @@
       "heading": "inbound-inbox",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/github.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses GitHubVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/knowledge.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses KnowledgeVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/mcp.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses McpVoice without importing or declaring it (TS2304)"
     },
     {
       "file": "docs/src/content/docs/voices/mcp.mdx",
@@ -625,42 +601,6 @@
       "reason": "partial snippet: uses NotionVoice without importing or declaring it (TS2304)"
     },
     {
-      "file": "docs/src/content/docs/voices/overview.mdx",
-      "heading": "using-a-voice",
-      "index": 1,
-      "reason": "partial snippet: uses defineScore without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/overview.mdx",
-      "heading": "the-voice-interface",
-      "index": 1,
-      "reason": "partial snippet: uses Tool without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/playwright.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses PlaywrightVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/playwright.mdx",
-      "heading": "teardown",
-      "index": 1,
-      "reason": "partial snippet: uses PlaywrightVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/postgres.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses PostgresVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/rag.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses RagVoice without importing or declaring it (TS2304)"
-    },
-    {
       "file": "docs/src/content/docs/voices/rag.mdx",
       "heading": "storage-providers",
       "index": 1,
@@ -673,46 +613,10 @@
       "reason": "partial snippet: uses TUTTI_API_KEY without importing or declaring it (TS2304)"
     },
     {
-      "file": "docs/src/content/docs/voices/sandbox.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses SandboxVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/sender.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses SenderVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/slack.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses SlackVoice without importing or declaring it (TS2304)"
-    },
-    {
       "file": "docs/src/content/docs/voices/slack.mdx",
       "heading": "inbound-inbox",
       "index": 1,
       "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/stripe.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses StripeVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/twitter.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses TwitterVoice without importing or declaring it (TS2304)"
-    },
-    {
-      "file": "docs/src/content/docs/voices/web.mdx",
-      "heading": "configuration",
-      "index": 1,
-      "reason": "partial snippet: uses WebVoice without importing or declaring it (TS2304)"
     }
   ]
 }

@@ -64,6 +64,8 @@ npx tutti-ai search browser   # search by name, description, or tags
 ## Using a voice
 
 ```ts
+import { AnthropicProvider, defineScore } from "@tuttiai/core";
+
 import { FilesystemVoice } from "@tuttiai/filesystem";
 
 export default defineScore({
@@ -84,6 +86,8 @@ export default defineScore({
 Every voice implements:
 
 ```ts
+import type { Permission, Tool, VoiceContext } from "@tuttiai/types";
+
 interface Voice {
   name: string;
   description?: string;

@@ -31,6 +31,8 @@ None.
 ## Configuration
 
 ```ts
+import { PlaywrightVoice } from "@tuttiai/playwright";
+
 // Defaults: headless, no slowdown, 10s timeout
 new PlaywrightVoice()
 
@@ -97,6 +99,8 @@ new PlaywrightVoice({
 The Playwright voice has a `teardown()` method that closes the browser. Call it when you're done:
 
 ```ts
+import { PlaywrightVoice } from "@tuttiai/playwright";
+
 const voice = new PlaywrightVoice();
 // ... use it ...
 await voice.teardown();
