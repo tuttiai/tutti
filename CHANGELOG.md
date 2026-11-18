@@ -55,6 +55,7 @@
 
 **Tests show how a durable run behaves when its host is paused rather than restarted** (tests only, no behaviour change). `packages/core/tests/interrupt/host-pause-approval.test.ts`, `host-pause-checkpoint.test.ts` and `host-pause-race.test.ts` freeze one runtime with its memory intact, move the fake clock past every timeout and wake it, for a run waiting on an approval and for a `durable` run that is not. Core has no sweeper, lease or heartbeat, so "not swept as dead" means the clock alone ends nothing: the approval stays pending, the checkpoint stays and the run still waits. The tests also cover a tool call cut off by the pause, a denial, a tool that throws, an unreadable checkpoint and a second runtime on the same stores. They expose three defects, recorded as `it.fails` and not fixed here: a pause longer than the in-memory session idle TTL fails the run after its tool ran ([#131](https://github.com/tuttiai/tutti/issues/131)), an approval resolved on a second runtime and then on the woken host runs the tool twice ([#132](https://github.com/tuttiai/tutti/issues/132)), and a durable run resumed by a second runtime during the pause completes twice ([#133](https://github.com/tuttiai/tutti/issues/133)).
 
+- core: the two host-pause tests for #131 now run as ordinary tests, so @tuttiai/core tests pass on main again (#149).
 - server: HTTP and SSE tests no longer time out on a loaded host (#73).
 - core: router and process tests use fake timers or deterministic waits instead of wall-clock time (#69).
 - cli: ReactiveScore watcher test no longer depends on real timing (#58).
@@ -89,6 +90,7 @@
 
 **Three docs links no longer point to guides that do not exist** (docs). The CLI reference's `serve` section and the Security guide's Guardrails section linked to `/guides/serve` and `/guides/guardrails`, and the `schedule` row in Core Concepts to `/guides/scheduling`. None of these pages exists, so the docs site returned 404 and the website showed plain text. The `schedule` row now links to the `tutti-ai schedule` section of the CLI reference, and the other two sentences are removed. Docs only, no package changes.
 
+**The CLI reference's `tutti-ai eval suite` example uses a `.json` suite file, and its link to the missing eval guide is removed** (docs). The example ran `tutti-ai eval suite ./my-suite.ts`, but the command reads the suite file with `JSON.parse`, so a `.ts` file fails with "Failed to parse suite file". It now uses `./my-suite.json`, and the sentence linking to `/guides/eval`, a page that does not exist, is replaced by one saying the suite file must be JSON. Docs only, no package changes.
 **The RAG voice docs page no longer lists Cohere as an embedding provider** (docs). `voices/rag.mdx` named "Voyage, Cohere" as other embedding providers, but `@tuttiai/rag` has no Cohere provider; its configuration accepts only `openai`, `anthropic` (Voyage AI) and `local`. Docs only, no change to any package.
 
 ### Changed

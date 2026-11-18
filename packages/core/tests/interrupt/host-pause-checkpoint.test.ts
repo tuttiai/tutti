@@ -71,8 +71,7 @@ describe("a checkpointed run, not waiting on an approval, when its host is pause
     expect(events.get("agent:end")).toBe(1);
   });
 
-  // TODO(#131): change back to it() once a live run's session survives the idle TTL.
-  it.fails("finishes exactly once after an 8-day pause (exposes #131: the session is evicted and the run fails at the end)", async () => {
+  it("finishes exactly once after an 8-day pause (regression test for #131)", async () => {
     const stores = memoryStores();
     const { c, model, run } = await frozenAfterCheckpoint(stores);
 
