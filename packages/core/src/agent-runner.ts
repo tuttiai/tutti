@@ -45,6 +45,7 @@ import {
   resolveSemanticMemory,
 } from "./runner/memory-run.js";
 import { writeBack } from "./runner/session-write-back.js";
+import { refuseIfMovedOn, sessionMark } from "./runner/session-moved-on.js";
 import type { TrajectoryObserver } from "./skills/observer.js";
 import { hashToolInput } from "./skills/observer.js";
 import type { SkillExecutor } from "./skills/executor.js";
@@ -593,6 +594,7 @@ export class AgentRunner {
         `Omit session_id to start a new conversation.`,
       );
     }
+    const startMark = sessionMark(session);
 
     return Tracing.agentRun(agent.name, session.id, agent.model, async () => {
       const agentHooks = agent.hooks;
@@ -1304,7 +1306,9 @@ export class AgentRunner {
         }
       }
 
-      // Persist updated messages
+      // Persist updated messages, unless another runtime finished this durable
+      // run's turn while it was held (#133).
+      if (durableEnabled) await refuseIfMovedOn(this.sessions, session.id, startMark);
       writeBack(this.sessions, session, messages);
       await this.clearPause(session.id, durableEnabled);
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatResponse, TuttiEventType } from "@tuttiai/types";
+import type { ChatMessage, ChatResponse, TuttiEventType } from "@tuttiai/types";
 
 import type { TuttiRuntime } from "../../src/runtime.js";
 import { createMockProvider, textResponse } from "../helpers/mock-provider.js";
@@ -15,6 +15,13 @@ interface Checkpointed {
 }
 
 const durableWorker = (c: Counts): ReturnType<typeof workerAgent> => workerAgent(countingVoice(c), { durable: true });
+
+/** The text of each assistant message in a session's history, in order. */
+function assistantTexts(messages: ChatMessage[]): string[] {
+  return messages
+    .filter((m) => m.role === "assistant")
+    .map((m) => (typeof m.content === "string" ? m.content : m.content.map((b) => (b.type === "text" ? b.text : "")).join("")));
+}
 
 /**
  * A durable run (no approval) that has run `safe_tool`, saved its checkpoint,
@@ -107,19 +114,25 @@ describe("a checkpointed run, not waiting on an approval, when its host is pause
     expect(c.safe_tool).toBe(1);
   });
 
-  // TODO(#133): change back to it() once only one runtime can finish a durable run's turn.
-  it.fails("finishes exactly once across both hosts when a peer runs the session during the freeze (exposes #133)", async () => {
+  it("finishes exactly once across both hosts when a peer runs the session during the freeze (regression test for #133)", async () => {
     const stores = memoryStores();
     const { c, model, events, run, session_id } = await frozenAfterCheckpoint(stores);
-    const peer = bootAgent(stores, createMockProvider([textResponse("done")]), durableWorker(c));
+    const peerModel = createMockProvider([textResponse("done")]);
+    const peer = bootAgent(stores, peerModel, durableWorker(c));
     const peerEvents = countEvents(peer, ["agent:end"]);
 
-    await peer.run("worker", "", session_id);
+    await expect(peer.run("worker", "", session_id)).resolves.toMatchObject({ output: "done" });
     await wake(2 * HOUR_MS);
     model.open();
-    await run.catch(() => undefined);
 
-    expect(c.safe_tool).toBe(1);
-    expect((events.get("agent:end") ?? 0) + (peerEvents.get("agent:end") ?? 0)).toBe(1);
+    await expect(run).rejects.toMatchObject({ code: "RUN_SUPERSEDED" });
+    expect(c).toEqual({ safe_tool: 1, danger_tool: 0, slow_tool: 0 });
+    expect(peerEvents.get("agent:end")).toBe(1);
+    expect(events.get("agent:end")).toBe(0);
+    expect(peerModel.chat).toHaveBeenCalledTimes(1);
+    expect(model.provider.chat).toHaveBeenCalledTimes(2);
+    const replies = assistantTexts(stores.sessions.get(session_id)?.messages ?? []);
+    expect(replies.filter((text) => text === "done")).toHaveLength(1);
+    expect(replies.at(-1)).toBe("done");
   });
 });
