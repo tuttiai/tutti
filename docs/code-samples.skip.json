@@ -580,37 +580,37 @@
       "file": "docs/src/content/docs/voices/discord.mdx",
       "heading": "inbound-inbox",
       "index": 1,
-      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+      "reason": "partial snippet: the inbox property of a score on its own, not a whole module (TS1005)"
     },
     {
       "file": "docs/src/content/docs/voices/email.mdx",
       "heading": "inbound-inbox",
       "index": 1,
-      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+      "reason": "partial snippet: the inbox property of a score on its own, not a whole module (TS1005)"
     },
     {
       "file": "docs/src/content/docs/voices/mcp.mdx",
       "heading": "bridging-multiple-mcp-servers",
       "index": 1,
-      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1109)"
+      "reason": "partial snippet: an agent's voices property on its own, ending in a trailing comma (TS1109)"
     },
     {
       "file": "docs/src/content/docs/voices/rag.mdx",
       "heading": "storage-providers",
       "index": 1,
-      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+      "reason": "partial snippet: two alternative values of RagVoice's storage property, shown side by side (TS1005)"
     },
     {
       "file": "docs/src/content/docs/voices/realtime.mdx",
       "heading": "connecting-from-a-browser",
       "index": 1,
-      "reason": "partial snippet: uses TUTTI_API_KEY without importing or declaring it (TS2304)"
+      "reason": "placeholder: TUTTI_API_KEY stands for the server API key the browser page supplies (TS2304)"
     },
     {
       "file": "docs/src/content/docs/voices/slack.mdx",
       "heading": "inbound-inbox",
       "index": 1,
-      "reason": "partial snippet: a fragment such as an object literal or a statement, not a whole module (TS1005)"
+      "reason": "partial snippet: the inbox property of a score on its own, not a whole module (TS1005)"
     }
   ]
 }
