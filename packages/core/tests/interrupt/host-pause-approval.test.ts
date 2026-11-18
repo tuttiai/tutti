@@ -76,8 +76,7 @@ describe("a run waiting on an approval when its host is paused", () => {
     expect(provider.chat).toHaveBeenCalledTimes(3);
   });
 
-  // TODO(#131): change back to it() once a live run's session survives the idle TTL.
-  it.fails("resumes exactly once after an 8-day pause (exposes #131: the session is evicted and the run fails after its tool ran)", async () => {
+  it("resumes exactly once after an 8-day pause (regression test for #131)", async () => {
     const stores = memoryStores();
     const c = counts();
     const { host, run, approval } = await pauseOnApproval(stores, [toolCalls("danger_tool")], countingVoice(c));
