@@ -17,11 +17,12 @@ npm install @tuttiai/knowledge
 ## Quickstart
 
 ```ts
+import { SecretsManager } from "@tuttiai/core";
 import { KnowledgeVoice } from "@tuttiai/knowledge";
 
 const voice = new KnowledgeVoice({
   url: "https://kb.example.com/agents/support-lead",
-  token: process.env.KNOWLEDGE_TOKEN!,
+  token: SecretsManager.require("KNOWLEDGE_TOKEN"),
 });
 ```
 
