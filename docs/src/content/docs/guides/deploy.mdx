@@ -145,11 +145,11 @@ After a restart the original `/run/stream` client is gone, so the resumed run's 
 Once your service is running, configure a `RunCostStore` so the cost-analysis CLI can read live data:
 
 ```ts
-import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+import { TuttiRuntime, PostgresRunCostStore, SecretsManager } from "@tuttiai/core";
 
 const runtime = new TuttiRuntime(score, {
   runCostStore: new PostgresRunCostStore({
-    connection_string: process.env.DATABASE_URL!,
+    connection_string: SecretsManager.require("DATABASE_URL"),
   }),
 });
 ```
