@@ -5,7 +5,9 @@
  * reporter (mochawesome, junit-report, jest-junit) consume this
  * format. Each golden case becomes a `<testcase>`; failing cases
  * carry a `<failure>` body with the first-failing scorer's detail,
- * the unified diff, and the agent output.
+ * the unified diff, and the agent output. A result that
+ * `--fail-on-skip` failed is a `ScorerSkipped` failure naming the case
+ * and the scorer.
  */
 
 import type { GoldenCase, GoldenRun, ScoreResult } from "@tuttiai/core";
@@ -27,6 +29,24 @@ function escapeXmlAttr(s: string): string {
 
 function firstFailure(scores: Record<string, ScoreResult>): ScoreResult | undefined {
   return Object.values(scores).find((s) => !s.passed);
+}
+
+/** `<failure>` message and type; a skip names the case and the scorer. */
+function describeFailure(
+  failure: ScoreResult | undefined,
+  caseName: string,
+): { message: string; type: string } {
+  if (failure?.skipped === true) {
+    const detail = failure.detail ? ": " + failure.detail : "";
+    return {
+      message: 'case "' + caseName + '" skipped by scorer "' + failure.scorer + '"' + detail,
+      type: "ScorerSkipped",
+    };
+  }
+  const message = failure
+    ? failure.scorer + (failure.detail ? ": " + failure.detail : " failed")
+    : "case failed";
+  return { message, type: "ScorerFailed" };
 }
 
 /**
@@ -81,9 +101,7 @@ function renderTestCase({ goldenCase, run, durationMs }: JunitRow): string {
   }
 
   const failure = firstFailure(run.scores);
-  const message = failure
-    ? failure.scorer + (failure.detail ? ": " + failure.detail : " failed")
-    : "case failed";
+  const { message, type } = describeFailure(failure, goldenCase.name);
 
   const parts: string[] = [];
   if (failure?.detail) parts.push(failure.detail);
@@ -97,7 +115,9 @@ function renderTestCase({ goldenCase, run, durationMs }: JunitRow): string {
     ">\n" +
     '      <failure message="' +
     escapeXmlAttr(message) +
-    '" type="ScorerFailed"><![CDATA[' +
+    '" type="' +
+    type +
+    '"><![CDATA[' +
     bodyRaw +
     "]]></failure>\n" +
     "    </testcase>\n"

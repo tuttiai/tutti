@@ -262,12 +262,14 @@ evalCmd
   .option("--tag <tag>", "Run only cases carrying this tag")
   .option("--ci", "Write JUnit XML + exit 1 on failure + drop colors")
   .option("-s, --score <path>", "Path to score file (default: ./tutti.score.ts)")
-  .action(async (opts: { case?: string; tag?: string; ci?: boolean; score?: string }) => {
+  .option("--fail-on-skip", "Fail the run (exit 1) when any scorer skipped, e.g. similarity without OPENAI_API_KEY")
+  .action(async (opts: { case?: string; tag?: string; ci?: boolean; score?: string; failOnSkip?: boolean }) => {
     const resolved: EvalRunOptions = {
       ...(opts.case !== undefined ? { case: opts.case } : {}),
       ...(opts.tag !== undefined ? { tag: opts.tag } : {}),
       ...(opts.ci !== undefined ? { ci: opts.ci } : {}),
       ...(opts.score !== undefined ? { score: opts.score } : {}),
+      ...(opts.failOnSkip !== undefined ? { failOnSkip: opts.failOnSkip } : {}),
     };
     await evalRunCommand(resolved);
   });

@@ -249,6 +249,7 @@ describe("runEvalRun", () => {
       passed: 0,
       failed: 0,
       total: 0,
+      skipped: 0,
       totalTokens: 0,
       totalCostUsd: 0,
     });
