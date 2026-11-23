@@ -64,3 +64,44 @@ export const SearchResponseSchema = z.object({
 
 /** `POST <url>/search`. */
 export type SearchResponse = z.infer<typeof SearchResponseSchema>;
+
+/**
+ * `POST <url>/graph/search`: the accepted entities of the agent's workspace graph that best match
+ * a query, each with the accepted facts about it. Optional for a service: one that has no graph
+ * answers 404, and the tool says so.
+ */
+export const GraphSearchRequestSchema = z.object({
+  query: z.string().min(1).max(2_000),
+  limit: z.number().int().min(1).max(20),
+});
+
+/** `POST <url>/graph/search`. */
+export type GraphSearchRequest = z.infer<typeof GraphSearchRequestSchema>;
+
+/** One accepted fact about an entity. `object` names the other entity when the fact links two. */
+export const GraphFactSchema = z.object({
+  id: z.string().min(1),
+  text: z.string(),
+  object: z.string().nullable(),
+  confidence: z.number(),
+  recorded_at: z.string(),
+});
+
+/** One accepted entity the graph search found, with its facts. */
+export const GraphHitSchema = z.object({
+  id: z.string().min(1),
+  kind: z.string().min(1),
+  name: z.string(),
+  summary: z.string().nullable(),
+  score: z.number(),
+  facts: z.array(GraphFactSchema),
+});
+
+/** `POST <url>/graph/search`. `mode` says whether meaning was searched, or words only. */
+export const GraphSearchResponseSchema = z.object({
+  entities: z.array(GraphHitSchema),
+  mode: z.enum(["hybrid", "keyword"]),
+});
+
+/** `POST <url>/graph/search`. */
+export type GraphSearchResponse = z.infer<typeof GraphSearchResponseSchema>;

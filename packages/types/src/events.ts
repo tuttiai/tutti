@@ -43,6 +43,33 @@ export type TuttiEvent =
       /** One redacted chunk of the specialist's output. Never empty. */
       text: string;
     }
+  /**
+   * Progress a running tool reported through `ToolContext.report_progress`,
+   * for example the status of an MCP task. Every update of a call arrives
+   * after its `tool:start` and before its `tool:end` or `tool:error`, and none
+   * after the call times out or the run is aborted. `message` is redacted by
+   * `SecretsManager` and capped at 500 characters.
+   */
+  | {
+      type: "tool:progress";
+      agent_name: string;
+      session_id: string;
+      tool_name: string;
+      /** Id of the tool_use block this call answers. */
+      tool_call_id: string;
+      /** Id of the remote task the tool is waiting on, when it has one. */
+      task_id?: string;
+      /** Status of that task as the remote side reports it. */
+      status?: string;
+      /** Where the update comes from, usually the voice name. */
+      source?: string;
+      /** Work done so far, in the unit `total` uses. */
+      progress?: number;
+      /** Total amount of work, when known. */
+      total?: number;
+      /** Redacted status line, at most 500 characters. */
+      message?: string;
+    }
   | { type: "parallel:start"; agents: string[] }
   | { type: "parallel:complete"; results: string[] }
   | { type: "cache:hit"; agent_name: string; tool: string }

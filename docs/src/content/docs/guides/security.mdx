@@ -135,11 +135,11 @@ Two enforcement modes:
 Daily/monthly caps query a `RunCostStore` at run start and add this run's accumulating cost to the snapshot. Use `PostgresRunCostStore` in any deployment with more than one worker so every process shares the same total: `InMemoryRunCostStore` is for dev and tests.
 
 ```ts
-import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+import { TuttiRuntime, PostgresRunCostStore, SecretsManager } from "@tuttiai/core";
 
 const runtime = new TuttiRuntime(score, {
   runCostStore: new PostgresRunCostStore({
-    connection_string: process.env.DATABASE_URL!,
+    connection_string: SecretsManager.require("DATABASE_URL"),
   }),
 });
 ```
@@ -218,7 +218,7 @@ Each factory returns a `GuardrailHook`. Three built-in factories ship with `@tut
 | `piiDetector(opts)` | Detect / redact emails, phone numbers, SSNs, credit cards | `{ on_match, patterns? }` |
 | `topicBlocker(opts)` | Refuse to answer prompts about listed topics | `{ topics: string[], on_match }` |
 
-You can also write your own by implementing the `GuardrailHook` contract: any `(context) => Promise<GuardrailResult>` function with `action: "allow" | "block" | "rewrite"`. See [Guardrails](/guides/guardrails) for the full API.
+You can also write your own by implementing the `GuardrailHook` contract: any `(context) => Promise<GuardrailResult>` function with `action: "allow" | "block" | "rewrite"`.
 
 ## Approval gates (HITL)
 

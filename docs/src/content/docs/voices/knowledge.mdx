@@ -28,7 +28,7 @@ permissions: ["network"]
 ```ts
 new KnowledgeVoice({
   url: "https://kb.example.com/agents/support-lead", // the service's address for this agent
-  token: process.env.KNOWLEDGE_TOKEN!,              // bearer token identifying the agent
+  token: SecretsManager.require("KNOWLEDGE_TOKEN"),  // bearer token identifying the agent
   default_top_k: 5,                                  // optional, 1 to 20
   timeout_ms: 15_000,                                // optional
 });
@@ -43,6 +43,7 @@ Never derive it from agent or user input.
 |---|---|
 | `list_knowledge_bases` | The bases the agent may search, with what each holds |
 | `search_knowledge_bases` | Passages relevant to a query, each naming its base and source |
+| `search_knowledge_graph` | Accepted entities of the workspace graph matching a query, each with its accepted facts |
 
 ## Service protocol
 
@@ -50,7 +51,9 @@ Never derive it from agent or user input.
 GET  <url>/bases   →  { bases: [{ handle, name, description, sources, chunks }] }
 POST <url>/search  ←  { query, top_k, bases? }
                    →  { results: [{ base, source, title, text, score, location }], mode, searched }
+POST <url>/graph/search  ←  { query, limit }
+                         →  { entities: [{ id, kind, name, summary, score, facts: [{ id, text, object, confidence, recorded_at }] }], mode }
 ```
 
-Both calls carry `Authorization: Bearer <token>`. The service decides which bases the agent may
+All calls carry `Authorization: Bearer <token>`. The service decides which bases the agent may
 read; one it withholds is absent from both answers.

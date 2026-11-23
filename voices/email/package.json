@@ -20,8 +20,8 @@
   },
   "dependencies": {
     "imapflow": "1.7.8",
-    "mailparser": "3.9.28",
-    "nodemailer": "10.0.10",
+    "mailparser": "3.14.5",
+    "nodemailer": "10.6.0",
     "zod": "3.25.76"
   },
   "peerDependencies": {

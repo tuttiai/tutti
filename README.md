@@ -85,10 +85,10 @@ Four pieces shipped in v0.24 that turn Tutti from "great in dev" to "ready in pr
 - **Hard cost budgets** — per-run, daily, and monthly USD ceilings throw `BudgetExceededError`. `model: 'auto'` per-agent sentinel for smart routing. Postgres-backed `RunCostStore` for multi-process deployments. `tutti-ai analyze costs` / `report costs` / `budgets` for visibility.
 
 ```ts
-import { TuttiRuntime, PostgresRunCostStore } from "@tuttiai/core";
+import { TuttiRuntime, PostgresRunCostStore, SecretsManager } from "@tuttiai/core";
 
 const runtime = new TuttiRuntime(score, {
-  runCostStore: new PostgresRunCostStore({ connection_string: process.env.DATABASE_URL! }),
+  runCostStore: new PostgresRunCostStore({ connection_string: SecretsManager.require("DATABASE_URL") }),
 });
 ```
 
@@ -263,6 +263,7 @@ const score = defineScore({
         cron: "0 9 * * *",       // 9 AM daily
         input: "Generate the daily status report",
         max_runs: 30,             // auto-disable after 30 runs
+        end_at: "2026-12-31T18:00:00Z", // optional: stop at this time, whichever comes first
       },
     },
   },
