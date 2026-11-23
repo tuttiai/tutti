@@ -4,6 +4,8 @@
 
 ### Security
 
+**The root lockfile now resolves fast-uri to 3.1.9, clearing GHSA-w74x-v6f9-j3xg, GHSA-xhq7-xmqj-769h, GHSA-wjr9-j795-jxcr and GHSA-333x-w4r6-6crp** (fast-uri, reached through ajv, @fastify/ajv-compiler, fast-json-stringify and @modelcontextprotocol/sdk). Repository builds only; no change for installed packages. No API changes.
+
 **`install_package` rejects package names that npm or pip would read as an option or as a path outside the sandbox** (`@tuttiai/sandbox`). The name goes unquoted into `npm install --prefix <root> <name>` or `pip install --target <root> <name>`, and the character check let through names such as `-g`, `/etc/x` and `../../pkg`, so a model could pass an option or install from a folder outside the sandbox. Names that start with `-` or `/`, or contain `..`, are now refused with `is_error: true` and the install hint before anything runs, even when they are on `allowed_packages`. Local installs such as `/opt/pkg` or `../pkg`, which worked before, are now refused. Registry names such as `lodash`, `@scope/pkg` and `pkg@1.2.3` are unchanged. No API changes.
 **fastify moves to 5.12.8, clearing GHSA-389g-gv7q-r4x8** (`@tuttiai/server`, `@tuttiai/whatsapp`). Both packages pinned fastify exactly at 5.12.5, which `npm audit` reports as moderate (GHSA-389g-gv7q-r4x8, affected 5.12.2 to 5.12.5). The exact pin moves to 5.12.8 in both; in the lockfile only fastify and its own dependencies move (find-my-way 9.10.0, safe-regex2 5.1.2, ret 0.5.1, and fastify no longer nests its own fast-uri 4.2.1). No API changes.
 
